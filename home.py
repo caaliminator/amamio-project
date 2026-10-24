@@ -45,6 +45,7 @@ def _counts():
                      + sum(1 for r in db.read("sales_requests")
                            if r.get("status") == "Pending Approval"),
         "awaiting_po": len(pur.requests_awaiting_po()),
+        "expected_pos": len(pur.open_pos_for_receiving()),
         "low_stock": len(services.low_stock_materials()),
         "maintenance_due": len(assets_service.maintenance_due()),
         "assets_out": len(assets_service.assets_out()),
@@ -150,6 +151,9 @@ def waiting_for(user, c):
             items.append({"title": text, "sub": sub,
                           "url": url_for(endpoint, **args)})
 
+    add(can(user, "receiving") and c["expected_pos"],
+        "%d purchase order(s) expected" % c["expected_pos"],
+        "Receive them against their PO when they arrive", "receiving.index")
     add(can(user, "inspection") and c["awaiting"],
         "%d box(es) waiting for inspection" % c["awaiting"],
         "Received at the Receiving Area", "receiving.inspection")

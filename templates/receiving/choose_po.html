@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Receive a delivery{% endblock %}
+{% block content %}
+<div class="focus">
+<a class="back-link" href="{{ url_for('receiving.index') }}">{{ icon('arrow-left', 15) }} Receiving Area</a>
+
+<h1 class="page-title">Which purchase order is this delivery for?</h1>
+<p class="page-sub">Match it with the PO no. on the supplier's delivery receipt. The supplier and the items ordered will be filled in for you.</p>
+
+<div class="queue mb">
+  {% for po in orders %}
+  <a class="queue-item" href="{{ url_for('receiving.new', po=po.id) }}">
+    <span class="code" style="min-width:96px">{{ po.po_no }}</span>
+    <span class="queue-main">
+      <span class="queue-title">{{ po.supplier_name }}</span>
+      <span class="queue-sub">Still to come: {{ po.summary }}{% if po.expected_delivery %} · expected {{ po.expected_delivery }}{% endif %}</span>
+    </span>
+    <span class="queue-go">Receive {{ icon('arrow-right', 14) }}</span>
+  </a>
+  {% endfor %}
+</div>
+
+<a class="queue-item" href="{{ url_for('receiving.new', po='none') }}">
+  <span class="task-icon" style="width:40px;height:40px">{{ icon('receiving', 18) }}</span>
+  <span class="queue-main">
+    <span class="queue-title">No purchase order</span>
+    <span class="queue-sub">Own harvest, a walk-in seller, or a delivery that isn't on any PO</span>
+  </span>
+  <span class="queue-go">Continue {{ icon('arrow-right', 14) }}</span>
+</a>
+</div>
+{% endblock %}

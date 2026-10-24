@@ -26,11 +26,15 @@
   </form>
 </div>
 {% elif po.status == 'Approved' %}
+{% set waiting = lines | selectattr('pending') | list %}
 <div class="next-action">
-  <div class="next-action-text"><b>Next: when the goods arrive</b><span>Receive them at the Receiving Area (or by QR), then mark this PO delivered.</span></div>
-  <form method="post" action="{{ url_for('purchasing.delivered', po_id=po.id) }}">
-    <button class="btn btn-primary" type="submit">Mark delivered</button>
+  <div class="next-action-text"><b>Waiting for the delivery</b><span>The Receiving Team Head receives it against this PO. Once everything ordered passes inspection, the PO is marked delivered by itself. If the supplier sent less and nothing more is coming, close it here.</span></div>
+  {% if not waiting %}
+  <form method="post" action="{{ url_for('purchasing.delivered', po_id=po.id) }}"
+        data-confirm="Close PO {{ po.po_no }} as delivered with what has been received so far?">
+    <button class="btn btn-ghost" type="submit">Close as delivered</button>
   </form>
+  {% endif %}
 </div>
 {% endif %}
 
@@ -39,9 +43,9 @@
   <div class="table-wrap">
     <table class="table" data-no-paginate>
       <thead><tr><th>Item</th><th>Description / specification</th><th class="num">Qty</th>
-        <th class="num">Unit price</th><th class="num">Amount</th><th>Requested delivery</th></tr></thead>
+        <th class="num">Unit price</th><th class="num">Amount</th><th>Requested delivery</th><th>Received</th></tr></thead>
       <tbody>
-        {% for it in po['items'] %}
+        {% for it in lines %}
         <tr>
           <td>{{ it.line_no }}</td>
           <td>{{ it.description }}
@@ -50,15 +54,21 @@
           <td class="num nowrap">{{ it.qty|qty(it.unit) }}</td>
           <td class="num">{{ it.unit_price|peso }}</td><td class="num">{{ it.amount|peso }}</td>
           <td>{{ it.requested_delivery or '—' }}</td>
+          <td class="nowrap">
+            {% if it.received or it.pending %}
+              <span class="{{ 'gold' if it.received >= it.qty else '' }}">{{ it.received|qty }} of {{ it.qty|qty(it.unit) }}</span>
+              {% if it.pending %}<div class="muted small">{{ it.pending|qty }} being inspected</div>{% endif %}
+            {% else %}<span class="muted">—</span>{% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>
       <tfoot>
-        <tr><td colspan="4">Subtotal</td><td class="num">{{ po.subtotal|peso }}</td><td></td></tr>
-        {% if po.discount %}<tr><td colspan="4">Discount</td><td class="num">−{{ po.discount|peso }}</td><td></td></tr>{% endif %}
-        {% if po.freight %}<tr><td colspan="4">Delivery / freight</td><td class="num">{{ po.freight|peso }}</td><td></td></tr>{% endif %}
-        {% if po.tax %}<tr><td colspan="4">VAT / other tax</td><td class="num">{{ po.tax|peso }}</td><td></td></tr>{% endif %}
-        <tr><td colspan="4"><b>Grand total</b></td><td class="num"><b>{{ po.grand_total|peso }}</b></td><td></td></tr>
+        <tr><td colspan="4">Subtotal</td><td class="num">{{ po.subtotal|peso }}</td><td colspan="2"></td></tr>
+        {% if po.discount %}<tr><td colspan="4">Discount</td><td class="num">−{{ po.discount|peso }}</td><td colspan="2"></td></tr>{% endif %}
+        {% if po.freight %}<tr><td colspan="4">Delivery / freight</td><td class="num">{{ po.freight|peso }}</td><td colspan="2"></td></tr>{% endif %}
+        {% if po.tax %}<tr><td colspan="4">VAT / other tax</td><td class="num">{{ po.tax|peso }}</td><td colspan="2"></td></tr>{% endif %}
+        <tr><td colspan="4"><b>Grand total</b></td><td class="num"><b>{{ po.grand_total|peso }}</b></td><td colspan="2"></td></tr>
       </tfoot>
     </table>
   </div>
@@ -87,6 +97,20 @@
     </dl>
   </div>
 </div>
+
+{% if deliveries %}
+<div class="section-label">Deliveries received against this PO</div>
+<div class="queue mb">
+  {% for b in deliveries %}
+  <a class="queue-item" href="{{ url_for('receiving.batch', batch_id=b.id) }}">
+    <span class="code" style="min-width:72px">{{ b.ref_no }}</span>
+    <span class="queue-main"><span class="queue-title">{{ b.received_date }} · {{ b.box_count or 0 }} box(es)</span>
+      <span class="queue-sub">{% if b.delivery_ref %}DR {{ b.delivery_ref }} · {% endif %}{{ b.total_good|qty }} accepted so far</span></span>
+    <span class="badge {{ 'badge-ok' if b.status == 'Completed' else 'badge-warn' }}">{{ 'Awaiting inspection' if b.status == 'Open' else b.status }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
 
 <div class="card mb">
   <div class="card-title">Sign-offs</div>

@@ -453,13 +453,11 @@ def users_by_id():
     return {u["id"]: u for u in db.read("users")}
 
 
-# --- Purchase requests (procurement -> approval -> QR receive) --------------
-def qr_token(request_id, item_id):
-    return "PR-%s-%s" % (request_id, item_id)
-
-
+# --- Purchase requests (request -> approval -> purchase order) --------------
 def parse_qr_token(token):
-    """Return (request_id, item_id) ints, or (None, None) if malformed."""
+    """PR-<request>-<item> labels were printed before goods were received
+    against purchase orders; scanning one still opens its request.
+    Return (request_id, item_id) ints, or (None, None) if malformed."""
     try:
         parts = (token or "").strip().split("-")
         if len(parts) == 3 and parts[0].upper() == "PR":
@@ -534,37 +532,6 @@ def create_production_request(requestor_id, product_id, qty, item_lines,
     return req
 
 
-def create_material_request(requestor_id, category, name, qty, description="",
-                            reason="", needed_by="", urgency="Normal"):
-    req = db.insert("purchase_requests", {
-        "type": "material",
-        "requestor_id": int(requestor_id),
-        "reason": (reason or "").strip(),
-        "needed_by": (needed_by or "").strip(),
-        "urgency": urgency or "Normal",
-        "status": "Pending Approval",
-        "remarks": "",
-        "items": [{
-            "item_id": 1,
-            "name": (name or "").strip(),
-            "category": category,
-            "description": (description or "").strip(),
-            "material_id": None,
-            "requested_qty": _to_float(qty),
-            "approved_qty": None,
-            "received_qty": None,
-            "status": "Pending",
-            "note": "",
-            "qr_token": None,
-        }],
-        "created_at": now_iso(),
-    })
-    notify_admins("New material request #%d awaiting approval — %s."
-                  % (req["id"], (reason or "no reason given")[:80]),
-                  link="/approvals/%d" % req["id"])
-    return req
-
-
 def apply_decision(request_id, decisions, remarks, action, decider_id=None):
     """Apply an approval decision.
 
@@ -600,13 +567,11 @@ def apply_decision(request_id, decisions, remarks, action, decider_id=None):
         it["approved_qty"] = approved
         if approved and approved > 0:
             it["status"] = "Ordered"
-            it["qr_token"] = qr_token(req["id"], iid)
             any_ordered = True
             if approved != requested:
                 any_revised = True
         else:
             it["status"] = "Rejected"
-            it["qr_token"] = None
 
     if not any_ordered:
         status = "Rejected"
@@ -626,90 +591,6 @@ def apply_decision(request_id, decisions, remarks, action, decider_id=None):
            "Your purchase request %s was %s." % (req.get("pr_no") or "#%d" % request_id, status.lower()),
            link="/requests/%d" % request_id)
     return req
-
-
-def receive_item(token, received_qty=None, note="", user_id=None):
-    """Receive a material against a QR token.  Returns a dict:
-    {ok, message, stock?} — ok False on any problem."""
-    request_id, item_id = parse_qr_token(token)
-    if request_id is None:
-        return {"ok": False, "message": "Invalid QR token."}
-    req = db.get("purchase_requests", request_id)
-    if not req:
-        return {"ok": False, "message": "Request %s not found." % request_id}
-
-    items = req.get("items", [])
-    target = next((it for it in items if it.get("item_id") == item_id), None)
-    if not target:
-        return {"ok": False, "message": "Item not found for token %s." % token}
-    if target.get("status") == "Received":
-        return {"ok": False, "message": "Item already received (token %s)." % token}
-    if target.get("status") != "Ordered" or not target.get("qr_token"):
-        return {"ok": False,
-                "message": "Item is not ordered / has no QR token yet."}
-
-    approved = _to_float(target.get("approved_qty") or target.get("requested_qty"))
-    qty = approved if received_qty in (None, "") else _to_float(received_qty, approved)
-    if qty <= 0:
-        return {"ok": False, "message": "Received quantity must be positive."}
-
-    material_id = target.get("material_id")
-    if not material_id:
-        # A material/equipment request that was not yet linked to a stock item:
-        # create the raw material on the fly so stock can be tracked.
-        material_id = _ensure_material_for_item(target)
-        target["material_id"] = material_id
-
-    item = adjust_stock("material", material_id, qty, "received",
-                        reference_id=request_id, user_id=user_id)
-    if item is None:
-        return {"ok": False,
-                "message": "Stock item %s no longer exists." % material_id}
-    target["status"] = "Received"
-    target["received_qty"] = qty
-    if note:
-        target["note"] = ((target.get("note") or "") + " " + note).strip()
-
-    all_received = all(it.get("status") in ("Received", "Rejected") for it in items)
-    new_status = "Received" if all_received else req.get("status")
-    db.update("purchase_requests", request_id,
-              {"items": items, "status": new_status})
-
-    # A purchase order is delivered once every line on it has been received.
-    po_id = target.get("po_id")
-    po = db.get("purchase_orders", po_id) if po_id else None
-    if po and po.get("status") == "Approved" and all(
-            it.get("status") == "Received" for it in items
-            if it.get("po_id") == po_id):
-        db.update("purchase_orders", po_id, {"status": "Delivered",
-                                             "delivered_at": today_iso()})
-
-    notify_admins(
-                "Material received for request #%d (%s)." % (request_id,
-                                                             item.get("name")),
-                link="/requests/%d" % request_id)
-    return {"ok": True,
-            "message": "Received %g %s of %s." % (qty, item.get("unit", ""),
-                                                  item.get("name")),
-            "stock": item.get("stock_qty")}
-
-
-def _ensure_material_for_item(item):
-    """Create a raw_materials record for a material/equipment request item."""
-    existing = db.query("raw_materials", name=item.get("name"))
-    if existing:
-        return existing[0]["id"]
-    mat = db.insert("raw_materials", {
-        "name": item.get("name") or "Received item",
-        "category": item.get("category") or "cleaning",
-        "unit": "pc",
-        "stock_qty": 0.0,
-        "reorder_level": 0,
-        "supplier_id": None,
-        "unit_cost": 0.0,
-        "expiry_date": "",
-    })
-    return mat["id"]
 
 
 # --- Internal sales requests (finished-goods release) ----------------------
@@ -1088,14 +969,16 @@ def _next_ref(prefix, collection, field="ref_no"):
 
 
 def create_receiving_batch(supplier_id, received_date, user_id,
-                           delivery_ref="", remarks="", po_no=""):
+                           delivery_ref="", remarks="", po_no="", po_id=None,
+                           supplier_name=""):
     """Open a delivery record.  Boxes are added to it next."""
     supplier = db.get("suppliers", supplier_id) if supplier_id else None
     batch = db.insert("receiving_batches", {
         "ref_no": _next_ref("RCV", "receiving_batches"),
         "supplier_id": int(supplier_id) if supplier_id else None,
         "supplier_name": supplier.get("name") if supplier
-                         else "Walk-in / own harvest",
+                         else (supplier_name or "Walk-in / own harvest"),
+        "po_id": po_id,
         "po_no": (po_no or "").strip(),
         "delivery_ref": (delivery_ref or "").strip(),
         "received_date": received_date or today_iso(),
@@ -1118,8 +1001,9 @@ def create_receiving_batch(supplier_id, received_date, user_id,
 def add_receiving_box(batch_id, material_id, declared_qty, user_id,
                       location="Receiving Area", count=1, lot_no="",
                       expiry_date="", packaging_condition="",
-                      temperature_c=None):
-    """Add ``count`` boxes of one item to a delivery, each with a QR code."""
+                      temperature_c=None, po_line_no=None):
+    """Add ``count`` boxes of one item to a delivery, each with a QR code.
+    ``po_line_no`` ties them to a line of the delivery's purchase order."""
     batch = db.get("receiving_batches", batch_id)
     if not batch:
         return [], "Delivery not found."
@@ -1149,6 +1033,8 @@ def add_receiving_box(batch_id, material_id, declared_qty, user_id,
             "material_id": material["id"],
             "material_name": material.get("name"),
             "unit": material.get("unit"),
+            "po_id": batch.get("po_id") if po_line_no else None,
+            "po_line_no": po_line_no,
             "track_mode": material.get("track_mode") or "weight",
             "declared_qty": declared,
             "lot_no": (lot_no or "").strip(),
@@ -1186,38 +1072,64 @@ def add_receiving_box(batch_id, material_id, declared_qty, user_id,
 
 
 def receive_delivery(user_id, supplier_id, received_date, lines, po_no="",
-                     delivery_ref="", remarks=""):
+                     delivery_ref="", remarks="", po_id=None):
     """Part 1 in one go: the delivery, its boxes, their QR codes, and a
     notification to the team that inspects them.
 
     lines: [{material_id, qty_per_box, boxes, lot_no, expiry_date,
-             packaging_condition, temperature_c}]
+             packaging_condition, temperature_c, po_line_no}]
+    With ``po_id`` the delivery is received against that (approved) purchase
+    order: lines carry the PO line they fill, and a PO line for an item not
+    yet in stock may use material_id "new" to add it to the materials list.
     Returns ``(batch, boxes, None)`` or ``(None, [], message)``."""
+    import purchasing_service as pur
+
+    po, po_lines = None, {}
+    if po_id:
+        po = db.get("purchase_orders", po_id)
+        if not po or po.get("status") != pur.PO_APPROVED:
+            return None, [], "That purchase order isn't open for receiving."
+        po_lines = {it["line_no"]: it for it in po.get("items") or []}
     clean = []
     for line in lines:
         if not line.get("material_id"):
             continue
-        material = db.get("raw_materials", line.get("material_id"))
-        if not material:
-            return None, [], "One of the items no longer exists."
+        try:
+            po_line = po_lines.get(int(line.get("po_line_no")))
+        except (TypeError, ValueError):
+            po_line = None
+        if line.get("material_id") == "new":
+            if not po_line:
+                return None, [], "Choose the item that arrived."
+            material, name = None, po_line.get("description")
+        else:
+            material = db.get("raw_materials", line.get("material_id"))
+            if not material:
+                return None, [], "One of the items no longer exists."
+            name = material.get("name")
         if _to_float(line.get("qty_per_box")) <= 0:
-            return None, [], ("Enter how much is in each box of %s."
-                              % material.get("name"))
-        clean.append((material, line))
+            return None, [], "Enter how much is in each box of %s." % name
+        clean.append((material, line, po_line))
     if not clean:
         return None, [], "Add at least one item that arrived."
 
-    batch = create_receiving_batch(supplier_id, received_date, user_id,
-                                   delivery_ref=delivery_ref, remarks=remarks,
-                                   po_no=po_no)
+    # Items ordered that aren't stocked yet join the materials list now.
+    clean = [(material or pur.material_for_po_line(po, po_line), line, po_line)
+             for material, line, po_line in clean]
+    batch = create_receiving_batch(
+        supplier_id or (po or {}).get("supplier_id"), received_date, user_id,
+        delivery_ref=delivery_ref, remarks=remarks,
+        po_no=(po or {}).get("po_no") or po_no, po_id=po["id"] if po else None,
+        supplier_name=(po or {}).get("supplier_name") or "")
     boxes = []
-    for material, line in clean:
+    for material, line, po_line in clean:
         created, err = add_receiving_box(
             batch["id"], material["id"], line.get("qty_per_box"), user_id,
             count=line.get("boxes") or 1, lot_no=line.get("lot_no") or "",
             expiry_date=line.get("expiry_date") or "",
             packaging_condition=line.get("packaging_condition") or "",
-            temperature_c=line.get("temperature_c"))
+            temperature_c=line.get("temperature_c"),
+            po_line_no=po_line["line_no"] if po_line else None)
         if err:
             return None, [], err
         boxes.extend(created)
@@ -1230,7 +1142,9 @@ def receive_delivery(user_id, supplier_id, received_date, lines, po_no="",
                     * max(1, int(_to_float(line.get("boxes"), 1))),
                     material.get("unit") or ""),
             max(1, int(_to_float(line.get("boxes"), 1))))
-        for material, line in clean)
+        for material, line, _ in clean)
+    if po:
+        summary += " (PO %s)" % po.get("po_no")
     notify_team({"production_head", "receiving_head"},
                 "Received at the Receiving Area — %s from %s: %s. Ready for "
                 "inspection & cleaning."
@@ -1259,6 +1173,13 @@ def _refresh_batch_totals(batch_id):
     if boxes and not open_boxes and batch.get("status") == "Open":
         changes.update({"status": "Completed", "closed_at": now_iso()})
     return db.update("receiving_batches", batch_id, changes)
+
+
+def _sync_purchase_order(box):
+    """A box delivered against a PO: update what the PO has received."""
+    if box.get("po_id"):
+        import purchasing_service as pur
+        pur.sync_po_receipts(box["po_id"])
 
 
 def _post_box_decision(box, material, user_id):
@@ -1345,6 +1266,7 @@ def inspect_receiving_box(box_id, user_id, usable_qty, unusable_qty=0,
     if status != BOX_HOLD:
         _post_box_decision(box, material, user_id)
     _refresh_batch_totals(box.get("batch_id"))
+    _sync_purchase_order(box)
 
     unit = material.get("unit") or ""
     message = ("Inspected %s (%s): %s usable, %s can't be used, %s damaged — %s."
@@ -1383,6 +1305,7 @@ def decide_held_box(box_id, decision, user_id, note=""):
     })
     _post_box_decision(box, material, user_id)
     _refresh_batch_totals(box.get("batch_id"))
+    _sync_purchase_order(box)
     notify_team({"receiving_head", "production_head"},
                 "Box %s on hold is now %s." % (box.get("box_code"), decision),
                 link="/receiving/box/%d" % int(box_id))

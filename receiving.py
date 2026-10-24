@@ -1,7 +1,9 @@
 """Module 1 — the receiving area, then inspection & cleaning.
 
 Part 1 (Receiving Team Head): a delivery is recorded once, in a short
-step-by-step flow — who it came from, what arrived and in how many boxes.
+step-by-step flow — which purchase order it fills (if any), who it came
+from, what arrived and in how many boxes.  Against a PO the supplier and the
+ordered items come pre-filled and each box stays tied to its PO line.
 Every box gets a QR label carrying its code, item, quantity and delivery
 details, and the production team is notified that boxes are waiting.
 
@@ -15,6 +17,7 @@ from flask import (Blueprint, abort, flash, g, redirect, render_template,
                    request, url_for)
 
 import db
+import purchasing_service as pur
 import services
 from security import can, current_user, module_required
 
@@ -48,7 +51,7 @@ def _batch_rows(batches):
 def _lines_from_form(form):
     """The repeating item cards of the receive wizard -> list of dicts."""
     keys = ("material_id", "qty_per_box", "boxes", "lot_no", "expiry_date",
-            "packaging_condition", "temperature_c")
+            "packaging_condition", "temperature_c", "po_line_no")
     columns = {k: form.getlist(k) for k in keys}
     lines = []
     for i in range(len(columns["material_id"])):
@@ -77,20 +80,34 @@ def index():
                       if b.get("received_date") == services.today_iso()]),
     }
     return render_template("receiving/index.html", batches=_batch_rows(listed),
-                           stats=stats, show=show)
+                           stats=stats, show=show,
+                           expected=pur.open_pos_for_receiving())
 
 
 @receiving_bp.route("/new", methods=["GET", "POST"])
 @module_required("receiving")
 def new():
+    """Which purchase order is this? (skipped when none are open) → the
+    delivery wizard, pre-filled from the PO when there is one."""
     form = request.form
+    po_arg = request.values.get("po")
+    open_pos = pur.open_pos_for_receiving()
+    if po_arg is None and open_pos and request.method == "GET":
+        return render_template("receiving/choose_po.html", orders=open_pos)
+    po = None
+    if po_arg and po_arg != "none":
+        po = db.get("purchase_orders", _int(po_arg))
+        if not po or po.get("status") != pur.PO_APPROVED:
+            flash("That purchase order isn't open for receiving.", "error")
+            return redirect(url_for("receiving.new"))
+
     if request.method == "POST":
         batch, boxes, err = services.receive_delivery(
             current_user()["id"], _int(form.get("supplier_id")),
             form.get("received_date") or services.today_iso(),
             _lines_from_form(form), po_no=form.get("po_no") or "",
             delivery_ref=form.get("delivery_ref") or "",
-            remarks=form.get("remarks") or "")
+            remarks=form.get("remarks") or "", po_id=po["id"] if po else None)
         if not err:
             flash("Delivery %s recorded — %d box(es) labelled. Print the QR "
                   "labels and stick one on each box." % (batch.get("ref_no"),
@@ -107,7 +124,8 @@ def new():
         category_of=services.material_category,
         track_labels=services.TRACK_MODE_LABELS,
         conditions=services.PACKAGING_CONDITIONS,
-        today=services.today_iso(), form=form,
+        today=services.today_iso(), form=form, po=po,
+        po_lines=[l for l in pur.lines_to_receive(po) if l["remaining"] > 0] if po else [],
         lines=_lines_from_form(form) if request.method == "POST" else [],
         start=1 if request.method == "POST" else 0)
 
@@ -119,8 +137,9 @@ def batch(batch_id):
     if not record:
         abort(404)
     boxes = services.receiving_box_rows(batch_id=batch_id)
+    po = db.get("purchase_orders", record.get("po_id")) if record.get("po_id") else None
     return render_template(
-        "receiving/batch.html", batch=record, boxes=boxes,
+        "receiving/batch.html", batch=record, boxes=boxes, po=po,
         badge=services.RECEIVING_BADGE.get(record.get("status"), "badge-muted"),
         received_by=services.user_name(record.get("received_by")),
         awaiting=[b for b in boxes if b["status"] == services.BOX_AWAITING])

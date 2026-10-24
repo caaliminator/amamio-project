@@ -20,8 +20,10 @@ Supplier acknowledgment.
 
 Flow: a head raises a PR → an admin approves, revises or rejects it (the
 existing approvals) → an admin prepares a PO from the approved lines →
-the PO is approved, printed and sent → goods arrive (received by QR or at
-the Receiving Area) → the PO is marked delivered.
+the PO is approved, printed and sent → the Receiving Team Head records the
+delivery against the PO (each box tied to its PO line) → boxes pass
+inspection → the PO is marked delivered once everything ordered has been
+accepted (or an admin closes it short).
 """
 from datetime import date
 
@@ -360,11 +362,18 @@ def approve_purchase_order(po_id, user, approved_by_name=""):
 
 
 def mark_delivered(po_id, user):
+    """Close a PO by hand — e.g. the supplier sent less and nothing more is
+    coming.  What was accepted at inspection stays as received."""
     po = db.get("purchase_orders", po_id)
     if not po:
         return None, "Purchase order not found."
     if po.get("status") != PO_APPROVED:
         return None, "Only an approved PO can be marked delivered."
+    receipts = po_receipts(po)
+    if any(r["pending"] for r in receipts.values()):
+        return None, ("Some boxes from this PO are still being inspected — "
+                      "wait for their decision first.")
+    _update_request_lines(po, receipts, closing=True)
     po = db.update("purchase_orders", po_id, {"status": PO_DELIVERED,
                                               "delivered_at": today_iso()})
     services.notify_admins("PO %s from %s marked delivered."
@@ -392,6 +401,144 @@ def cancel_purchase_order(po_id, user):
             changes["status"] = "Approved"
         db.update("purchase_requests", req["id"], changes)
     return db.update("purchase_orders", po_id, {"status": PO_CANCELLED}), None
+
+
+# --- Receiving against a purchase order ------------------------------------------
+# Units on a PO line are taken to be the stock unit of the item it receives.
+_BUDGET_TO_CATEGORY = {"Raw materials": "raw", "Packaging": "packaging",
+                       "Office supplies": "office"}
+_WEIGHT_UNITS = {"kg", "g"}
+
+
+def po_receipts(po):
+    """Per PO line: accepted qty, qty still in inspection, boxes delivered."""
+    rows = {it["line_no"]: {"received": 0.0, "pending": 0.0, "boxes": 0}
+            for it in po.get("items") or []}
+    for box in db.query("receiving_boxes", po_id=po["id"]):
+        row = rows.get(box.get("po_line_no"))
+        if row is None:
+            continue
+        row["boxes"] += 1
+        status = services.box_status(box)
+        if status == services.BOX_ACCEPTED:
+            row["received"] += _to_float(box.get("good_qty"))
+        elif status in (services.BOX_AWAITING, services.BOX_HOLD):
+            row["pending"] += _to_float(box.get("declared_qty"))
+    return rows
+
+
+def lines_to_receive(po):
+    """The PO's lines with what is received, in inspection and still to come."""
+    receipts = po_receipts(po)
+    rows = []
+    for it in po.get("items") or []:
+        r = receipts[it["line_no"]]
+        qty = _to_float(it.get("qty"))
+        rows.append(dict(it, received=r["received"], pending=r["pending"],
+                         boxes=r["boxes"],
+                         remaining=max(0.0, round(qty - r["received"] - r["pending"], 3))))
+    return rows
+
+
+def open_pos_for_receiving():
+    """Approved POs with something still to come — what Receiving expects."""
+    rows = []
+    for po in db.read("purchase_orders"):
+        if po.get("status") != PO_APPROVED:
+            continue
+        lines = lines_to_receive(po)
+        waiting = [l for l in lines if l["remaining"] > 0]
+        if not waiting:
+            continue
+        rows.append({"id": po["id"], "po_no": po.get("po_no"),
+                     "supplier_name": po.get("supplier_name"),
+                     "expected_delivery": po.get("expected_delivery") or "",
+                     "lines": waiting,
+                     "summary": ", ".join(
+                         "%s %s" % (l["description"], services.fmt_qty(l["remaining"], l.get("unit") or ""))
+                         for l in waiting[:3]) + (" + %d more" % (len(waiting) - 3)
+                                                  if len(waiting) > 3 else "")})
+    rows.sort(key=lambda r: (r["expected_delivery"] or "9999", r["po_no"] or ""))
+    return rows
+
+
+def material_for_po_line(po, line):
+    """The stock item a PO line is received into, created (once) for items
+    ordered that aren't on the materials list yet."""
+    if line.get("material_id"):
+        material = db.get("raw_materials", line["material_id"])
+        if material:
+            return material
+    material = _match_material(line.get("description"))
+    material = db.get("raw_materials", material) if material else None
+    req = db.get("purchase_requests", po.get("purchase_request_id")) or {}
+    pr_item = next((i for i in req.get("items") or []
+                    if i.get("item_id") == line.get("pr_item_id")), {})
+    if not material:
+        unit = (line.get("unit") or "pc").strip()
+        material = db.insert("raw_materials", {
+            "name": line.get("description") or "Received item",
+            "category": _BUDGET_TO_CATEGORY.get(pr_item.get("budget_category"), "cleaning"),
+            "subcategory": "",
+            "unit": unit,
+            "track_mode": "weight" if unit in _WEIGHT_UNITS else "piece",
+            "stock_qty": 0.0,
+            "reorder_level": 0,
+            "supplier_id": po.get("supplier_id"),
+            "unit_cost": _to_float(line.get("unit_price")),
+            "created_at": now_iso(),
+        })
+    # Remember the link on the PO line and the PR line it came from.
+    for it in po.get("items") or []:
+        if it["line_no"] == line["line_no"]:
+            it["material_id"] = material["id"]
+    db.update("purchase_orders", po["id"], {"items": po["items"]})
+    if pr_item:
+        pr_item["material_id"] = material["id"]
+        db.update("purchase_requests", req["id"], {"items": req["items"]})
+    return material
+
+
+def _update_request_lines(po, receipts, closing=False):
+    """Copy what came in onto the PR lines of this PO."""
+    req = db.get("purchase_requests", po.get("purchase_request_id"))
+    if not req:
+        return
+    by_pr_item = {it.get("pr_item_id"): it for it in po.get("items") or []}
+    for it in req.get("items") or []:
+        line = by_pr_item.get(it.get("item_id"))
+        if it.get("po_id") != po["id"] or not line:
+            continue
+        r = receipts[line["line_no"]]
+        it["received_qty"] = round(r["received"], 3)
+        full = r["received"] >= _to_float(line.get("qty")) - 1e-9
+        if (full or closing) and not r["pending"]:
+            it["status"] = "Received"
+    changes = {"items": req["items"]}
+    if all(it.get("status") in ("Received", "Rejected") for it in req["items"]):
+        changes["status"] = "Received"
+    db.update("purchase_requests", req["id"], changes)
+
+
+def sync_po_receipts(po_id):
+    """After a box from this PO is decided: update the PR lines, and mark
+    the PO delivered once every line has been accepted in full."""
+    po = db.get("purchase_orders", po_id)
+    if not po or po.get("status") != PO_APPROVED:
+        return po
+    receipts = po_receipts(po)
+    _update_request_lines(po, receipts)
+    complete = all(not receipts[it["line_no"]]["pending"]
+                   and receipts[it["line_no"]]["received"]
+                   >= _to_float(it.get("qty")) - 1e-9
+                   for it in po.get("items") or [])
+    if complete:
+        po = db.update("purchase_orders", po_id, {"status": PO_DELIVERED,
+                                                  "delivered_at": today_iso()})
+        services.notify_admins(
+            "PO %s from %s is delivered — everything ordered passed inspection."
+            % (po["po_no"], po["supplier_name"]), link="/purchasing/%d" % po_id)
+    return po
 
 
 def po_track(po):

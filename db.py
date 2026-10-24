@@ -112,19 +112,23 @@ SCHEMA = {
     "receiving_batches": {
         "columns": {
             "id": ID, "ref_no": SHORT, "supplier_id": FK, "supplier_name": STR,
-            "po_no": SHORT, "delivery_ref": STR, "received_date": DATE,
-            "received_by": FK, "status": SHORT, "remarks": TEXT,
+            "po_id": FK, "po_no": SHORT, "delivery_ref": STR,
+            "received_date": DATE, "received_by": FK, "status": SHORT,
+            "remarks": TEXT,
             "box_count": "INT NULL", "total_declared": NUM, "total_good": NUM,
             "total_unusable": NUM, "total_damaged": NUM,
             "checked_by_name": STR, "approved_by_name": STR,
             "created_at": TS, "closed_at": TS,
         },
-        "foreign_keys": {"supplier_id": "suppliers", "received_by": "users"},
+        "foreign_keys": {"supplier_id": "suppliers", "received_by": "users",
+                         "po_id": "purchase_orders"},
     },
     "receiving_boxes": {
         "columns": {
             "id": ID, "batch_id": FK, "box_code": SHORT, "seq": "INT NULL",
             "material_id": FK, "material_name": STR, "unit": SHORT,
+            # The purchase-order line this box was delivered against, if any
+            "po_id": FK, "po_line_no": "INT NULL",
             "track_mode": SHORT, "declared_qty": NUM, "lot_no": SHORT,
             "expiry_date": DATE, "packaging_condition": SHORT,
             "temperature_c": NUM,
@@ -142,7 +146,7 @@ SCHEMA = {
         },
         "foreign_keys": {"batch_id": "receiving_batches",
                          "material_id": "raw_materials", "checked_by": "users",
-                         "received_by": "users"},
+                         "received_by": "users", "po_id": "purchase_orders"},
     },
 
     # --- Honey production: containers + moisture/appearance QC --------------

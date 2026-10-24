@@ -1,8 +1,9 @@
 """Approvals blueprint: admin decisions on purchase requests.
 
-Approving items sets them to 'Ordered' and mints a QR token; NO stock moves here
-(stock only changes when materials are received via QR scan).  The decision
-also fills the PR form's "Checked by" and "Approved by" sign-offs."""
+Approving items sets them to 'Ordered' so they can go on a purchase order; NO
+stock moves here (stock only changes when the goods are received and pass
+inspection).  The decision also fills the PR form's "Checked by" and
+"Approved by" sign-offs."""
 from flask import (Blueprint, abort, flash, redirect, render_template, request,
                    url_for)
 

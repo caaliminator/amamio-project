@@ -18,6 +18,23 @@
   <div class="figure"><div class="figure-label">Received today</div><div class="figure-value">{{ stats.today }}</div></div>
 </div>
 
+{% if expected %}
+<div class="section-label">Expected deliveries — approved purchase orders ({{ expected|length }})</div>
+<div class="queue mb">
+  {% for po in expected %}
+  <a class="queue-item" href="{{ url_for('receiving.new', po=po.id) }}">
+    <span class="code" style="min-width:96px">{{ po.po_no }}</span>
+    <span class="queue-main">
+      <span class="queue-title">{{ po.supplier_name }}</span>
+      <span class="queue-sub">Still to come: {{ po.summary }}{% if po.expected_delivery %} · expected {{ po.expected_delivery }}{% endif %}</span>
+    </span>
+    <span class="queue-go">Receive {{ icon('arrow-right', 14) }}</span>
+  </a>
+  {% endfor %}
+</div>
+<div class="section-label">Deliveries</div>
+{% endif %}
+
 <div class="toolbar">
   <div class="seg">
     <a href="{{ url_for('receiving.index', show='open') }}" class="{{ 'is-active' if show == 'open' }}">Open</a>

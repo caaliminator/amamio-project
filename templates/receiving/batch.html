@@ -10,7 +10,8 @@
     <h1 class="record-title">{{ batch.supplier_name }}</h1>
     <div class="muted small">
       Received {{ batch.received_date }} by {{ received_by }}
-      {% if batch.po_no %} · PO {{ batch.po_no }}{% endif %}
+      {% if po and can('purchasing') %} · <a href="{{ url_for('purchasing.detail', po_id=po.id) }}">PO {{ po.po_no }}</a>
+      {% elif batch.po_no %} · PO {{ batch.po_no }}{% endif %}
       {% if batch.delivery_ref %} · DR {{ batch.delivery_ref }}{% endif %}
     </div>
   </div>

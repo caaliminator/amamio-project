@@ -535,25 +535,109 @@ except facility_service.RecordError:
 check(saved and facility_service.open_sanitation_count() == open_before + 1,
       "sanitation record saved; the open repair is tracked")
 
-# 9) approve a purchase request -> receive via QR adds material stock
+# 9) approved PR -> PO -> received against the PO -> inspection -> stock
 with application.test_client() as c:
     login(c, "admin", "admin123")
     req = [r for r in db.read("purchase_requests")
            if r["status"] == "Pending Approval"
            and r["items"][0].get("material_id")][0]
     item = req["items"][0]
-    before = services.current_stock("material", item["material_id"])
-    c.post("/approvals/%d" % req["id"], data={"action": "approve",
-           "approved_qty_%d" % item["item_id"]: str(item["requested_qty"])},
-           follow_redirects=True)
-    tok = db.get("purchase_requests", req["id"])["items"][0]["qr_token"]
-    c.post("/qr/receive", json={"token": tok})
-    after = services.current_stock("material", item["material_id"])
-    check(after > before, "QR receive increased material stock")
-    again = c.post("/qr/receive", json={"token": tok})
-    check(again.status_code == 400
-          and services.current_stock("material", item["material_id"]) == after,
-          "re-receive is idempotent")
+    c.post("/approvals/%d" % req["id"], data={"action": "approve"})
+    check(not db.get("purchase_requests", req["id"])["items"][0].get("qr_token"),
+          "approval no longer mints a scan-to-stock QR code")
+    check(c.post("/qr/receive", json={"token": "PR-%d-1" % req["id"]}).status_code
+          in (404, 405), "the scan-to-stock shortcut is gone")
+    lines = [i for i in db.get("purchase_requests", req["id"])["items"]
+             if i["status"] == "Ordered"]
+    c.post("/purchasing/new?request_id=%d" % req["id"], data={
+        "request_id": req["id"], "supplier_name": "Highland Produce Traders",
+        "po_date": services.today_iso(), "payment_terms": "Cash on delivery",
+        "pr_item_id": [str(i["item_id"]) for i in lines],
+        "include": ["1"] * len(lines),
+        "description": [i["name"] for i in lines], "brand_model": [""] * len(lines),
+        "qty": [str(i["approved_qty"]) for i in lines],
+        "unit": [i["unit"] for i in lines], "unit_price": ["10"] * len(lines),
+        "requested_delivery": [""] * len(lines), "vat": [""] * len(lines),
+        "remarks": [""] * len(lines)})
+    po = db.read("purchase_orders")[-1]
+    c.post("/purchasing/%d/approve" % po["id"])
+with application.test_client() as c:
+    login(c, "receiving", "recv123")
+    page = c.get("/receiving/new").data.decode("utf-8")
+    check(po["po_no"] in page and "No purchase order" in page,
+          "receiving starts by choosing the purchase order")
+    page = c.get("/receiving/new?po=%d" % po["id"]).data.decode("utf-8")
+    check("PO line 1" in page and po["supplier_name"] in page,
+          "the PO's supplier and items are filled in")
+    first, second = po["items"][0], po["items"][1]
+    c.post("/receiving/new?po=%d" % po["id"], data={
+        "supplier_id": "", "received_date": services.today_iso(),
+        "delivery_ref": "DR-PO-1",
+        "po_line_no": [str(first["line_no"]), str(second["line_no"])],
+        "material_id": [str(first["material_id"]), str(second["material_id"])],
+        "qty_per_box": [str(first["qty"]), str(second["qty"] / 2)],
+        "boxes": ["1", "1"], "lot_no": ["", ""], "expiry_date": ["", ""],
+        "packaging_condition": ["", ""], "temperature_c": ["", ""]})
+    batch = db.read("receiving_batches")[-1]
+    boxes = db.query("receiving_boxes", batch_id=batch["id"])
+    check(batch.get("po_id") == po["id"] and len(boxes) == 2
+          and all(b.get("po_id") == po["id"] for b in boxes)
+          and batch["supplier_name"] == po["supplier_name"],
+          "the delivery and its boxes are tied to the PO lines")
+with application.test_client() as c:
+    login(c, "production", "prod123")
+    before = services.current_stock("material", first["material_id"])
+    for b in boxes:
+        c.post("/receiving/box/%d/inspect" % b["id"], data={
+            "usable_qty": str(b["declared_qty"]), "unusable_qty": "0",
+            "damaged_qty": "0", "acceptance": "Accepted", "cleaned": "1"})
+    check(services.current_stock("material", first["material_id"])
+          >= before + first["qty"] - 1e-6,
+          "accepted boxes add the PO items to stock")
+    po_now = db.get("purchase_orders", po["id"])
+    check(po_now["status"] == "Approved",
+          "a PO with a line still short stays open")
+    pr_now = db.get("purchase_requests", req["id"])
+    check(pr_now["items"][0]["status"] == "Received"
+          and abs(pr_now["items"][1]["received_qty"] - second["qty"] / 2) < 1e-6,
+          "the PR shows what was received per line")
+with application.test_client() as c:
+    login(c, "admin", "admin123")
+    page = c.get("/purchasing/%d" % po["id"]).data.decode("utf-8")
+    check("being inspected" not in page and " of " in page,
+          "the PO page shows received against ordered")
+    c.post("/purchasing/%d/delivered" % po["id"])
+    check(db.get("purchase_orders", po["id"])["status"] == "Delivered",
+          "a short PO can be closed as delivered")
+
+# 9b) the client's PO 2026-09-017 (switches, not stocked yet) received in full
+demo_po = db.query("purchase_orders", po_no="2026-09-017")[0]
+n = len(demo_po["items"])
+with application.test_client() as c:
+    login(c, "receiving", "recv123")
+    page = c.get("/receiving/new?po=%d" % demo_po["id"]).data.decode("utf-8")
+    check("as a new stock item" in page,
+          "an ordered item not on the materials list can be added on receipt")
+    c.post("/receiving/new?po=%d" % demo_po["id"], data={
+        "supplier_id": "", "received_date": services.today_iso(),
+        "po_line_no": [str(i["line_no"]) for i in demo_po["items"]],
+        "material_id": ["new"] * n,
+        "qty_per_box": [str(i["qty"]) for i in demo_po["items"]],
+        "boxes": ["1"] * n, "lot_no": [""] * n, "expiry_date": [""] * n,
+        "packaging_condition": [""] * n, "temperature_c": [""] * n})
+    batch = db.read("receiving_batches")[-1]
+    check(batch.get("po_id") == demo_po["id"]
+          and db.query("raw_materials", name="Timer switch"),
+          "the switches join the materials list when received")
+with application.test_client() as c:
+    login(c, "production", "prod123")
+    for b in db.query("receiving_boxes", batch_id=batch["id"]):
+        c.post("/receiving/box/%d/inspect" % b["id"], data={
+            "usable_qty": str(b["declared_qty"]), "unusable_qty": "0",
+            "damaged_qty": "0", "acceptance": "Accepted", "cleaned": "1"})
+    check(db.get("purchase_orders", demo_po["id"])["status"] == "Delivered"
+          and db.query("purchase_requests", pr_no="2026-09-017")[0]["status"] == "Received",
+          "the PO is delivered and the PR received once everything passes inspection")
 
 # 10) a request without a reason is refused
 with application.test_client() as c:

@@ -109,8 +109,5 @@
 
 <div class="flex gap-sm wrap">
   <a class="btn btn-ghost btn-sm" href="{{ url_for('requests.print_form', id=req.id) }}">{{ icon('printer', 14) }} Print Purchase Request Form</a>
-  {% if (req['items'] or []) | selectattr('qr_token') | list %}
-  <a class="btn btn-ghost btn-sm" href="{{ url_for('qr.print_codes', request_id=req.id) }}">{{ icon('qr', 14) }} QR labels for receiving</a>
-  {% endif %}
 </div>
 {% endblock %}

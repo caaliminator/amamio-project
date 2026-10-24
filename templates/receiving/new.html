@@ -2,22 +2,31 @@
 {% from "receiving/_item_fields.html" import item_fields, item_script %}
 {% block title %}Receive a delivery{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('receiving.index') }}">{{ icon('arrow-left', 15) }} Receiving Area</a>
+<a class="back-link" href="{{ url_for('receiving.new') if po else url_for('receiving.index') }}">{{ icon('arrow-left', 15) }} {{ 'Choose another purchase order' if po else 'Receiving Area' }}</a>
+
+{% set submitted = {} %}
+{% for l in lines if l.po_line_no %}{% set _ = submitted.update({l.po_line_no|string: l}) %}{% endfor %}
+{% set extra_lines = lines | rejectattr('po_line_no') | list %}
 
 <form method="post" class="wizard" data-wizard data-wizard-start="{{ start }}"
       data-submit-label="Save &amp; print QR labels" data-cancel="{{ url_for('receiving.index') }}">
 
   <section class="wz-step" data-title="Who delivered it?"
-           data-hint="Pick the supplier and the day the delivery arrived at the receiving area.">
+           data-hint="{{ ('For purchase order ' ~ po.po_no ~ '. Enter the day the delivery arrived at the receiving area.') if po else 'Pick the supplier and the day the delivery arrived at the receiving area.' }}">
     <div class="wz-body">
       <div class="form-row">
         <label class="form-label" for="supplier_id">Supplier</label>
+        {% if po %}
+          <input type="hidden" name="supplier_id" value="{{ po.supplier_id or '' }}">
+          <input type="text" id="supplier_id" name="supplier_display" value="{{ po.supplier_name }}" readonly class="locked-field" data-review-label="Supplier">
+        {% else %}
         <select id="supplier_id" name="supplier_id" data-review-label="Supplier">
           <option value="">Own harvest / walk-in (no supplier)</option>
           {% for s in suppliers %}
             <option value="{{ s.id }}" {{ 'selected' if form.supplier_id == s.id|string }}>{{ s.name }}</option>
           {% endfor %}
         </select>
+        {% endif %}
       </div>
       <div class="form-row">
         <label class="form-label" for="received_date">Date received <span class="req">*</span></label>
@@ -33,7 +42,11 @@
       <div class="form-grid cols-2">
         <div class="form-row">
           <label class="form-label" for="po_no">PO no.</label>
-          <input type="text" id="po_no" name="po_no" maxlength="40" value="{{ form.po_no or '' }}" placeholder="e.g. PO-1043">
+          {% if po %}
+          <input type="text" id="po_no" name="po_no" value="{{ po.po_no }}" readonly class="locked-field">
+          {% else %}
+          <input type="text" id="po_no" name="po_no" maxlength="40" value="{{ form.po_no or '' }}" placeholder="If the paperwork shows one">
+          {% endif %}
         </div>
         <div class="form-row">
           <label class="form-label" for="delivery_ref">DR / delivery receipt no.</label>
@@ -48,19 +61,37 @@
   </section>
 
   <section class="wz-step" id="itemsStep" data-title="What arrived?"
-           data-hint="Add each item and how it came packed. Each box gets its own QR code. Several boxes of the same item with the same amount can be added in one go.">
+           data-hint="{{ 'These are the items still to come on this PO, with the quantity ordered filled in — change it to what actually arrived. Tick “Not in this delivery” for anything that didn’t come.' if po_lines else 'Add each item and how it came packed. Each box gets its own QR code. Several boxes of the same item with the same amount can be added in one go.' }}">
     <div class="line-cards" id="lineCards">
-      {% for line in (lines or [none]) %}
+      {% for l in po_lines %}
+      {% set sent = submitted.get(l.line_no|string) %}
       <div class="line-card" data-item>
         <div class="line-card-head">
-          <span class="line-card-num">Item {{ loop.index }}</span>
+          <span class="line-card-num">PO line {{ l.line_no }}</span>
+          <label class="flex gap-sm small" style="align-items:center;margin:0;cursor:pointer">
+            <input type="checkbox" class="js-skip" data-review-skip> Not in this delivery
+          </label>
+        </div>
+        <p class="small mb-sm"><b>{{ l.description }}</b>{% if l.brand_model %} · {{ l.brand_model }}{% endif %}
+          <span class="muted">— ordered {{ l.qty|qty(l.unit) }}{% if l.received %}, {{ l.received|qty }} received{% endif %}{% if l.pending %}, {{ l.pending|qty }} being inspected{% endif %} · still to come <b>{{ l.remaining|qty(l.unit) }}</b></span></p>
+        <input type="hidden" name="po_line_no" value="{{ l.line_no }}">
+        {{ item_fields(sent or {'material_id': l.material_id or 'new', 'qty_per_box': '%g'|format(l.remaining), 'boxes': 1},
+                       materials, categories, category_of, track_labels, conditions,
+                       new_item=none if l.material_id else l.description, new_unit=l.unit) }}
+      </div>
+      {% endfor %}
+      {% for line in (extra_lines or ([] if po_lines else [none])) %}
+      <div class="line-card" data-item>
+        <div class="line-card-head">
+          <span class="line-card-num">Item</span>
           <button type="button" class="line-remove" data-remove-line aria-label="Remove this item">&times;</button>
         </div>
+        <input type="hidden" name="po_line_no" value="">
         {{ item_fields(line, materials, categories, category_of, track_labels, conditions) }}
       </div>
       {% endfor %}
     </div>
-    <button type="button" class="add-line mt-sm" id="addLine">{{ icon('plus', 15) }} Add another item</button>
+    <button type="button" class="add-line mt-sm" id="addLine">{{ icon('plus', 15) }} {{ 'Add an item that isn’t on the PO' if po_lines else 'Add another item' }}</button>
   </section>
 
   <section class="wz-step" data-title="Check and save" data-review
@@ -75,6 +106,7 @@
       <span class="line-card-num">Item</span>
       <button type="button" class="line-remove" data-remove-line aria-label="Remove this item">&times;</button>
     </div>
+    <input type="hidden" name="po_line_no" value="">
     {{ item_fields(none, materials, categories, category_of, track_labels, conditions) }}
   </div>
 </template>
@@ -87,10 +119,12 @@
   var step = document.getElementById("itemsStep");
 
   function renumber() {
-    var all = cards.querySelectorAll("[data-item]");
-    all.forEach(function (c, i) {
-      c.querySelector(".line-card-num").textContent = "Item " + (i + 1);
-      c.querySelector("[data-remove-line]").style.visibility = all.length > 1 ? "" : "hidden";
+    var extra = cards.querySelectorAll("[data-item] [data-remove-line]");
+    var n = cards.querySelectorAll("[data-item]").length;
+    extra.forEach(function (btn, i) {
+      var card = btn.closest("[data-item]");
+      card.querySelector(".line-card-num").textContent = "Item " + (i + 1);
+      btn.style.visibility = n > 1 ? "" : "hidden";
     });
   }
   document.getElementById("addLine").addEventListener("click", function () {
@@ -105,12 +139,23 @@
     btn.closest("[data-item]").remove();
     renumber();
   });
+  // A PO line that didn't come: its fields are switched off, so nothing
+  // from that card is sent or checked.
+  cards.addEventListener("change", function (e) {
+    if (!e.target.matches(".js-skip")) return;
+    var card = e.target.closest("[data-item]");
+    card.classList.toggle("is-skipped", e.target.checked);
+    card.style.opacity = e.target.checked ? ".5" : "";
+    card.querySelectorAll("input, select, textarea").forEach(function (el) {
+      if (el !== e.target) el.disabled = e.target.checked;
+    });
+  });
   renumber();
 
   // The review shows one line per item: "Ginger — 12 kg × 3 boxes = 36 kg".
   step.reviewHtml = function () {
     var esc = window.IMS.esc, out = [], boxes = 0;
-    cards.querySelectorAll("[data-item]").forEach(function (c) {
+    cards.querySelectorAll("[data-item]:not(.is-skipped)").forEach(function (c) {
       var sel = c.querySelector("select[name=material_id]");
       var opt = sel.options[sel.selectedIndex];
       if (!sel.value) return;

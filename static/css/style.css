@@ -241,6 +241,45 @@
 :root[data-theme="light"] .chat-panel { background: #ffffff; }
 :root[data-theme="light"] .paper { box-shadow: 0 6px 24px rgba(60, 50, 20, .12); border: 1px solid var(--border); }
 
+/* ---------- Sidebar in the opposite theme ----------
+   Dark pages get a light sidebar and light pages a dark one, so the menu
+   stands apart from the page.  Only the tokens the sidebar uses are swapped;
+   "no data-theme yet" (Match my device, before the script runs) is dark. */
+:root:not([data-theme="light"]) .sidebar {
+  color-scheme: light;
+  --bg-2: #f5f4ef;
+  --border: #e3dfd4;
+  --text: #2a2822;
+  --text-2: #3f3c35;
+  --heading: #121212;
+  --muted: #66625a;
+  --muted-2: #8a8579;
+  --raise-1: #ebe8df;
+  --raise-4: #e9e6de;
+  --line-2: #d8d4c9;
+  --gold-ink: #8a6a12;
+  --gold-bright: #6b520b;
+  --gold-line: rgba(160, 125, 30, .45);
+  --grad-gold-text: linear-gradient(120deg, #9a7616 0%, #7d5f0e 50%, #a8862a 100%);
+}
+:root[data-theme="light"] .sidebar {
+  color-scheme: dark;
+  --bg-2: #0e0e0e;
+  --border: #242424;
+  --text: #e8e8e8;
+  --text-2: #bdbdbd;
+  --heading: #ffffff;
+  --muted: #a3a3a3;
+  --muted-2: #8a8a8a;
+  --raise-1: #1a1a1a;
+  --raise-4: #222222;
+  --line-2: #2a2a2a;
+  --gold-ink: #e2c26a;
+  --gold-bright: #f0d68a;
+  --gold-line: rgba(212, 175, 55, .42);
+  --grad-gold-text: linear-gradient(120deg, #f6e18c 0%, #d4af37 48%, #f0d27a 100%);
+}
+
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 

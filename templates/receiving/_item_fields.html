@@ -1,11 +1,15 @@
 {# One item that arrived: which item, how much per box, how many boxes, and
    the optional lot / expiry / condition details from the paper report.
-   `line` is a dict of submitted values (or empty). #}
-{% macro item_fields(line, materials, categories, category_of, track_labels, conditions) %}
+   `line` is a dict of submitted values (or empty).  `new_item` (a PO line's
+   description) offers adding an ordered item that isn't stocked yet. #}
+{% macro item_fields(line, materials, categories, category_of, track_labels, conditions, new_item=none, new_unit='') %}
 <div class="form-row">
   <label class="form-label">Item <span class="req">*</span></label>
   <select name="material_id" required data-review-label="Item" class="js-material">
     <option value="">Choose the item that arrived…</option>
+    {% if new_item %}
+    <option value="new" data-unit="{{ new_unit }}" {{ 'selected' if line and line.material_id == 'new' }}>＋ Add "{{ new_item }}" as a new stock item</option>
+    {% endif %}
     {% for key, label in categories %}
       <optgroup label="{{ label }}">
         {% for m in materials if category_of(m) == key %}

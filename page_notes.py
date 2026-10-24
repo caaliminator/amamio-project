@@ -36,15 +36,15 @@ NOTES = {
     # --- Module 1: receiving & inspection ------------------------------------
     "receiving.index": {
         "title": "Receiving Area — Module 1, part 1",
-        "what": "Every delivery that arrives at the production site (lemon, ginger, bottles…). Open deliveries still have boxes waiting for inspection.",
+        "what": "Every delivery that arrives at the production site (lemon, ginger, bottles…), and the approved purchase orders still expected. Open deliveries still have boxes waiting for inspection.",
         "who": "Receiving Team Head (recording) · " + ADMINS,
-        "flow": "Receive a delivery → print a QR label per box → the production team is notified → each box is inspected & cleaned (part 2).",
+        "flow": "Purchase order expected → receive the delivery against it → print a QR label per box → the production team is notified → each box is inspected & cleaned (part 2) → accepted items join stock and the PO shows them received.",
     },
     "receiving.new": {
         "title": "Receive a delivery",
-        "what": "Record one delivery: who delivered it, the PO / DR numbers, and what arrived — each item, how much is in each box (kg, pieces or units) and how many boxes.",
+        "what": "Record one delivery: first which purchase order it is for (or none — own harvest, walk-in), then who delivered it, the DR number, and what arrived — each item, how much is in each box (kg, pieces or units) and how many boxes. With a PO, the supplier and the items still to come are filled in.",
         "who": "Receiving Team Head",
-        "flow": "Saving creates one QR label per box (code, item, quantity, lot, expiry, supplier) and notifies the production team. Nothing joins stock yet — that happens after inspection.",
+        "flow": "Saving creates one QR label per box (code, item, quantity, lot, expiry, supplier) and notifies the production team. Nothing joins stock yet — that happens after inspection. An item ordered that isn't on the materials list yet is added to it.",
         "form": "Raw Materials Receiving and Inspection Report (receiving columns)",
     },
     "receiving.batch": {
@@ -604,9 +604,9 @@ NOTES = {
     },
     "purchasing.detail": {
         "title": "One purchase order",
-        "what": "The PO's supplier, delivery, items, totals and sign-offs.",
+        "what": "The PO's supplier, delivery, items, totals and sign-offs — and, per item, how much has been received and accepted at inspection.",
         "who": ADMINS,
-        "flow": "Approve it, print it for the supplier, then mark it delivered when the goods arrive.",
+        "flow": "Approve it and print it for the supplier. The Receiving Team Head receives the goods against it; it is marked delivered by itself once everything ordered passes inspection, or closed here if the supplier sent less.",
     },
     "purchasing.print_po": {
         "title": "Purchase Order (print)",
@@ -614,12 +614,6 @@ NOTES = {
         "who": ADMINS,
         "flow": "Print it, sign it and send it to the supplier.",
         "form": "Purchase Order",
-    },
-    "qr.print_codes": {
-        "title": "Purchase QR codes",
-        "what": "QR codes for approved purchase items, so they can be received by scanning.",
-        "who": ADMINS + " · Team Heads",
-        "flow": "Scanning one on arrival adds the item to stock (once).",
     },
     "reports.index": {
         "title": "Reports",

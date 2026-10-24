@@ -1,11 +1,11 @@
 """QR blueprint: one scanner for every code the floor produces.
 
-Four kinds of code circulate in the business, told apart by their prefix:
+These codes circulate in the business, told apart by their prefix:
 
-    PR-<request>-<item>  a material ordered against an approved purchase request
     RB-<box>             a receiving cage box / crate
     HC-<container>       a honey container awaiting (or carrying) its QC result
     PK-<run>             a packing run
+    PR-<request>-<item>  an older purchase-request label (opens the request)
 
 Scanning any of them here resolves what it is and shows the matching action,
 so staff only ever need this one screen.
@@ -158,7 +158,9 @@ def resolve_token(token):
             ],
         }
 
-    # PR-<request>-<item>
+    # PR-<request>-<item>: labels from before goods were received against
+    # purchase orders.  They open the request; receiving happens at the
+    # Receiving Area now, so every delivery is inspected first.
     request_id, item_id = services.parse_qr_token(token)
     req = db.get("purchase_requests", request_id) if request_id else None
     if not req:
@@ -177,7 +179,7 @@ def resolve_token(token):
         "subtitle": material.get("name") or item.get("name") or "",
         "status": item.get("status"),
         "url": url_for("requests.detail", id=request_id),
-        "action": "Open the request",
+        "action": "Open the request — receive the goods at the Receiving Area",
         "details": [
             ("Item", material.get("name") or item.get("name")),
             ("Requested", item.get("requested_qty")),
@@ -215,32 +217,6 @@ def go():
     return redirect(result["url"])
 
 
-@qr_bp.route("/receive", methods=["POST"])
-@module_required("qr")
-def receive():
-    """Receive a material against an approved purchase-request token."""
-    if request.is_json:
-        data = request.get_json(silent=True) or {}
-        token = data.get("token")
-        received_qty = data.get("received_qty")
-        note = data.get("note") or ""
-    else:
-        token = request.form.get("token")
-        received_qty = request.form.get("received_qty")
-        note = request.form.get("note") or ""
-
-    result = services.receive_item(token, received_qty, note,
-                                   user_id=current_user()["id"])
-
-    if request.is_json:
-        status = 200 if result.get("ok") else 400
-        return jsonify({"message": result.get("message"),
-                        "stock": result.get("stock")}), status
-
-    flash(result.get("message"), "success" if result.get("ok") else "error")
-    return redirect(url_for("qr.scan"))
-
-
 @qr_bp.route("/image/<token>")
 @module_required("qr")
 def image(token):
@@ -260,24 +236,3 @@ def image(token):
         'font-size="12" font-family="monospace" fill="#111">%s</text></svg>'
         % escape(token))
     return Response(svg, mimetype="image/svg+xml")
-
-
-@qr_bp.route("/print/<int:request_id>")
-@module_required("qr")
-def print_codes(request_id):
-    req = db.get("purchase_requests", request_id)
-    if not req:
-        abort(404)
-    requestor = db.get("users", req.get("requestor_id"))
-    materials_by_id = {m["id"]: m for m in db.read("raw_materials")}
-    items = []
-    for it in req.get("items", []):
-        if not it.get("qr_token"):
-            continue
-        row = dict(it)
-        if it.get("material_id"):
-            mat = materials_by_id.get(it.get("material_id"), {})
-            row["material_name"] = mat.get("name")
-        items.append(row)
-    return render_template("qr/print_codes.html", req=req, requestor=requestor,
-                           items=items)

@@ -123,7 +123,10 @@ def _po_or_404(po_id):
 def detail(po_id):
     po = _po_or_404(po_id)
     req = db.get("purchase_requests", po.get("purchase_request_id")) or {}
+    deliveries = sorted(db.query("receiving_batches", po_id=po["id"]),
+                        key=lambda b: b.get("created_at") or "")
     return render_template("purchasing/detail.html", po=po, req=req,
+                           lines=pur.lines_to_receive(po), deliveries=deliveries,
                            track=pur.po_track(po), me=current_user(),
                            badge=pur.PO_BADGE.get(po.get("status"), "badge-muted"))
 
