@@ -81,7 +81,8 @@ import page_notes             # noqa: E402
 NOT_PAGES = {"static", "auth.root", "auth.login", "auth.logout",
              "honey.suggest", "qr.lookup", "qr.image", "qr.go",
              "platforms.export_csv", "platforms.import_file",
-             "migration.download", "requests.bom_calc", "production.new"}
+             "migration.download", "requests.bom_calc", "production.new",
+             "requests.new_material"}
 pages = {r.endpoint for r in application.url_map.iter_rules()
          if "GET" in r.methods and r.endpoint not in NOT_PAGES}
 missing = sorted(p for p in pages if not page_notes.for_endpoint(p))
@@ -115,6 +116,9 @@ GUARDS = [
     ("packer1", "member123", "/platforms/", 403),
     ("packer1", "member123", "/requests/", 403),
     ("packer1", "member123", "/packing/new", 200),
+    ("admin", "admin123", "/packing/", 403),
+    ("superadmin", "super123", "/packing/new", 200),
+    ("admin", "admin123", "/purchasing/", 200),
     ("production", "prod123", "/receiving/new", 403),
     ("production", "prod123", "/receiving/inspection", 200),
     ("receiving", "recv123", "/receiving/new", 200),
@@ -256,6 +260,110 @@ with application.test_client() as c:
           "packing summary counts packed, disbursed and courier separately")
     check(c.post("/packing/%d/cancel" % run["id"]).status_code == 403,
           "a packing member cannot cancel a run")
+
+# 7b) Packing is recorded by the packers (and the Super Admin) as themselves
+packer1_id = db.query("users", username="packer1")[0]["id"]
+packer2_id = db.query("users", username="packer2")[0]["id"]
+with application.test_client() as c:
+    login(c, "packer1", "member123")
+    page = c.get("/packing/new").data.decode("utf-8")
+    check("in stock" in page and 'name="packer_id"' not in page,
+          "packers see stock counts and cannot change Packed by")
+    _, product = stock("Pure Honey 250 mL", "product")
+    c.post("/packing/new", data={
+        "channel": "Shopee", "packer_id": str(packer2_id),
+        "pack_date": services.today_iso(), "order_ref": "SHP-LOCK",
+        "product_id": [str(product["id"])], "qty": ["1"], "damaged_qty": ["0"],
+        "line_notes": [""]})
+    check(db.read("packing_runs")[-1]["packer_id"] == packer1_id,
+          "a packer always records packing under their own account")
+    runs_before = len(db.read("packing_runs"))
+    have = services.current_stock("product", product["id"])
+    c.post("/packing/new", data={
+        "channel": "Shopee", "pack_date": services.today_iso(),
+        "product_id": [str(product["id"])], "qty": [str(have + 50)],
+        "damaged_qty": ["0"], "line_notes": [""]})
+    check(len(db.read("packing_runs")) == runs_before
+          and services.current_stock("product", product["id"]) == have,
+          "packing more than is in stock is refused")
+with application.test_client() as c:
+    login(c, "superadmin", "super123")
+    c.post("/packing/new", data={
+        "channel": "Lazada", "packer_id": str(packer2_id),
+        "pack_date": services.today_iso(),
+        "product_id": [str(product["id"])], "qty": ["1"], "damaged_qty": ["0"],
+        "line_notes": [""]})
+    check(db.read("packing_runs")[-1]["packer_id"] == packer2_id,
+          "the Super Admin can record packing for a chosen packer")
+
+# 7c) Purchase Request Form -> approval -> Purchase Order (the client's forms)
+demo = db.query("purchase_requests", pr_no="2026-09-017")
+check(demo and demo[0]["status"] == "Ordered"
+      and demo[0]["checked_by_name"] == "Jefrey S. Pabillore",
+      "the client's PR 2026-09-017 is seeded, approved and ordered")
+demo_po = db.query("purchase_orders", po_no="2026-09-017")
+check(demo_po and abs(demo_po[0]["grand_total"] - 1100) < 0.01
+      and demo_po[0]["supplier_name"] == "Trimix Butuan",
+      "its PO to Trimix Butuan totals P1,100.00")
+with application.test_client() as c:
+    login(c, "production", "prod123")
+    check(c.get("/requests/new").status_code == 200, "PR form opens")
+    c.post("/requests/new", data={
+        "department": "Production", "purpose": "Spare parts for the sealer",
+        "needed_by": "", "notes": "Heating element burnt", "urgency": "Urgent",
+        "description": ["Heating element", "Teflon tape"],
+        "purpose_use": ["Band sealer", "Band sealer"], "qty": ["2", "3"],
+        "unit": ["pc", "roll"], "est_unit_cost": ["450", "80"],
+        "preferred_supplier": ["Trimix Butuan", ""],
+        "budget_category": ["Equipment / repair", ""], "remark": ["", ""]})
+    pr = db.read("purchase_requests")[-1]
+    check(pr.get("purpose") == "Spare parts for the sealer"
+          and len(pr["items"]) == 2 and abs(pr["total_estimated"] - 1140) < 0.01
+          and pr["pr_no"].startswith(services.today_iso()[:7]),
+          "PR saved with its number, items and estimated total")
+    check(c.get("/requests/%d/print" % pr["id"]).status_code == 200,
+          "PR prints as the Purchase Request Form")
+    check(c.get("/purchasing/").status_code == 403,
+          "a team head cannot open purchase orders")
+with application.test_client() as c:
+    login(c, "admin", "admin123")
+    c.post("/approvals/%d" % pr["id"], data={
+        "action": "approve", "checked_by_name": "Jefrey S. Pabillore"})
+    pr = db.get("purchase_requests", pr["id"])
+    check(pr["status"] == "Approved" and pr["checked_by_name"] == "Jefrey S. Pabillore"
+          and pr["approved_by_name"], "approval records Checked by and Approved by")
+    check(c.get("/purchasing/new?request_id=%d" % pr["id"]).status_code == 200,
+          "PO form opens for the approved PR")
+    c.post("/purchasing/new?request_id=%d" % pr["id"], data={
+        "request_id": pr["id"], "supplier_name": "Trimix Butuan",
+        "supplier_address": "Butuan", "po_date": services.today_iso(),
+        "payment_terms": "Cash on delivery", "deliver_to": "Amamio Farm Products",
+        "delivery_address": "Nasipit", "freight": "60",
+        "pr_item_id": ["1", "2"], "include": ["1", "0"],
+        "description": ["Heating element", "Teflon tape"], "brand_model": ["", ""],
+        "qty": ["2", "3"], "unit": ["pc", "roll"], "unit_price": ["430", "80"],
+        "requested_delivery": ["", ""], "vat": ["", ""], "remarks": ["", ""],
+        "prepared_by": "Bernadith Frianeza", "checked_by": "Fe Amor Eballar"})
+    po = db.read("purchase_orders")[-1]
+    pr = db.get("purchase_requests", pr["id"])
+    check(po["po_no"] == pr["pr_no"] and len(po["items"]) == 1
+          and abs(po["grand_total"] - 920) < 0.01,
+          "PO prepared from the approved lines (unticked line left out)")
+    check(pr["status"] == "Approved" and pr["items"][0]["po_no"] == po["po_no"]
+          and not pr["items"][1].get("po_id"),
+          "the PR shows which line is on the PO and which still needs one")
+    c.post("/purchasing/%d/approve" % po["id"], data={"approved_by_name": "Janice Nilda A. Mira"})
+    check(db.get("purchase_orders", po["id"])["status"] == "Approved",
+          "PO approved")
+    page = c.get("/purchasing/%d/print" % po["id"]).data.decode("utf-8")
+    check("Purchase Order" in page and "Janice Nilda A. Mira" in page,
+          "PO prints as the Purchase Order form")
+    c.post("/purchasing/%d/delivered" % po["id"])
+    check(db.get("purchase_orders", po["id"])["status"] == "Delivered",
+          "PO marked delivered")
+    for route in ("/purchasing/", "/requests/", "/requests/%d" % pr["id"],
+                  "/approvals/", "/purchasing/%d" % po["id"]):
+        check(c.get(route).status_code == 200, "%s renders" % route)
 
 # 8) Module 5 — sales uploads and reports
 # A made-up Shopify CSV goes through the whole flow (upload → preview → save
@@ -492,7 +600,8 @@ data_sql = mysql_export.build_data_sql()
 for table in ("receiving_boxes", "packing_items", "honey_allocations",
               "assets", "asset_movements", "stock_movements",
               "month_end_count_lines", "batch_dispensing", "batch_steps",
-              "retention_samples", "sanitation_areas", "pest_control_areas"):
+              "retention_samples", "sanitation_areas", "pest_control_areas",
+              "purchase_orders", "purchase_order_items"):
     check("CREATE TABLE `%s`" % table in schema,
           "MySQL schema has %s" % table)
 check("INSERT INTO `users`" in data_sql, "MySQL data dump includes rows")

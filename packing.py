@@ -13,22 +13,26 @@ from flask import (Blueprint, abort, flash, redirect, render_template, request,
 
 import db
 import services
-from security import (current_user, is_admin, module_required, normalize_role)
+from security import (PACKER_ROLES, current_user, is_super_admin,
+                      module_required, normalize_role)
 
 packing_bp = Blueprint("packing", __name__)
-
-PACKER_ROLES = ("packing_head", "packing_member")
-
 
 def _packers():
     """Everyone who can be named as the packer on a run."""
     return [u for u in db.read("users")
             if u.get("active", True)
-            and (normalize_role(u.get("role")) in PACKER_ROLES or is_admin(u))]
+            and normalize_role(u.get("role")) in PACKER_ROLES + ("super_admin",)]
+
+
+def _picks_packer(user):
+    """Only the Super Admin records packing on someone else's behalf; a
+    packer's runs are always recorded under their own account."""
+    return is_super_admin(user)
 
 
 def _can_cancel(user):
-    return is_admin(user) or normalize_role(user.get("role")) == "packing_head"
+    return is_super_admin(user) or normalize_role(user.get("role")) == "packing_head"
 
 
 def _run_row(r):
@@ -101,10 +105,16 @@ def new():
                 "damaged_qty": damaged[i] if i < len(damaged) else 0,
                 "notes": notes[i] if i < len(notes) else "",
             })
-        try:
-            packer_id = int(form.get("packer_id") or user["id"])
-        except ValueError:
-            packer_id = user["id"]
+        # "Packed by" is the logged-in packer; only the Super Admin may name
+        # another packer (whatever a form posts).
+        packer_id = user["id"]
+        if _picks_packer(user):
+            try:
+                chosen = int(form.get("packer_id") or user["id"])
+            except ValueError:
+                chosen = user["id"]
+            if any(p["id"] == chosen for p in _packers()):
+                packer_id = chosen
         order_raw = (form.get("sales_order_id") or "").strip()
         sales_order_id = int(order_raw) if order_raw.isdigit() else None
 
@@ -144,6 +154,7 @@ def new():
     return render_template(
         "packing/new.html", products=products,
         channels=services.PACKING_CHANNELS, packers=_packers(),
+        picks_packer=_picks_packer(user),
         orders=open_orders, today=services.today_iso(), form=form,
         lines=lines, me=user, start=2 if request.method == "POST" else 0)
 

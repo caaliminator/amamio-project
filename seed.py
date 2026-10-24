@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, timezone
 from werkzeug.security import generate_password_hash
 
 import db
+import purchasing_service as pur
 import seed_catalog as cat
 import services
 from security import ROLE_LABELS, ROLES
@@ -538,6 +539,10 @@ def _seed_packing(users, products):
 
 def _seed_live_docs(users, products, materials):
     """Pending approvals and customer orders so no screen starts empty."""
+    # The client's own PR 2026-09-017 and its PO, as on the paper forms.
+    for s in db.query("suppliers", name="Trimix Butuan"):
+        db.update("suppliers", s["id"], {"address": "Butuan"})
+    pur.seed_demo(users, {s["name"]: s for s in db.read("suppliers")})
     services.create_production_request(
         requestor_id=users["production_head"]["id"],
         product_id=products["Honey Lemon Ginger Concentrate 300 mL"]["id"],
@@ -554,11 +559,14 @@ def _seed_live_docs(users, products, materials):
         remarks="Lemon and ginger ran out mid-batch; next HLGC run is Monday.",
         needed_by=_days_ago(-4), urgency="Urgent")
 
-    services.create_material_request(
-        requestor_id=users["assets_head"]["id"], category="cleaning",
-        name="Dishwashing Liquid 3.78 L", qty=4,
-        description="For the washing area.",
-        reason="Below reorder level", needed_by=_days_ago(-7))
+    pur.create_purchase_request(
+        users["assets_head"], "Assets & Maintenance",
+        "Cleaning supplies below reorder level", _days_ago(-7),
+        [{"description": "Dishwashing Liquid 3.78 L", "purpose_use": "Washing area",
+          "qty": 4, "unit": "gal", "est_unit_cost": 385,
+          "preferred_supplier": "Sanitary Care Products Asia",
+          "budget_category": "Production supplies"}],
+        notes="For the washing area — two gallons left.")
 
     services.create_sales_request(
         requestor_id=users["packing_head"]["id"],

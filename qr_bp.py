@@ -127,6 +127,20 @@ def resolve_token(token):
         action = {"In Progress": "Finish packing",
                   "Packed": "Disburse or hand to courier"}.get(
                       run.get("status"), "Open this packing run")
+        if not can(current_user(), "packing"):
+            # Packing runs are opened by the packing team only.
+            return {
+                "ok": True, "kind": "packing", "token": token, "record": run,
+                "title": "Packing %s — %s item(s)" % (
+                    run.get("channel") or "", services.fmt_qty(run.get("total_qty"))),
+                "subtitle": "Run %s · packed by %s" % (token,
+                                                       run.get("packer_name") or "—"),
+                "status": run.get("status"), "url": url_for("qr.scan"),
+                "action": "Only the packing team opens packing runs",
+                "details": [("Pack date", run.get("pack_date")),
+                            ("Courier", run.get("courier")),
+                            ("Tracking no.", run.get("tracking_no"))],
+            }
         return {
             "ok": True, "kind": "packing", "token": token, "record": run,
             "title": "Packing %s — %s item(s)" % (

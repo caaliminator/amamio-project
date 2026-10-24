@@ -47,6 +47,7 @@ _PARENT_FK = {
     "pest_control_areas": ("pest_control_records", "pest_control_record_id"),
     "batch_dispensing": ("batch_records", "batch_record_id"),
     "batch_steps": ("batch_records", "batch_record_id"),
+    "purchase_order_items": ("purchase_orders", "purchase_order_id"),
 }
 
 

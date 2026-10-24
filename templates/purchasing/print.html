@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}PO {{ po.po_no }}{% endblock %}
+{% block content %}
+<a class="back-link no-print" href="{{ url_for('purchasing.detail', po_id=po.id) }}">{{ icon('arrow-left', 15) }} PO {{ po.po_no }}</a>
+<div class="filter-bar no-print">
+  <span class="muted small">Purchase Order · {{ po.status }}{% if po.status == 'Prepared' %} — not yet approved{% endif %}</span>
+  <button class="btn btn-primary" type="button" onclick="window.print()">{{ icon('printer', 15) }} Print</button>
+</div>
+
+<div class="paper">
+<div class="gform">
+  <div class="gform-org">AMAMIO FARM PRODUCTS</div>
+  <div class="gform-bar center">Purchase Order</div>
+  <div class="gform-fields white">
+    <div><b>PO No.</b><span>{{ po.po_no }}</span></div>
+    <div><b>PO Date</b><span>{{ po.po_date|longdate }}</span></div>
+    <div><b>Expected Delivery Date</b><span>{{ po.expected_delivery|longdate }}</span></div>
+    <div><b>Payment Terms</b><span>{{ po.payment_terms }}</span></div>
+  </div>
+  <div class="gform-bar">Supplier Information</div>
+  <div class="gform-fields white">
+    <div><b>Supplier Name</b><span>{{ po.supplier_name }}</span></div>
+    <div><b>TIN</b><span>{{ po.supplier_tin }}</span></div>
+    <div><b>Address</b><span>{{ po.supplier_address }}</span></div>
+    <div><b>Contact Person</b><span>{{ po.supplier_contact_person }}</span></div>
+    <div><b>Contact No. / Email</b><span>{{ po.supplier_contact }}</span></div>
+    <div><b>Supplier Reference</b><span>{{ po.supplier_reference }}</span></div>
+  </div>
+  <div class="gform-bar">Delivery Information</div>
+  <div class="gform-fields white">
+    <div class="wide"><b>Deliver To</b><span>{{ po.deliver_to }}</span></div>
+    <div><b>Delivery Address</b><span>{{ po.delivery_address }}</span></div>
+    <div><b>Delivery Contact</b><span>{{ po.delivery_contact }}</span></div>
+    <div class="wide"><b>Delivery Instructions</b><span>{{ po.delivery_instructions }}</span></div>
+  </div>
+  <table>
+    <thead>
+      <tr><th>Item</th><th>Description / Specification</th><th>Brand / Model</th><th>Qty</th><th>Unit</th>
+        <th>Unit Price</th><th>Amount</th><th>Requested Delivery</th><th>VAT / Tax</th><th>Remarks</th></tr>
+    </thead>
+    <tbody>
+      {% for it in po['items'] %}
+      <tr>
+        <td class="num">{{ it.line_no }}</td><td>{{ it.description }}</td><td>{{ it.brand_model }}</td>
+        <td class="num">{{ it.qty|qty }}</td><td>{{ it.unit }}</td>
+        <td class="num">{{ it.unit_price|peso }}</td><td class="num">{{ it.amount|peso }}</td>
+        <td>{{ it.requested_delivery|longdate }}</td><td>{{ it.vat }}</td><td>{{ it.remarks }}</td>
+      </tr>
+      {% endfor %}
+      {% for n in range(po['items']|length + 1, [6, po['items']|length + 1]|max) %}
+      <tr><td class="num">{{ n }}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      {% endfor %}
+      <tr class="total"><td colspan="6" class="num">SUBTOTAL</td><td class="num">{{ po.subtotal|peso }}</td><td colspan="3"></td></tr>
+      <tr class="total"><td colspan="6" class="num">Discount</td><td class="num">{{ po.discount|peso if po.discount else '' }}</td><td colspan="3"></td></tr>
+      <tr class="total"><td colspan="6" class="num">Delivery / Freight</td><td class="num">{{ po.freight|peso if po.freight else '' }}</td><td colspan="3"></td></tr>
+      <tr class="total"><td colspan="6" class="num">VAT / Other Tax</td><td class="num">{{ po.tax|peso if po.tax else '' }}</td><td colspan="3"></td></tr>
+      <tr class="grand"><td colspan="6" class="num">GRAND TOTAL</td><td class="num">{{ po.grand_total|peso }}</td><td colspan="3"></td></tr>
+    </tbody>
+  </table>
+  <div class="gform-bar" style="margin-top:10px">Terms / Special Instructions</div>
+  <div class="gform-text">{{ po.terms }}</div>
+  <div class="gform-sign">
+    {% for who, name, on in [
+         ('Prepared By', po.prepared_by_name, po.prepared_at),
+         ('Checked By', po.checked_by_name, po.prepared_at if po.checked_by_name else ''),
+         ('Approved By', po.approved_by_name, po.approved_at),
+         ('Supplier Acknowledgment', po.supplier_ack_name, po.supplier_ack_date)] %}
+    <div>
+      <div class="who">{{ who }}</div>
+      <div class="name">{{ name or '' }}</div>
+      <div class="cap">Name &amp; Signature</div>
+      <div class="date">Date: {{ on|longdate }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="gform-foot">AMAMIO FARM PRODUCTS &nbsp;|&nbsp; Purchase Order &nbsp;|&nbsp; Controlled Form</div>
+</div>
+</div>
+{% endblock %}

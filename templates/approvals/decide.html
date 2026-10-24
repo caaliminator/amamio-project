@@ -1,115 +1,94 @@
 {% extends "base.html" %}
-{% block title %}Review Request #{{ req.id }}{% endblock %}
+{% block title %}Review PR {{ req.pr_label }}{% endblock %}
 {% block content %}
 <style>
-  .approve-item-name { font-weight: 600; }
   .approve-reject-cell { white-space: nowrap; text-align: center !important; width: 1%; }
-  .approve-actions { margin-top: 1rem; }
-  .table input.qty-input { width: 7.5rem; margin-left: auto; display: block; text-align: right; }
+  .table input.qty-input { width: 7rem; margin-left: auto; display: block; text-align: right; }
 </style>
+<a class="back-link" href="{{ url_for('approvals.index') }}">{{ icon('arrow-left', 15) }} Approvals</a>
 
-<h1 class="page-title">Review request #{{ req.id }}</h1>
-
-<div class="card">
-  <div class="grid grid-3">
-    <div>
-      <div class="muted">Type</div>
-      <div>
-        {% if req.type == 'production' %}Recipe ingredients{% else %}Supplies / equipment{% endif %}
-      </div>
-    </div>
-    <div>
-      <div class="muted">Requestor</div>
-      <div>{{ req.requestor_name }}</div>
-    </div>
-    <div>
-      <div class="muted">Created</div>
-      <div>{{ req.created_at[:16].replace('T', ' ') if req.created_at else '—' }}</div>
-    </div>
-    <div>
-      <div class="muted">Urgency</div>
-      <div><span class="badge {{ urgency_badge.get(req.urgency or 'Normal', 'badge-muted') }}">{{ req.urgency or 'Normal' }}</span></div>
-    </div>
-    <div>
-      <div class="muted">Needed by</div>
-      <div>{{ req.needed_by or '—' }}</div>
-    </div>
-    {% if req.type == 'production' %}
-    <div>
-      <div class="muted">For product</div>
-      <div>{{ req.product_name or '—' }}{% if req.qty %} &times; {{ req.qty }}{% endif %}</div>
-    </div>
-    {% endif %}
+<div class="record-head">
+  <div>
+    <div class="record-code">PR No. {{ req.pr_label }}</div>
+    <h1 class="record-title">{{ req.purpose or req.reason or 'Purchase request' }}</h1>
+    <div class="muted small">{{ req.department or ('Production' if req.type == 'production' else '—') }} · requested by {{ req.requestor_name }}
+      · {{ req.date_requested or (req.created_at or '')[:10] }}{% if req.needed_by %} · required {{ req.needed_by }}{% endif %}</div>
   </div>
-  <hr class="divider">
-  <div class="muted">Reason given</div>
-  <p style="font-size:1.05rem">{{ req.reason or 'No reason was recorded.' }}</p>
-  {% if req.remarks %}
-  <p class="muted small">Requestor remarks: {{ req.remarks }}</p>
-  {% endif %}
+  <span class="badge {{ urgency_badge.get(req.urgency or 'Normal', 'badge-muted') }}">{{ req.urgency or 'Normal' }}</span>
 </div>
 
-<form class="form" method="post"
-      action="{{ url_for('approvals.decide', request_id=req.id) }}">
-  <div class="card">
-    <div class="card-title">Line items</div>
+{% if req.notes or req.remarks %}
+<div class="card mb">
+  <div class="card-title">Requester's notes / special instructions</div>
+  <p>{{ req.notes or req.remarks }}</p>
+  {% if req.type == 'production' %}<p class="muted small">For {{ req.product_name or 'a production run' }}{% if req.qty %} × {{ req.qty|qty }}{% endif %}.</p>{% endif %}
+</div>
+{% endif %}
+
+<form class="form" method="post" action="{{ url_for('approvals.decide', request_id=req.id) }}">
+  <div class="card mb">
+    <div class="card-title">Items — change a quantity or tick Reject</div>
     <div class="table-wrap">
-      <table class="table">
+      <table class="table" data-no-paginate>
         <thead>
           <tr>
-            <th>#</th>
             <th>Item</th>
-            {% if req.type == 'material' %}<th>Category</th>{% endif %}
-            <th>Unit</th>
-            <th class="text-right">Requested</th>
-            <th class="text-right">Approved qty</th>
+            <th class="num">Requested</th><th>Unit</th>
+            <th class="num">Est. unit</th><th class="num">Est. total</th>
+            <th class="num">Approved qty</th>
             <th class="approve-reject-cell">Reject</th>
           </tr>
         </thead>
         <tbody>
           {% for it in req['items'] %}
           <tr>
-            <td>{{ it.item_id }}</td>
-            <td class="approve-item-name">
-              {{ it.display_name }}
-              {% if it.note %}<div class="muted">{{ it.note }}</div>{% endif %}
-              {% if it.description %}<div class="muted">{{ it.description }}</div>{% endif %}
-            </td>
-            {% if req.type == 'material' %}<td>{{ it.category or '-' }}</td>{% endif %}
+            <td class="wrap"><b>{{ it.display_name }}</b>
+              {% set sub = [it.purpose_use, it.remark or it.note, ('from ' ~ it.preferred_supplier) if it.preferred_supplier else ''] | select | join(' · ') %}
+              {% if sub %}<div class="muted small">{{ sub }}</div>{% endif %}</td>
+            <td class="num">{{ it.requested_qty|qty }}</td>
             <td>{{ it.display_unit }}</td>
-            <td class="text-right">{{ it.requested_qty }}</td>
-            <td class="text-right">
-              <input class="qty-input text-right" type="number" step="any" min="0"
+            <td class="num">{{ it.est_unit_cost|peso if it.est_unit_cost else '—' }}</td>
+            <td class="num">{{ it.est_total|peso if it.est_total else '—' }}</td>
+            <td class="num">
+              <input class="qty-input" type="number" step="any" min="0"
                      name="approved_qty_{{ it.item_id }}"
-                     value="{{ it.approved_qty if it.approved_qty not in (none, '') else it.requested_qty }}">
+                     value="{{ "%g"|format((it.approved_qty if it.approved_qty not in (none, '') else it.requested_qty)|float) }}">
             </td>
-            <td class="approve-reject-cell">
-              <input type="checkbox" name="reject_{{ it.item_id }}" value="1">
-            </td>
+            <td class="approve-reject-cell"><input type="checkbox" name="reject_{{ it.item_id }}" value="1"></td>
           </tr>
           {% endfor %}
         </tbody>
+        <tfoot><tr><td colspan="4">Total estimated purchase cost</td><td class="num">{{ req.total|peso }}</td><td colspan="2"></td></tr></tfoot>
       </table>
     </div>
   </div>
 
   <div class="card">
+    <div class="form-grid cols-2">
+      <div class="form-row">
+        <label class="form-label" for="checked_by_name">Checked by</label>
+        <input type="text" id="checked_by_name" name="checked_by_name" maxlength="80"
+               value="{{ req.checked_by_name or '' }}" placeholder="Name of who checked the request">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Approved by</label>
+        <input type="text" value="{{ me.name }}" readonly class="locked-field">
+      </div>
+    </div>
     <div class="form-row">
-      <label class="form-label" for="remarks">Remarks (saved to the request &amp; sent to the requestor)</label>
-      <textarea id="remarks" name="remarks" rows="3"
-                placeholder="e.g. Requested 15, approved 10 — budget limit.">{{ req.remarks or '' }}</textarea>
+      <label class="form-label" for="remarks">Remarks (sent to the requester)</label>
+      <textarea id="remarks" name="remarks" rows="2"
+                placeholder="e.g. Requested 15, approved 10 — budget limit."></textarea>
     </div>
-    <div class="approve-actions flex gap">
+    <div class="flex gap wrap">
       <button class="btn btn-primary" type="submit" name="action" value="approve">Approve</button>
-      <button class="btn" type="submit" name="action" value="revise">Revise</button>
+      <button class="btn" type="submit" name="action" value="revise">Approve with changes</button>
       <button class="btn btn-danger" type="submit" name="action" value="reject"
-              data-confirm="Reject the entire request #{{ req.id }}?">Reject</button>
-      <a class="btn btn-ghost" href="{{ url_for('approvals.index') }}">Cancel</a>
+              data-confirm="Reject the whole request {{ req.pr_label }}?">Reject</button>
     </div>
-    <p class="muted mt">
-      Approved items are set to <strong>Ordered</strong> and get a QR token. Changing any
-      quantity marks the request <strong>Revised</strong>; otherwise <strong>Approved</strong>.
-      No inventory changes until materials are received via QR scan.
+    <p class="muted small mt">
+      Approved items can then be put on a purchase order. Changing a quantity marks the request
+      <strong>Revised</strong>. No stock changes until the goods are received.
     </p>
   </div>
 </form>

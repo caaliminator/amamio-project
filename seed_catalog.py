@@ -223,6 +223,7 @@ for _row in ASSETS:
 # --- Supplier Directory -----------------------------------------------------
 # (name, tin, category, items, buy_from / contact)
 SUPPLIERS = [
+    ("Trimix Butuan", "", "Production", "Switches, timers and electrical parts", ""),
     ("Allen Mall", "", "Packing", "Jute cord rope 15 mm & 25 mm", "Shopee"),
     ("Akiro Store", "", "Packing", "Vacuum sealers 25x35 cm", ""),
     ("2 Dragons", "", "Office", "12.5 in x 164 ft phototop (glossy)", "Shopee"),

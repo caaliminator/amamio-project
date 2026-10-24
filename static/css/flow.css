@@ -70,6 +70,15 @@
   .page-note-facts dd { margin-bottom: 6px; }
 }
 
+/* Out-of-stock choices: red and not selectable (packing product list). */
+select option.opt-out, select option.opt-out:disabled { color: var(--danger); }
+.out-word { color: var(--danger); font-weight: 600; }
+/* A value filled in by the system that the user can't change. */
+.locked-field, .locked-field:hover, .locked-field:focus {
+  background: var(--raise-3); border-color: var(--border); color: var(--text);
+  cursor: not-allowed; box-shadow: none;
+}
+
 /* Phones: keep the top bar to the essentials. */
 @media (max-width: 520px) {
   .topbar .user-meta, .topbar .topbar-date { display: none; }
@@ -413,6 +422,33 @@
 .paper-foot div { border-top: 1px solid #111; padding-top: 4px; }
 .paper-note { font-size: .72rem; color: #444; margin-top: 8px; }
 .paper .stamp { display: inline-block; padding: 1px 8px; border: 1.5px solid #111; border-radius: 4px; font-weight: 800; font-size: .72rem; }
+
+/* Green "controlled form" layout — Purchase Request Form and Purchase Order. */
+.gform { border: 2px solid #222; padding: 0 0 6px; font-size: .8rem; min-width: 760px; }
+.gform-org { text-align: center; color: #5b7a2e; font-weight: 800; font-size: 1.5rem; letter-spacing: .02em; padding: 8px 0 2px; }
+.gform-bar { background: #5b7a2e; color: #fff; font-weight: 700; letter-spacing: .04em; padding: 3px 10px; text-transform: uppercase; font-size: .8rem; }
+.gform-bar.center { text-align: center; font-size: .95rem; }
+.gform-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 28px; padding: 8px 12px; background: #eef1ea; }
+.gform-fields.white { background: #fff; }
+.gform-fields > div { display: grid; grid-template-columns: 170px 1fr; align-items: end; }
+.gform-fields > div.wide { grid-column: 1 / -1; }
+.gform-fields b { font-weight: 700; }
+.gform-fields span { border-bottom: 1px solid #333; min-height: 1.3em; padding: 0 4px; }
+.gform table { width: 100%; border-collapse: collapse; }
+.gform th { background: #5b7a2e; color: #fff; font-weight: 700; padding: 4px 5px; text-align: center; vertical-align: middle; border: 1px solid #5b7a2e; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.gform td { border: 1px solid #777; padding: 3px 5px; vertical-align: top; color: #111; height: 1.6em; }
+.gform td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gform tr.total td { background: #eef1ea; font-weight: 800; }
+.gform tr.grand td { background: #5b7a2e; color: #fff; font-weight: 800; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.gform-text { padding: 6px 12px; min-height: 2.4em; }
+.gform-sign { display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr); margin-top: 8px; }
+.gform-sign > div { border: 1px solid #555; text-align: center; }
+.gform-sign .who { background: #5b7a2e; color: #fff; font-weight: 700; padding: 3px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.gform-sign .name { font-weight: 700; padding: 10px 4px 2px; min-height: 2.4em; text-transform: uppercase; }
+.gform-sign .cap { border-top: 1px solid #555; font-size: .72rem; padding: 2px; }
+.gform-sign .date { border-top: 1px solid #555; text-align: left; padding: 3px 6px; }
+.gform-foot { text-align: center; font-style: italic; color: #555; font-size: .72rem; margin-top: 8px; }
+.gform-bar, .gform-fields { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
 @media print {
   @page { size: auto; margin: 10mm; }

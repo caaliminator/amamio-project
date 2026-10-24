@@ -462,13 +462,17 @@ SCHEMA = {
     },
 
     # --- Requests & approvals ----------------------------------------------
+    # Purchase Request Form (see purchasing_service.py for the paper fields).
     "purchase_requests": {
         "columns": {
-            "id": ID, "type": SHORT, "requestor_id": FK, "product_id": FK,
-            "product_name": STR, "qty": NUM, "reason": TEXT,
-            "needed_by": DATE, "urgency": SHORT, "status": SHORT,
-            "remarks": TEXT, "decided_by": FK, "decided_at": TS,
-            "created_at": TS,
+            "id": ID, "type": SHORT, "pr_no": SHORT, "requestor_id": FK,
+            "requested_by_name": STR, "department": SHORT, "purpose": TEXT,
+            "date_requested": DATE, "product_id": FK, "product_name": STR,
+            "qty": NUM, "reason": TEXT, "needed_by": DATE, "urgency": SHORT,
+            "notes": TEXT, "total_estimated": MONEY, "status": SHORT,
+            "remarks": TEXT, "checked_by_name": STR, "approved_by_name": STR,
+            "purchasing_by_name": STR, "purchasing_date": DATE,
+            "decided_by": FK, "decided_at": TS, "created_at": TS,
         },
         "children": {"items": "purchase_request_items"},
         "foreign_keys": {"requestor_id": "users", "product_id": "products",
@@ -477,12 +481,50 @@ SCHEMA = {
     "purchase_request_items": {
         "columns": {
             "id": ID, "purchase_request_id": FK, "item_id": "INT NULL",
-            "name": STR, "category": SHORT, "description": TEXT,
-            "material_id": FK, "requested_qty": NUM, "approved_qty": NUM,
-            "received_qty": NUM, "status": SHORT, "note": TEXT,
-            "qr_token": SHORT,
+            "name": STR, "purpose_use": STR, "unit": SHORT,
+            "category": SHORT, "description": TEXT, "material_id": FK,
+            "requested_qty": NUM, "est_unit_cost": MONEY, "est_total": MONEY,
+            "preferred_supplier": STR, "budget_category": SHORT,
+            "remark": TEXT, "approved_qty": NUM, "received_qty": NUM,
+            "status": SHORT, "note": TEXT, "qr_token": SHORT,
+            "po_id": FK, "po_no": SHORT,
         },
         "foreign_keys": {"purchase_request_id": "purchase_requests",
+                         "material_id": "raw_materials",
+                         "po_id": "purchase_orders"},
+    },
+    # Purchase Order (paper form), prepared from an approved PR.
+    "purchase_orders": {
+        "columns": {
+            "id": ID, "po_no": SHORT, "purchase_request_id": FK,
+            "pr_no": SHORT, "po_date": DATE, "expected_delivery": DATE,
+            "payment_terms": STR, "supplier_id": FK, "supplier_name": STR,
+            "supplier_address": TEXT, "supplier_contact": STR,
+            "supplier_tin": SHORT, "supplier_contact_person": STR,
+            "supplier_reference": STR, "deliver_to": STR,
+            "delivery_address": TEXT, "delivery_instructions": TEXT,
+            "delivery_contact": STR, "subtotal": MONEY, "discount": MONEY,
+            "freight": MONEY, "tax": MONEY, "grand_total": MONEY,
+            "terms": TEXT, "prepared_by_name": STR, "prepared_at": DATE,
+            "checked_by_name": STR, "approved_by_name": STR,
+            "approved_at": DATE, "supplier_ack_name": STR,
+            "supplier_ack_date": DATE, "status": SHORT, "delivered_at": DATE,
+            "created_by": FK, "created_at": TS,
+        },
+        "children": {"items": "purchase_order_items"},
+        "unique": ["po_no"],
+        "foreign_keys": {"purchase_request_id": "purchase_requests",
+                         "supplier_id": "suppliers", "created_by": "users"},
+    },
+    "purchase_order_items": {
+        "columns": {
+            "id": ID, "purchase_order_id": FK, "line_no": "INT NULL",
+            "pr_item_id": "INT NULL", "material_id": FK, "description": STR,
+            "brand_model": STR, "qty": NUM, "unit": SHORT,
+            "unit_price": MONEY, "amount": MONEY, "requested_delivery": DATE,
+            "vat": SHORT, "remarks": TEXT,
+        },
+        "foreign_keys": {"purchase_order_id": "purchase_orders",
                          "material_id": "raw_materials"},
     },
 

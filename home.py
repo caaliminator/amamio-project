@@ -12,6 +12,7 @@ import assets_service
 import db
 import facility_service
 import platform_service as ps
+import purchasing_service as pur
 import services
 from security import can, is_admin, normalize_role
 
@@ -43,6 +44,7 @@ def _counts():
                          if r.get("status") == "Pending Approval")
                      + sum(1 for r in db.read("sales_requests")
                            if r.get("status") == "Pending Approval"),
+        "awaiting_po": len(pur.requests_awaiting_po()),
         "low_stock": len(services.low_stock_materials()),
         "maintenance_due": len(assets_service.maintenance_due()),
         "assets_out": len(assets_service.assets_out()),
@@ -122,10 +124,15 @@ def tasks_for(user, c):
                   primary=bool(c["approvals"])),
             _task("Sales reports", "What sold, on which platform, week by week",
                   "chart", "platforms.index", primary=not c["approvals"]),
+            _task("Purchase orders", "Approved requests to order from the supplier",
+                  "orders", "purchasing.index", count=c["awaiting_po"]),
             _task("Receiving & inspection", "Deliveries and boxes on the floor",
                   "receiving", "receiving.index", count=c["awaiting"]),
-            _task("Packing & dispatch", "Packed, disbursed and with the courier",
-                  "packing", "packing.index", count=c["packed_waiting"]),
+        ]
+        if can(user, "packing"):        # the Super Admin; not the Admin role
+            t.append(_task("Packing & dispatch", "Packed, disbursed and with the courier",
+                           "packing", "packing.index", count=c["packed_waiting"]))
+        t += [
             _task("Equipment & supplies", "Every IN and OUT, maintenance due",
                   "tools", "assets.index", count=c["maintenance_due"]),
             _task("Reports", "Receiving, QC, packing, damage and AI insight",
@@ -166,6 +173,9 @@ def waiting_for(user, c):
         "Disburse or hand to the courier", "packing.index")
     add(can(user, "approvals") and c["approvals"],
         "%d request(s) to approve" % c["approvals"], "", "approvals.index")
+    add(can(user, "purchasing") and c["awaiting_po"],
+        "%d approved request(s) waiting for a PO" % c["awaiting_po"],
+        "Prepare the purchase order for the supplier", "purchasing.index")
     add(can(user, "assets") and c["maintenance_due"],
         "%d maintenance job(s) due" % c["maintenance_due"],
         "Within the next 14 days", "assets.index")

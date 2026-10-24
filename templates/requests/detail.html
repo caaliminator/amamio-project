@@ -1,93 +1,116 @@
 {% extends "base.html" %}
-{% block title %}Request #{{ req.id }}{% endblock %}
+{% block title %}PR {{ row.pr_no }}{% endblock %}
 {% block content %}
-<div class="flex gap mb" style="justify-content:space-between;align-items:flex-start;flex-wrap:wrap;">
+<a class="back-link" href="{{ url_for('requests.index') }}">{{ icon('arrow-left', 15) }} Purchase Requests</a>
+
+<div class="record-head">
   <div>
-    <h1 class="page-title">Request #{{ req.id }}</h1>
-    <p class="muted">
-      {{ 'Production material request' if req.type == 'production' else 'New material / equipment request' }}
-      · <span class="badge {{ status_badge.get(req.status, 'badge-muted') }}">{{ req.status }}</span>
-    </p>
+    <div class="record-code">PR No. {{ row.pr_no }}</div>
+    <h1 class="record-title">{{ row.purpose or row.summary }}</h1>
+    <div class="muted small">{{ row.department or '—' }} · requested by {{ row.requested_by }} · {{ row.date_requested }}
+      {% if row.needed_by %} · required {{ row.needed_by }}{% endif %}</div>
   </div>
-  <div class="flex gap">
-    {% set ordered_items = (req['items'] or []) | selectattr('qr_token') | list %}
-    {% if ordered_items %}
-      <a class="btn btn-primary" href="{{ url_for('qr.print_codes', request_id=req.id) }}">Print QR codes</a>
-    {% endif %}
-    <a class="btn btn-ghost" href="{{ url_for('requests.index') }}">Back to requests</a>
+  <div class="flex gap-sm wrap" style="align-items:center">
+    {% if row.urgency != 'Normal' %}<span class="badge {{ urgency_badge.get(row.urgency, 'badge-warn') }}">{{ row.urgency }}</span>{% endif %}
+    <span class="badge {{ row.badge }}">{{ row.status }}</span>
+  </div>
+</div>
+
+{% set steps = ['Requested', 'Approved', 'PO prepared', 'Received'] %}
+{% set reached = {'Pending Approval': 0, 'Approved': 1, 'Revised': 1, 'Ordered': 2, 'Received': 3}.get(req.status, 0) %}
+<div class="track mb">
+  {% if req.status == 'Rejected' %}
+    <span class="track-step is-done">Requested</span><span class="track-step is-now">Rejected</span>
+  {% else %}
+    {% for label in steps %}<span class="track-step is-{{ 'done' if loop.index0 < reached else ('now' if loop.index0 == reached else '') }}">{{ label }}</span>{% endfor %}
+  {% endif %}
+</div>
+
+{% if is_admin and req.status == 'Pending Approval' %}
+<div class="next-action">
+  <div class="next-action-text"><b>Next: check and approve it</b><span>Approve, change quantities, or reject — the requester is told.</span></div>
+  <a class="btn btn-primary" href="{{ url_for('approvals.decide', request_id=req.id) }}">Review request</a>
+</div>
+{% elif can_order %}
+<div class="next-action">
+  <div class="next-action-text"><b>Next: prepare the purchase order</b><span>The approved items go onto a PO for the supplier.</span></div>
+  <a class="btn btn-primary" href="{{ url_for('purchasing.new', request_id=req.id) }}">Prepare purchase order</a>
+</div>
+{% elif req.status == 'Pending Approval' %}
+<div class="next-action">
+  <div class="next-action-text"><b>Waiting for approval</b><span>The admin has been notified. You'll get a notification once it is decided.</span></div>
+</div>
+{% endif %}
+
+<div class="card mb">
+  <div class="card-title">Items</div>
+  <div class="table-wrap">
+    <table class="table" data-no-paginate>
+      <thead>
+        <tr>
+          <th>Item</th><th>Description</th><th class="num">Qty</th>
+          <th class="num">Est. unit</th><th class="num">Est. total</th>
+          <th>Preferred supplier</th><th class="num">Approved</th><th>Status</th><th>PO</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ it.name }}
+            {% set sub = [it.purpose_use, it.budget_category, it.remark or it.note] | select | join(' · ') %}
+            {% if sub %}<div class="muted small">{{ sub }}</div>{% endif %}</td>
+          <td class="num nowrap">{{ it.requested_qty|qty(it.unit) }}</td>
+          <td class="num">{{ it.est_unit_cost|peso if it.est_unit_cost else '—' }}</td>
+          <td class="num">{{ it.est_total|peso if it.est_total else '—' }}</td>
+          <td>{{ it.preferred_supplier or '—' }}</td>
+          <td class="num">{{ it.approved_qty|qty if it.approved_qty is not none else '—' }}</td>
+          <td><span class="badge {{ status_badge.get(it.status, 'badge-muted') }}">{{ it.status }}</span></td>
+          <td>{% if it.po_id %}<a href="{{ url_for('purchasing.detail', po_id=it.po_id) }}">{{ it.po_no }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr><td colspan="4">Total estimated purchase cost</td><td class="num">{{ row.total|peso }}</td><td colspan="4"></td></tr></tfoot>
+    </table>
   </div>
 </div>
 
 <div class="card mb">
-  <div class="grid grid-3">
-    <div><div class="form-label">Requestor</div>{{ requestor.name if requestor else '—' }}</div>
-    <div><div class="form-label">Created</div>{{ (req.created_at or '')[:16].replace('T', ' ') or '—' }}</div>
-    <div><div class="form-label">Type</div>{{ 'Production (BOM)' if req.type == 'production' else 'Material / Equipment' }}</div>
-    {% if req.type == 'production' %}
-    <div><div class="form-label">Product</div>{{ req.product_name or '—' }}</div>
-    <div><div class="form-label">Quantity</div>{{ req.qty or '—' }}</div>
-    {% endif %}
-    <div><div class="form-label">Urgency</div>
-      <span class="badge {{ urgency_badge.get(req.urgency or 'Normal', 'badge-muted') }}">{{ req.urgency or 'Normal' }}</span>
-    </div>
-    <div><div class="form-label">Needed by</div>{{ req.needed_by or '—' }}</div>
-  </div>
-  <hr class="divider">
-  <div class="form-label">Reason for this request</div>
-  <p>{{ req.reason or 'No reason was recorded.' }}</p>
-  {% if req.remarks %}
-  <div class="mt"><div class="form-label">Requestor remarks</div><p class="muted">{{ req.remarks }}</p></div>
-  {% endif %}
+  <div class="card-title">Requester's notes / special instructions</div>
+  <p>{{ req.notes or (req.remarks if req.type != 'general') or '—' }}</p>
+  {% if req.type == 'production' %}<p class="muted small">Ingredients for {{ req.product_name or 'a production run' }}{% if req.qty %} × {{ req.qty|qty }}{% endif %}.</p>{% endif %}
+  {% if req.remarks and req.type == 'general' %}<div class="form-label mt">Approver's remarks</div><p>{{ req.remarks }}</p>{% endif %}
 </div>
 
-<div class="card">
-  <div class="card-title">Items</div>
-  <div class="table-wrap">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Item</th>
-          {% if req.type == 'material' %}<th>Category</th>{% endif %}
-          <th class="text-right">Requested</th>
-          <th class="text-right">Approved</th>
-          <th>Status</th>
-          <th>Remarks / note</th>
-          <th>QR</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for it in (req['items'] or []) %}
-        <tr>
-          <td>{{ it.item_id }}</td>
-          <td>
-            {% if req.type == 'production' %}
-              {% set mat = materials_by_id.get(it.material_id) or {} %}
-              {{ mat.get('name', 'Material #' ~ it.material_id) }}
-              {% if mat.get('unit') %}<span class="muted">({{ mat.get('unit') }})</span>{% endif %}
-            {% else %}
-              {{ it.name }}
-              {% if it.material_id %}<span class="muted">· linked to inventory</span>{% endif %}
-              {% if it.description %}<div class="muted">{{ it.description }}</div>{% endif %}
-            {% endif %}
-          </td>
-          {% if req.type == 'material' %}<td>{{ it.category or '—' }}</td>{% endif %}
-          <td class="text-right">{{ it.requested_qty }}</td>
-          <td class="text-right">{{ it.approved_qty if it.approved_qty is not none else '—' }}</td>
-          <td><span class="badge {{ status_badge.get(it.status, 'badge-muted') }}">{{ it.status }}</span></td>
-          <td>{{ it.note or '' }}</td>
-          <td>
-            {% if it.qr_token %}
-              <a href="{{ url_for('qr.image', token=it.qr_token) }}" target="_blank" rel="noopener" title="{{ it.qr_token }}">View QR</a>
-            {% else %}
-              <span class="muted">—</span>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <p class="muted mt">QR codes become available once the request is approved and its items are marked <strong>Ordered</strong>.</p>
+<div class="card mb">
+  <div class="card-title">Sign-offs</div>
+  <dl class="review-list">
+    <dt>Requested by</dt><dd>{{ row.requested_by }} · {{ row.date_requested }}</dd>
+    <dt>Checked by</dt><dd>{{ req.checked_by_name or '—' }}{% if req.checked_by_name and decided_on %} · {{ decided_on }}{% endif %}</dd>
+    <dt>Approved by</dt><dd>{{ req.approved_by_name or '—' }}{% if req.approved_by_name and decided_on %} · {{ decided_on }}{% endif %}</dd>
+    <dt>Purchasing / Procurement</dt><dd>{{ req.purchasing_by_name or '—' }}{% if req.purchasing_date %} · {{ req.purchasing_date }}{% endif %}</dd>
+  </dl>
+</div>
+
+{% if orders %}
+<div class="section-label">Purchase orders</div>
+<div class="queue mb">
+  {% for po in orders %}
+  <a class="queue-item" href="{{ url_for('purchasing.detail', po_id=po.id) }}">
+    <span class="code" style="min-width:96px">{{ po.po_no }}</span>
+    <span class="queue-main"><span class="queue-title">{{ po.supplier_name }}</span>
+      <span class="queue-sub">{{ po['items']|length }} item(s) · PO date {{ po.po_date }}{% if po.expected_delivery %} · expected {{ po.expected_delivery }}{% endif %}</span></span>
+    <b class="nowrap">{{ po.grand_total|peso }}</b>
+    <span class="badge {{ po_badge.get(po.status, 'badge-muted') }}">{{ po.status }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="flex gap-sm wrap">
+  <a class="btn btn-ghost btn-sm" href="{{ url_for('requests.print_form', id=req.id) }}">{{ icon('printer', 14) }} Print Purchase Request Form</a>
+  {% if (req['items'] or []) | selectattr('qr_token') | list %}
+  <a class="btn btn-ghost btn-sm" href="{{ url_for('qr.print_codes', request_id=req.id) }}">{{ icon('qr', 14) }} QR labels for receiving</a>
+  {% endif %}
 </div>
 {% endblock %}

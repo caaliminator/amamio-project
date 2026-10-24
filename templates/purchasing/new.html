@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% block title %}New purchase order{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('requests.detail', id=req.id) }}">{{ icon('arrow-left', 15) }} PR {{ pr_no }}</a>
+
+{% set chosen = form.supplier_id or (suggested.id if suggested else '') %}
+{% macro sv(key, fallback='') %}{{ form.get(key) if form.get(key) is not none else fallback }}{% endmacro %}
+
+<form method="post" class="wizard" data-wizard data-wizard-start="{{ start }}" id="poForm"
+      data-submit-label="Prepare purchase order" data-cancel="{{ url_for('requests.detail', id=req.id) }}">
+  <input type="hidden" name="request_id" value="{{ req.id }}">
+
+  <section class="wz-step" data-title="Who is the supplier?"
+           data-hint="PO No. {{ po_no }} · from PR {{ pr_no }}. Pick from the Supplier Directory to fill in the details.">
+    <div class="wz-body">
+      <div class="form-row">
+        <label class="form-label" for="supplier_id">From the Supplier Directory</label>
+        <select id="supplier_id" name="supplier_id" data-review-skip>
+          <option value="">— A supplier not in the directory —</option>
+          {% for s in suppliers %}
+          <option value="{{ s.id }}" {{ 'selected' if chosen|string == s.id|string }}
+                  data-name="{{ s.name }}" data-address="{{ s.address }}" data-contact="{{ s.contact }}"
+                  data-tin="{{ s.tin }}" data-person="{{ s.contact_person }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-grid cols-2">
+        <div class="form-row">
+          <label class="form-label" for="supplier_name">Supplier name <span class="req">*</span></label>
+          <input type="text" id="supplier_name" name="supplier_name" required maxlength="120"
+                 value="{{ sv('supplier_name', suggested.name if suggested else (items[0].preferred_supplier or '')) }}">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="supplier_tin">TIN</label>
+          <input type="text" id="supplier_tin" name="supplier_tin" maxlength="40" value="{{ sv('supplier_tin', suggested.tin if suggested else '') }}">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="supplier_address">Address</label>
+          <input type="text" id="supplier_address" name="supplier_address" maxlength="200" value="{{ sv('supplier_address', suggested.address if suggested else '') }}">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="supplier_contact_person">Contact person</label>
+          <input type="text" id="supplier_contact_person" name="supplier_contact_person" maxlength="80" value="{{ sv('supplier_contact_person', suggested.contact_person if suggested else '') }}">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="supplier_contact">Contact no. / email</label>
+          <input type="text" id="supplier_contact" name="supplier_contact" maxlength="120" value="{{ sv('supplier_contact', suggested.contact if suggested else '') }}">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="supplier_reference">Supplier reference</label>
+          <input type="text" id="supplier_reference" name="supplier_reference" maxlength="80" value="{{ sv('supplier_reference') }}" placeholder="Quotation no., if any">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wz-step" data-title="When, how to pay, and where to deliver">
+    <div class="wz-body">
+      <div class="form-grid cols-2">
+        <div class="form-row">
+          <label class="form-label" for="po_date">PO date <span class="req">*</span></label>
+          <input type="date" id="po_date" name="po_date" required value="{{ sv('po_date', today) }}">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="expected_delivery">Expected delivery date</label>
+          <input type="date" id="expected_delivery" name="expected_delivery" value="{{ sv('expected_delivery', req.needed_by or '') }}">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-label">Payment terms</div>
+        <div class="chip-choices" data-review-label="Payment terms">
+          {% for t in payment_terms %}
+          <label class="chip-choice"><input type="radio" name="payment_terms" value="{{ t }}" {{ 'checked' if sv('payment_terms', payment_terms[0]) == t }}><span>{{ t }}</span></label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-grid cols-2">
+        <div class="form-row">
+          <label class="form-label" for="deliver_to">Deliver to</label>
+          <input type="text" id="deliver_to" name="deliver_to" maxlength="120" value="{{ sv('deliver_to', company_name) }}">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="delivery_contact">Delivery contact</label>
+          <input type="text" id="delivery_contact" name="delivery_contact" maxlength="80" value="{{ sv('delivery_contact', req.requested_by_name or '') }}">
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="delivery_address">Delivery address</label>
+        <input type="text" id="delivery_address" name="delivery_address" maxlength="200" value="{{ sv('delivery_address', company_address) }}">
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="delivery_instructions">Delivery instructions</label>
+        <input type="text" id="delivery_instructions" name="delivery_instructions" maxlength="200" value="{{ sv('delivery_instructions') }}" placeholder="e.g. Door to door">
+      </div>
+    </div>
+  </section>
+
+  <section class="wz-step" id="itemsStep" data-title="Items and prices"
+           data-hint="These are the approved items on PR {{ pr_no }}. Untick one to leave it for another PO.">
+    <div class="line-cards" id="lineCards">
+      {% for it in items %}
+      <div class="line-card" data-line>
+        <div class="line-card-head">
+          <label class="flex gap-sm" style="align-items:center;margin:0">
+            <input type="checkbox" class="js-include" data-review-skip checked>
+            <span class="line-card-num">Item {{ loop.index }}</span>
+          </label>
+          <span class="muted small">approved {{ it.approved_qty|qty(it.unit) }}{% if it.preferred_supplier %} · preferred {{ it.preferred_supplier }}{% endif %}</span>
+        </div>
+        <input type="hidden" name="pr_item_id" value="{{ it.item_id }}">
+        <input type="hidden" name="include" value="1" class="js-include-val">
+        <div class="form-grid cols-2">
+          <div class="form-row">
+            <label class="form-label">Description / specification</label>
+            <input type="text" name="description" maxlength="160" value="{{ it.name }}">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Brand / model</label>
+            <input type="text" name="brand_model" maxlength="80" placeholder="Optional">
+          </div>
+        </div>
+        <div class="form-grid cols-3">
+          <div class="form-row">
+            <label class="form-label">Qty</label>
+            <input type="number" name="qty" min="0.01" step="any" inputmode="decimal" value="{{ "%g"|format(it.approved_qty|float) }}" class="js-qty">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Unit</label>
+            <input type="text" name="unit" maxlength="20" value="{{ it.unit or 'pc' }}">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Unit price (₱)</label>
+            <input type="number" name="unit_price" min="0" step="0.01" inputmode="decimal" value="{{ it.est_unit_cost or '' }}" class="js-price">
+          </div>
+        </div>
+        <div class="form-grid cols-3">
+          <div class="form-row">
+            <label class="form-label">Requested delivery</label>
+            <input type="date" name="requested_delivery">
+          </div>
+          <div class="form-row">
+            <label class="form-label">VAT / tax</label>
+            <input type="text" name="vat" maxlength="20" placeholder="e.g. 12% or VAT-ex">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Remarks</label>
+            <input type="text" name="remarks" maxlength="160" value="{{ it.remark or '' }}">
+          </div>
+        </div>
+        <div class="tally js-amount" style="margin-top:0;margin-bottom:12px"></div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="tally is-even" id="subtotal"></div>
+  </section>
+
+  <section class="wz-step" id="totalsStep" data-title="Totals, terms and sign-offs">
+    <div class="wz-body">
+      <div class="form-grid cols-3">
+        <div class="form-row">
+          <label class="form-label" for="discount">Discount (₱)</label>
+          <input type="number" id="discount" name="discount" min="0" step="0.01" value="{{ sv('discount') }}" placeholder="0.00" class="js-adj">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="freight">Delivery / freight (₱)</label>
+          <input type="number" id="freight" name="freight" min="0" step="0.01" value="{{ sv('freight') }}" placeholder="0.00" class="js-adj">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="tax">VAT / other tax (₱)</label>
+          <input type="number" id="tax" name="tax" min="0" step="0.01" value="{{ sv('tax') }}" placeholder="0.00" class="js-adj">
+        </div>
+      </div>
+      <div class="tally is-even" id="grandTotal"></div>
+      <div class="form-row mt">
+        <label class="form-label" for="terms">Terms / special instructions</label>
+        <textarea id="terms" name="terms" rows="3" maxlength="800">{{ sv('terms', default_terms) }}</textarea>
+      </div>
+      <div class="form-grid cols-2">
+        <div class="form-row">
+          <label class="form-label" for="prepared_by">Prepared by</label>
+          <input type="text" id="prepared_by" name="prepared_by" maxlength="80" value="{{ sv('prepared_by', me.name) }}">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="checked_by">Checked by</label>
+          <input type="text" id="checked_by" name="checked_by" maxlength="80" value="{{ sv('checked_by') }}" placeholder="Name">
+        </div>
+      </div>
+      <p class="muted small">Approved by is filled in when the PO is approved. The supplier signs the acknowledgment on the printed copy.</p>
+    </div>
+  </section>
+
+  <section class="wz-step" data-title="Check and prepare" data-review
+           data-hint="The PO is saved as Prepared; approve it on the next page, then print it.">
+    <div class="wz-body"></div>
+  </section>
+</form>
+
+<script>
+(function () {
+  var cards = document.getElementById("lineCards");
+  var sel = document.getElementById("supplier_id");
+  var fields = { name: "supplier_name", address: "supplier_address", contact: "supplier_contact",
+                 tin: "supplier_tin", person: "supplier_contact_person" };
+  sel.addEventListener("change", function () {
+    var o = sel.options[sel.selectedIndex];
+    if (!o.value) return;
+    Object.keys(fields).forEach(function (k) { document.getElementById(fields[k]).value = o.getAttribute("data-" + k) || ""; });
+  });
+
+  function peso(v) { return "₱" + v.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function num(el) { return parseFloat(el.value) || 0; }
+  function subtotal() {
+    var sum = 0;
+    cards.querySelectorAll("[data-line]").forEach(function (c) {
+      var on = c.querySelector(".js-include").checked;
+      var amt = num(c.querySelector(".js-qty")) * num(c.querySelector(".js-price"));
+      c.querySelector(".js-include-val").value = on ? "1" : "0";
+      c.style.opacity = on ? "" : ".5";
+      c.querySelector(".js-amount").innerHTML = "<span>Amount</span><b>" + peso(on ? amt : 0) + "</b>";
+      if (on) sum += amt;
+    });
+    return sum;
+  }
+  function update() {
+    var sub = subtotal();
+    var adj = function (id) { return num(document.getElementById(id)); };
+    document.getElementById("subtotal").innerHTML = "<span>Subtotal</span><b>" + peso(sub) + "</b>";
+    document.getElementById("grandTotal").innerHTML = "<span>Grand total</span><b>" +
+      peso(sub - adj("discount") + adj("freight") + adj("tax")) + "</b>";
+  }
+  document.getElementById("poForm").addEventListener("input", update);
+  document.getElementById("poForm").addEventListener("change", update);
+  update();
+
+  var step = document.getElementById("itemsStep");
+  step.addEventListener("wz:validate", function (e) {
+    if (!cards.querySelector(".js-include:checked")) {
+      e.preventDefault(); e.detail.message = "Keep at least one item on this PO.";
+    }
+  });
+  step.reviewHtml = function () {
+    var esc = window.IMS.esc, out = [];
+    cards.querySelectorAll("[data-line]").forEach(function (c) {
+      if (!c.querySelector(".js-include").checked) return;
+      var q = num(c.querySelector(".js-qty")), p = num(c.querySelector(".js-price"));
+      out.push("<dt>" + esc(c.querySelector("[name=description]").value) + "</dt><dd>" + q + " " +
+        esc(c.querySelector("[name=unit]").value) + " × " + peso(p) + " = " + peso(q * p) + "</dd>");
+    });
+    out.push("<dt>Subtotal</dt><dd>" + peso(subtotal()) + "</dd>");
+    return out.join("");
+  };
+  document.getElementById("totalsStep").reviewHtml = function () {
+    var g = document.getElementById("grandTotal").querySelector("b").textContent;
+    var esc = window.IMS.esc;
+    return "<dt>Grand total</dt><dd>" + g + "</dd>" +
+      "<dt>Prepared by</dt><dd>" + esc(document.getElementById("prepared_by").value || "—") + "</dd>" +
+      "<dt>Checked by</dt><dd>" + esc(document.getElementById("checked_by").value || "—") + "</dd>";
+  };
+})();
+</script>
+{% endblock %}

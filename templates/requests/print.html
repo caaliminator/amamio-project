@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}PR {{ row.pr_no }}{% endblock %}
+{% block content %}
+<a class="back-link no-print" href="{{ url_for('requests.detail', id=req.id) }}">{{ icon('arrow-left', 15) }} PR {{ row.pr_no }}</a>
+<div class="filter-bar no-print">
+  <span class="muted small">Purchase Request Form · {{ row.status }}</span>
+  <button class="btn btn-primary" type="button" onclick="window.print()">{{ icon('printer', 15) }} Print</button>
+</div>
+
+<div class="paper">
+<div class="gform">
+  <div class="gform-org">AMAMIO FARM PRODUCTS</div>
+  <div class="gform-bar center">Purchase Request Form</div>
+  <div class="gform-fields">
+    <div><b>PR No.:</b><span>{{ row.pr_no }}</span></div>
+    <div><b>Date Requested:</b><span>{{ row.date_requested|longdate }}</span></div>
+    <div><b>Requesting Department:</b><span>{{ (row.department or '')|upper }}</span></div>
+    <div><b>Required Date:</b><span>{{ row.needed_by|longdate }}</span></div>
+    <div><b>Purpose / Justification:</b><span>{{ (row.purpose or '')|upper }}</span></div>
+    <div><b>Requested By:</b><span>{{ row.requested_by|upper }}</span></div>
+  </div>
+  <table>
+    <thead>
+      <tr><th>Item</th><th>Item Description</th><th>Purpose / Use</th><th>Qty</th><th>Unit</th>
+        <th>Est. Unit</th><th>Est. Total Cost</th><th>Preferred Supplier</th><th>Budget / category</th><th>Remark</th></tr>
+    </thead>
+    <tbody>
+      {% for it in items %}
+      <tr>
+        <td class="num">{{ loop.index }}</td>
+        <td>{{ it.name|upper }}</td>
+        <td>{{ (it.purpose_use or '')|upper }}</td>
+        <td class="num">{{ it.requested_qty|qty }}</td>
+        <td>{{ it.unit }}</td>
+        <td class="num">{{ it.est_unit_cost|peso if it.est_unit_cost else '' }}</td>
+        <td class="num">{{ it.est_total|peso if it.est_total else '' }}</td>
+        <td>{{ (it.preferred_supplier or '')|upper }}</td>
+        <td>{{ it.budget_category or '' }}</td>
+        <td>{{ it.remark or ('Not approved' if it.status == 'Rejected' else '') }}</td>
+      </tr>
+      {% endfor %}
+      {% for _ in range([0, 5 - items|length]|max) %}
+      <tr><td class="num"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      {% endfor %}
+      <tr class="total"><td colspan="6" class="num">TOTAL ESTIMATED PURCHASE COST</td><td class="num">{{ row.total|peso }}</td><td colspan="3"></td></tr>
+    </tbody>
+  </table>
+  <div class="gform-bar" style="margin-top:10px">Requester's Notes / Special Instructions</div>
+  <div class="gform-text">{{ (req.notes or (req.remarks if req.type != 'general') or '')|upper }}</div>
+  <div class="gform-sign">
+    {% for who, name, on in [
+         ('Requested By', row.requested_by, row.date_requested),
+         ('Checked By', req.checked_by_name, decided_on if req.checked_by_name else ''),
+         ('Approved By', req.approved_by_name, decided_on if req.approved_by_name else ''),
+         ('Purchasing / Procurement', req.purchasing_by_name, req.purchasing_date)] %}
+    <div>
+      <div class="who">{{ who }}</div>
+      <div class="name">{{ name or '' }}</div>
+      <div class="cap">Name &amp; Signature</div>
+      <div class="date">Date: {{ on|longdate }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="gform-foot">AMAMIO FARM PRODUCTS &nbsp;|&nbsp; Purchase Request &nbsp;|&nbsp; Controlled Form</div>
+</div>
+</div>
+{% endblock %}

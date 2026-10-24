@@ -72,6 +72,7 @@ PERMISSIONS = {
     "requests":      _HEADS,                     # every head can raise requests
     "analytics":     ADMIN_ROLES,
     "approvals":     ADMIN_ROLES,
+    "purchasing":    ADMIN_ROLES,                # purchase orders
     "reports":       ADMIN_ROLES,
     "users":         ADMIN_ROLES,
     "migration":     {"super_admin"},
@@ -91,7 +92,8 @@ PERMISSIONS = {
     "suppliers":     ADMIN_ROLES | {"receiving_head", "production_head",
                                     "assets_head"},
     # Module 4 — packing, disbursement and courier hand-over.
-    "packing":       ADMIN_ROLES | {"packing_head", "packing_member"},
+    # Packing is done only by the packers themselves (see EXACT_ROLES).
+    "packing":       {"super_admin", "packing_head", "packing_member"},
     # Module 5 — marketplace uploads and sales reports.
     "platforms":     ADMIN_ROLES | {"packing_head"},
     # Stock release: packing requests it, production fulfils it.
@@ -103,6 +105,13 @@ PERMISSIONS = {
 
 # Modules only the Super Admin may reach, whatever PERMISSIONS says.
 SUPER_ADMIN_ONLY = {"migration"}
+
+# Modules where PERMISSIONS is exact — the Admin role does NOT get in by
+# default.  Packing is recorded by the packers and the Super Admin only.
+EXACT_ROLES = {"packing": PERMISSIONS["packing"]}
+
+# Roles that record packing as themselves ("Packed by" is their own name).
+PACKER_ROLES = ("packing_head", "packing_member")
 
 # Sidebar groups: (section label, [(module, label, icon name, endpoint), ...])
 # Icon names refer to icons.ICONS (monochrome line icons).  Each role only sees
@@ -140,8 +149,9 @@ NAV = [
         ("suppliers", "Supplier Directory",    "suppliers", "suppliers.index"),
     ]),
     ("Management", [
-        ("requests",  "Requests",  "requests", "requests.index"),
-        ("approvals", "Approvals", "approvals", "approvals.index"),
+        ("requests",   "Purchase Requests", "requests", "requests.index"),
+        ("approvals",  "Approvals",         "approvals", "approvals.index"),
+        ("purchasing", "Purchase Orders",   "orders", "purchasing.index"),
         ("reports",   "Reports",   "reports", "reports.index"),
         ("analytics", "Analytics", "analytics", "analytics.index"),
     ]),
@@ -177,6 +187,8 @@ def can(user, module):
     role = normalize_role(user.get("role"))
     if module in SUPER_ADMIN_ONLY:
         return role == "super_admin"
+    if module in EXACT_ROLES:
+        return role in EXACT_ROLES[module]
     if role in ADMIN_ROLES:
         return True
     allowed = PERMISSIONS.get(module)

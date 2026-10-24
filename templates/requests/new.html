@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}New purchase request{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('requests.index') }}">{{ icon('arrow-left', 15) }} Purchase Requests</a>
+
+{% macro item_card(line) %}
+<div class="line-card" data-line>
+  <div class="line-card-head">
+    <span class="line-card-num">Item</span>
+    <button type="button" class="line-remove" data-remove-line aria-label="Remove this item">&times;</button>
+  </div>
+  <div class="form-grid cols-2">
+    <div class="form-row">
+      <label class="form-label">Item description <span class="req">*</span></label>
+      <input type="text" name="description" maxlength="120" required value="{{ line.description if line else '' }}" placeholder="e.g. Timer switch">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Purpose / use</label>
+      <input type="text" name="purpose_use" maxlength="120" value="{{ line.purpose_use if line else '' }}" placeholder="e.g. Dehydrator">
+    </div>
+  </div>
+  <div class="form-grid cols-3">
+    <div class="form-row">
+      <label class="form-label">Qty <span class="req">*</span></label>
+      <input type="number" name="qty" min="0.01" step="any" required inputmode="decimal" value="{{ line.qty if line else 1 }}" class="js-qty">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Unit</label>
+      <select name="unit">
+        {% for u in units %}<option {{ 'selected' if line and line.unit == u }}>{{ u }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Est. unit cost (₱)</label>
+      <input type="number" name="est_unit_cost" min="0" step="0.01" inputmode="decimal" value="{{ line.est_unit_cost if line else '' }}" placeholder="0.00" class="js-cost">
+    </div>
+  </div>
+  <div class="form-grid cols-2">
+    <div class="form-row">
+      <label class="form-label">Preferred supplier</label>
+      <input type="text" name="preferred_supplier" maxlength="120" list="supplierList" value="{{ line.preferred_supplier if line else '' }}" placeholder="From the directory, or type a new one">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Budget / category</label>
+      <select name="budget_category">
+        <option value="">—</option>
+        {% for c in categories %}<option {{ 'selected' if line and line.budget_category == c }}>{{ c }}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="form-row">
+    <label class="form-label">Remark</label>
+    <input type="text" name="remark" maxlength="160" value="{{ line.remark if line else '' }}" placeholder="Optional">
+  </div>
+  <div class="tally js-line-total" style="margin-top:0;margin-bottom:12px"></div>
+</div>
+{% endmacro %}
+
+<form method="post" class="wizard" data-wizard data-wizard-start="{{ start }}" id="prForm"
+      data-submit-label="Submit for approval" data-cancel="{{ url_for('requests.index') }}">
+
+  <section class="wz-step" data-title="What is this request for?"
+           data-hint="This will be PR No. {{ next_no }} on the Purchase Request Form.">
+    <div class="wz-body">
+      <div class="form-row" style="grid-column:1 / -1">
+        <div class="form-label">Requesting department <span class="req">*</span></div>
+        <div class="chip-choices" data-review-label="Department">
+          {% for d in departments %}
+          <label class="chip-choice"><input type="radio" name="department" value="{{ d }}" required
+                 {{ 'checked' if (form.department or my_department) == d }}><span>{{ d }}</span></label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="purpose">Purpose / justification <span class="req">*</span></label>
+        <input type="text" id="purpose" name="purpose" maxlength="200" required value="{{ form.purpose or '' }}" placeholder="e.g. Machine accessories">
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="needed_by">Required date</label>
+        <input type="date" id="needed_by" name="needed_by" min="{{ today }}" value="{{ form.needed_by or '' }}">
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="requested_by">Requested by</label>
+        <input type="text" id="requested_by" value="{{ me.name }} · {{ today }}" readonly class="locked-field" data-review-skip>
+      </div>
+    </div>
+  </section>
+
+  <section class="wz-step" id="itemsStep" data-title="What do you need?"
+           data-hint="One card per item, as on the form. The estimated total adds up as you type.">
+    <div class="line-cards" id="lineCards">
+      {% for line in (lines or [none]) %}{{ item_card(line) }}{% endfor %}
+    </div>
+    <button type="button" class="add-line mt-sm" id="addLine">{{ icon('plus', 15) }} Add another item</button>
+    <div class="tally is-even" id="grandTotal"></div>
+  </section>
+
+  <section class="wz-step" data-title="Notes for the approver">
+    <div class="wz-body">
+      <div class="form-row">
+        <label class="form-label" for="notes">Requester's notes / special instructions</label>
+        <textarea id="notes" name="notes" rows="3" maxlength="500" placeholder="e.g. Melted push button switch and damaged timer switch">{{ form.notes or '' }}</textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-label">How urgent?</div>
+        <div class="chip-choices" data-review-label="Urgency">
+          {% for u in urgencies %}
+          <label class="chip-choice"><input type="radio" name="urgency" value="{{ u }}" {{ 'checked' if (form.urgency or 'Normal') == u }}><span>{{ u }}</span></label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wz-step" data-title="Check and submit" data-review
+           data-hint="The admin is notified to check and approve it.">
+    <div class="wz-body"></div>
+  </section>
+</form>
+
+<datalist id="supplierList">{% for s in suppliers %}<option value="{{ s }}">{% endfor %}</datalist>
+<template id="lineTpl">{{ item_card(none) }}</template>
+
+<script>
+(function () {
+  var cards = document.getElementById("lineCards");
+  var tpl = document.getElementById("lineTpl");
+  var step = document.getElementById("itemsStep");
+  var grand = document.getElementById("grandTotal");
+  function peso(v) { return "₱" + v.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function lineTotal(c) {
+    return (parseFloat(c.querySelector(".js-qty").value) || 0) * (parseFloat(c.querySelector(".js-cost").value) || 0);
+  }
+  function update() {
+    var sum = 0;
+    cards.querySelectorAll("[data-line]").forEach(function (c, i) {
+      c.querySelector(".line-card-num").textContent = "Item " + (i + 1);
+      c.querySelector("[data-remove-line]").style.visibility = cards.children.length > 1 ? "" : "hidden";
+      var t = lineTotal(c);
+      sum += t;
+      c.querySelector(".js-line-total").innerHTML = "<span>Est. total cost</span><b>" + peso(t) + "</b>";
+    });
+    grand.innerHTML = "<span>Total estimated purchase cost</span><b>" + peso(sum) + "</b>";
+  }
+  document.getElementById("addLine").addEventListener("click", function () {
+    var node = tpl.content.firstElementChild.cloneNode(true);
+    cards.appendChild(node); update(); node.querySelector("input").focus();
+  });
+  cards.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-remove-line]");
+    if (b) { b.closest("[data-line]").remove(); update(); }
+  });
+  cards.addEventListener("input", update);
+  update();
+
+  step.reviewHtml = function () {
+    var esc = window.IMS.esc, out = [], sum = 0;
+    cards.querySelectorAll("[data-line]").forEach(function (c) {
+      var d = c.querySelector("[name=description]").value.trim();
+      if (!d) return;
+      var q = parseFloat(c.querySelector(".js-qty").value) || 0;
+      var u = c.querySelector("[name=unit]").value;
+      var cost = parseFloat(c.querySelector(".js-cost").value) || 0;
+      var sup = c.querySelector("[name=preferred_supplier]").value.trim();
+      sum += q * cost;
+      out.push("<dt>" + esc(d) + "</dt><dd>" + q + " " + esc(u) + (cost ? " × " + peso(cost) + " = " + peso(q * cost) : "") +
+        (sup ? " · " + esc(sup) : "") + "</dd>");
+    });
+    out.push("<dt>Total estimated purchase cost</dt><dd>" + peso(sum) + "</dd>");
+    return out.join("");
+  };
+})();
+</script>
+{% endblock %}

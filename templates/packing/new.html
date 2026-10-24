@@ -11,13 +11,16 @@
   </div>
   <div class="form-row">
     <label class="form-label">Product <span class="req">*</span></label>
-    <select name="product_id" required>
+    <select name="product_id" required class="js-product">
       <option value="">Choose a product…</option>
       {% for p in products %}
+      {% set out = p.stock <= 0 %}
       <option value="{{ p.id }}" data-stock="{{ p.stock }}" data-unit="{{ p.unit }}"
-              {{ 'selected' if line and line.product_id == p.id|string }}>{{ p.name }} — {{ p.stock|qty }} in stock</option>
+              {% if out %}disabled data-out="1" class="opt-out"{% endif %}
+              {{ 'selected' if line and line.product_id == p.id|string and not out }}>{{ p.name }} — {{ 'OUT OF STOCK' if out else (p.stock|qty) ~ ' ' ~ p.unit ~ ' in stock' }}</option>
       {% endfor %}
     </select>
+    <div class="form-hint">Products shown in <span class="out-word">red</span> have no stock and can't be packed.</div>
   </div>
   <div class="form-grid cols-2">
     <div class="form-row">
@@ -55,11 +58,18 @@
       <div class="form-grid cols-2">
         <div class="form-row">
           <label class="form-label" for="packer_id">Packed by <span class="req">*</span></label>
+          {% if picks_packer %}
           <select id="packer_id" name="packer_id" required>
             {% for u in packers %}
             <option value="{{ u.id }}" {{ 'selected' if (form.packer_id or me.id|string) == u.id|string }}>{{ u.name }}</option>
             {% endfor %}
           </select>
+          {% else %}
+          {# A packer always records packing as themselves. #}
+          <input type="text" id="packer_id" name="packed_by_display" value="{{ me.name }}" readonly
+                 class="locked-field" aria-readonly="true" data-review-label="Packed by">
+          <div class="form-hint">Recorded under your account.</div>
+          {% endif %}
         </div>
         <div class="form-row">
           <label class="form-label" for="pack_date">Pack date <span class="req">*</span></label>
@@ -123,8 +133,23 @@
       sync(c);
     });
   }
+  // Out-of-stock products can't be picked — except for a confirmed sales
+  // order, whose stock was already taken out when it was confirmed.
+  var linkedOrder = document.getElementById("sales_order_id");
+  function applyStockRule(root) {
+    var forOrder = !!(linkedOrder && linkedOrder.value);
+    (root || cards).querySelectorAll("option[data-out]").forEach(function (o) {
+      o.disabled = !forOrder;
+      if (!forOrder && o.selected) o.parentNode.value = "";
+    });
+  }
+  if (linkedOrder) linkedOrder.addEventListener("change", function () {
+    applyStockRule(); renumber();
+  });
+  applyStockRule();
   document.getElementById("addLine").addEventListener("click", function () {
     var node = tpl.content.firstElementChild.cloneNode(true);
+    applyStockRule(node);
     cards.appendChild(node); renumber(); node.querySelector("select").focus();
   });
   cards.addEventListener("click", function (e) {

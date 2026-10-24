@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Purchase Orders{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Purchase Orders</h1>
+    <p class="page-sub">Approved purchase requests become purchase orders for the supplier.</p>
+  </div>
+</div>
+
+<div class="figures mb">
+  <div class="figure {{ 'is-bad' if counts.awaiting_po }}"><div class="figure-label">Approved PRs waiting for a PO</div><div class="figure-value">{{ counts.awaiting_po }}</div></div>
+  <div class="figure"><div class="figure-label">POs to approve</div><div class="figure-value">{{ counts.prepared }}</div></div>
+  <div class="figure"><div class="figure-label">Approved, waiting for delivery</div><div class="figure-value">{{ counts.approved }}</div></div>
+</div>
+
+<div class="section-label">Approved requests waiting for a PO ({{ awaiting|length }})</div>
+{% if awaiting %}
+<div class="queue mb">
+  {% for r in awaiting %}
+  <a class="queue-item" href="{{ url_for('purchasing.new', request_id=r.id) }}">
+    <span class="code" style="min-width:96px">{{ r.pr_no }}</span>
+    <span class="queue-main">
+      <span class="queue-title">{{ r.purpose or r.summary }}</span>
+      <span class="queue-sub">{{ r.lines }} approved item(s) · {{ r.department or '—' }}{% if r.needed_by %} · needed {{ r.needed_by }}{% endif %}</span>
+    </span>
+    <span class="queue-go">Prepare PO {{ icon('arrow-right', 14) }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card mb"><div class="empty" style="padding:24px">
+  <div class="empty-title">Nothing waiting</div>
+  <p class="muted">Approve a purchase request under <a href="{{ url_for('approvals.index') }}">Approvals</a> and it shows up here.</p>
+</div></div>
+{% endif %}
+
+<div class="toolbar">
+  <div class="seg">
+    <a href="{{ url_for('purchasing.index', show='open') }}" class="{{ 'is-active' if show == 'open' }}">Open POs</a>
+    <a href="{{ url_for('purchasing.index', show='all') }}" class="{{ 'is-active' if show != 'open' }}">All POs</a>
+  </div>
+</div>
+{% if orders %}
+<div class="queue">
+  {% for po in orders %}
+  <a class="queue-item" href="{{ url_for('purchasing.detail', po_id=po.id) }}">
+    <span class="code" style="min-width:96px">{{ po.po_no }}</span>
+    <span class="queue-main">
+      <span class="queue-title">{{ po.supplier_name }}</span>
+      <span class="queue-sub">{{ po['items']|length }} item(s) · PO date {{ po.po_date }}{% if po.expected_delivery %} · expected {{ po.expected_delivery }}{% endif %}{% if po.payment_terms %} · {{ po.payment_terms }}{% endif %}</span>
+    </span>
+    <b class="nowrap">{{ po.grand_total|peso }}</b>
+    <span class="badge {{ po_badge.get(po.status, 'badge-muted') }}">{{ po.status }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card"><div class="empty" style="padding:24px">
+  <div class="empty-title">{{ 'No open purchase orders' if show == 'open' else 'No purchase orders yet' }}</div>
+</div></div>
+{% endif %}
+{% endblock %}

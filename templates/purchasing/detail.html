@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}PO {{ po.po_no }}{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('purchasing.index') }}">{{ icon('arrow-left', 15) }} Purchase Orders</a>
+
+<div class="record-head">
+  <div>
+    <div class="record-code">PO No. {{ po.po_no }}</div>
+    <h1 class="record-title">{{ po.supplier_name }} — {{ po.grand_total|peso }}</h1>
+    <div class="muted small">PO date {{ po.po_date }}{% if po.expected_delivery %} · expected {{ po.expected_delivery }}{% endif %}{% if po.payment_terms %} · {{ po.payment_terms }}{% endif %}
+      · from <a href="{{ url_for('requests.detail', id=po.purchase_request_id) }}">PR {{ po.pr_no or ('#' ~ po.purchase_request_id) }}</a></div>
+  </div>
+  <span class="badge {{ badge }}">{{ po.status }}</span>
+</div>
+
+<div class="track mb">
+  {% for label, state in track %}<span class="track-step is-{{ state }}">{{ label }}</span>{% endfor %}
+</div>
+
+{% if po.status == 'Prepared' %}
+<div class="next-action">
+  <div class="next-action-text"><b>Next: approve this PO</b><span>Then print it and send it to {{ po.supplier_name }}.</span></div>
+  <form method="post" action="{{ url_for('purchasing.approve', po_id=po.id) }}" class="flex gap-sm wrap" style="align-items:center">
+    <input type="text" name="approved_by_name" value="{{ me.name }}" maxlength="80" aria-label="Approved by" style="max-width:220px">
+    <button class="btn btn-primary" type="submit">Approve PO</button>
+  </form>
+</div>
+{% elif po.status == 'Approved' %}
+<div class="next-action">
+  <div class="next-action-text"><b>Next: when the goods arrive</b><span>Receive them at the Receiving Area (or by QR), then mark this PO delivered.</span></div>
+  <form method="post" action="{{ url_for('purchasing.delivered', po_id=po.id) }}">
+    <button class="btn btn-primary" type="submit">Mark delivered</button>
+  </form>
+</div>
+{% endif %}
+
+<div class="card mb">
+  <div class="card-title">Items</div>
+  <div class="table-wrap">
+    <table class="table" data-no-paginate>
+      <thead><tr><th>Item</th><th>Description / specification</th><th class="num">Qty</th>
+        <th class="num">Unit price</th><th class="num">Amount</th><th>Requested delivery</th></tr></thead>
+      <tbody>
+        {% for it in po['items'] %}
+        <tr>
+          <td>{{ it.line_no }}</td>
+          <td>{{ it.description }}
+            {% set sub = [it.brand_model, ('VAT/tax: ' ~ it.vat) if it.vat else '', it.remarks] | select | join(' · ') %}
+            {% if sub %}<div class="muted small">{{ sub }}</div>{% endif %}</td>
+          <td class="num nowrap">{{ it.qty|qty(it.unit) }}</td>
+          <td class="num">{{ it.unit_price|peso }}</td><td class="num">{{ it.amount|peso }}</td>
+          <td>{{ it.requested_delivery or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr><td colspan="4">Subtotal</td><td class="num">{{ po.subtotal|peso }}</td><td></td></tr>
+        {% if po.discount %}<tr><td colspan="4">Discount</td><td class="num">−{{ po.discount|peso }}</td><td></td></tr>{% endif %}
+        {% if po.freight %}<tr><td colspan="4">Delivery / freight</td><td class="num">{{ po.freight|peso }}</td><td></td></tr>{% endif %}
+        {% if po.tax %}<tr><td colspan="4">VAT / other tax</td><td class="num">{{ po.tax|peso }}</td><td></td></tr>{% endif %}
+        <tr><td colspan="4"><b>Grand total</b></td><td class="num"><b>{{ po.grand_total|peso }}</b></td><td></td></tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+<div class="grid grid-2 mb">
+  <div class="card">
+    <div class="card-title">Supplier</div>
+    <dl class="review-list">
+      <dt>Name</dt><dd>{{ po.supplier_name }}</dd>
+      <dt>Address</dt><dd>{{ po.supplier_address or '—' }}</dd>
+      <dt>Contact no. / email</dt><dd>{{ po.supplier_contact or '—' }}</dd>
+      <dt>TIN</dt><dd>{{ po.supplier_tin or '—' }}</dd>
+      <dt>Contact person</dt><dd>{{ po.supplier_contact_person or '—' }}</dd>
+      <dt>Supplier reference</dt><dd>{{ po.supplier_reference or '—' }}</dd>
+    </dl>
+  </div>
+  <div class="card">
+    <div class="card-title">Delivery</div>
+    <dl class="review-list">
+      <dt>Deliver to</dt><dd>{{ po.deliver_to }}</dd>
+      <dt>Address</dt><dd>{{ po.delivery_address }}</dd>
+      <dt>Instructions</dt><dd>{{ po.delivery_instructions or '—' }}</dd>
+      <dt>Contact</dt><dd>{{ po.delivery_contact or '—' }}</dd>
+      {% if po.delivered_at %}<dt>Delivered</dt><dd>{{ po.delivered_at }}</dd>{% endif %}
+    </dl>
+  </div>
+</div>
+
+<div class="card mb">
+  <div class="card-title">Sign-offs</div>
+  <dl class="review-list">
+    <dt>Prepared by</dt><dd>{{ po.prepared_by_name or '—' }}{% if po.prepared_at %} · {{ po.prepared_at }}{% endif %}</dd>
+    <dt>Checked by</dt><dd>{{ po.checked_by_name or '—' }}</dd>
+    <dt>Approved by</dt><dd>{{ po.approved_by_name or '—' }}{% if po.approved_at %} · {{ po.approved_at }}{% endif %}</dd>
+  </dl>
+  {% if po.terms %}<div class="form-label mt">Terms / special instructions</div><p class="muted small">{{ po.terms }}</p>{% endif %}
+</div>
+
+<div class="flex gap-sm wrap">
+  <a class="btn btn-ghost btn-sm" href="{{ url_for('purchasing.print_po', po_id=po.id) }}">{{ icon('printer', 14) }} Print Purchase Order</a>
+  {% if po.status in ('Prepared', 'Approved') %}
+  <form method="post" action="{{ url_for('purchasing.cancel', po_id=po.id) }}"
+        data-confirm="Cancel PO {{ po.po_no }}? Its items can be put on a new PO.">
+    <button class="btn btn-ghost btn-sm" type="submit">Cancel PO</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

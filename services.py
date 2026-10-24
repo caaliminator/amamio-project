@@ -190,6 +190,20 @@ def fmt_peso(value):
         return "₱0.00"
 
 
+_MONTHS = ("Jan.", "Feb.", "Mar.", "Apr.", "May", "June", "July", "Aug.",
+           "Sept.", "Oct.", "Nov.", "Dec.")
+
+
+def fmt_date(value):
+    """'2026-09-21' -> 'Sept. 21, 2026' (as written on the paper forms)."""
+    text = str(value or "")[:10]
+    try:
+        y, m, d = (int(p) for p in text.split("-"))
+        return "%s %d, %d" % (_MONTHS[m - 1], d, y)
+    except (ValueError, IndexError):
+        return text
+
+
 # --- Item / stock primitives ----------------------------------------------
 def _collection_for(item_type):
     return "raw_materials" if item_type == "material" else "products"
@@ -463,22 +477,44 @@ def create_production_request(requestor_id, product_id, qty, item_lines,
     ``item_lines``: list of {material_id, requested_qty, note}.  ``reason`` is
     mandatory for the client (why the buy is needed — out of stock, bigger
     batch, spoilage, …) and is shown to the approver."""
+    import purchasing_service as purchasing   # (imports this module)
     product = db.get("products", product_id)
+    requestor = db.get("users", requestor_id) or {}
+    suppliers = {s["id"]: s.get("name") for s in db.read("suppliers")}
     items = []
     for i, line in enumerate(item_lines, start=1):
+        material = db.get("raw_materials", line["material_id"]) or {}
+        qty_wanted = _to_float(line.get("requested_qty", 0))
+        cost = _to_float(material.get("unit_cost"))
         items.append({
             "item_id": i,
             "material_id": int(line["material_id"]),
-            "requested_qty": _to_float(line.get("requested_qty", 0)),
+            "name": material.get("name") or "",
+            "purpose_use": "Production of %s" % (product.get("name") if product else "a batch"),
+            "unit": material.get("unit") or "",
+            "requested_qty": qty_wanted,
+            "est_unit_cost": round(cost, 2),
+            "est_total": round(cost * qty_wanted, 2),
+            "preferred_supplier": suppliers.get(material.get("supplier_id")) or "",
+            "budget_category": "Raw materials" if material_category(material) == "raw"
+                               else "Packaging",
+            "remark": (line.get("note") or "").strip(),
             "approved_qty": None,
             "received_qty": None,
             "status": "Pending",
             "note": (line.get("note") or "").strip(),
             "qr_token": None,
+            "po_id": None,
+            "po_no": "",
         })
     req = db.insert("purchase_requests", {
         "type": "production",
+        "pr_no": purchasing.next_pr_no(),
         "requestor_id": int(requestor_id),
+        "requested_by_name": requestor.get("name") or "",
+        "department": "Production",
+        "purpose": (reason or "").strip(),
+        "date_requested": today_iso(),
         "product_id": int(product_id),
         "product_name": product.get("name") if product else None,
         "qty": _to_float(qty),
@@ -487,11 +523,13 @@ def create_production_request(requestor_id, product_id, qty, item_lines,
         "urgency": urgency or "Normal",
         "status": "Pending Approval",
         "remarks": (remarks or "").strip(),
+        "notes": (remarks or "").strip(),
+        "total_estimated": round(sum(it["est_total"] for it in items), 2),
         "items": items,
         "created_at": now_iso(),
     })
-    notify_admins("New production request #%d awaiting approval — %s."
-                  % (req["id"], (reason or "no reason given")[:80]),
+    notify_admins("New production request %s awaiting approval — %s."
+                  % (req["pr_no"], (reason or "no reason given")[:80]),
                   link="/approvals/%d" % req["id"])
     return req
 
@@ -585,7 +623,7 @@ def apply_decision(request_id, decisions, remarks, action, decider_id=None):
         "decided_at": now_iso(),
     })
     notify(req.get("requestor_id"),
-           "Your purchase request #%d was %s." % (request_id, status.lower()),
+           "Your purchase request %s was %s." % (req.get("pr_no") or "#%d" % request_id, status.lower()),
            link="/requests/%d" % request_id)
     return req
 
@@ -636,6 +674,15 @@ def receive_item(token, received_qty=None, note="", user_id=None):
     new_status = "Received" if all_received else req.get("status")
     db.update("purchase_requests", request_id,
               {"items": items, "status": new_status})
+
+    # A purchase order is delivered once every line on it has been received.
+    po_id = target.get("po_id")
+    po = db.get("purchase_orders", po_id) if po_id else None
+    if po and po.get("status") == "Approved" and all(
+            it.get("status") == "Received" for it in items
+            if it.get("po_id") == po_id):
+        db.update("purchase_orders", po_id, {"status": "Delivered",
+                                             "delivered_at": today_iso()})
 
     notify_admins(
                 "Material received for request #%d (%s)." % (request_id,
@@ -1942,7 +1989,25 @@ def mark_packed(run_id, user_id=None):
 
 def pack_now(channel, packer_id, lines, user_id, **details):
     """Create a run and mark it packed in one step — the usual case on the
-    floor, where the record is made once the parcels are ready."""
+    floor, where the record is made once the parcels are ready.
+
+    A product with no stock can't be packed (unless the run is for a sales
+    order, whose stock was already taken out when it was confirmed)."""
+    if not details.get("sales_order_id"):
+        needed = {}
+        for line in lines:
+            if line.get("product_id") and _to_float(line.get("qty")) > 0:
+                pid = int(line["product_id"])
+                needed[pid] = needed.get(pid, 0.0) + _to_float(line.get("qty"))
+        for pid, qty in needed.items():
+            product = db.get("products", pid)
+            on_hand = current_stock("product", pid)
+            if product and qty > on_hand:
+                return None, ("%s has %s in stock — it can't be packed%s."
+                              % (product.get("name"),
+                                 fmt_qty(on_hand, product.get("unit") or ""),
+                                 "" if on_hand <= 0
+                                 else " (you entered %s)" % fmt_qty(qty)))
     run, err = create_packing_run(channel, packer_id, lines, user_id, **details)
     if err:
         return None, err
