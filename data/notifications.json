@@ -1022,5 +1022,69 @@
     "is_read": false,
     "created_at": "2026-10-16T05:39:43.206265+00:00",
     "id": 128
+  },
+  {
+    "user_id": 1,
+    "message": "Purchase request #1 was checked by Amamio Admin — awaiting your final approval.",
+    "link": "/approvals/1",
+    "is_read": false,
+    "created_at": "2026-10-26T11:45:24.451813+00:00",
+    "id": 129
+  },
+  {
+    "user_id": 4,
+    "message": "Your purchase request #1 was checked by Amamio Admin and is waiting for the Super Admin's final approval.",
+    "link": "/requests/1",
+    "is_read": false,
+    "created_at": "2026-10-26T11:45:24.494499+00:00",
+    "id": 130
+  },
+  {
+    "user_id": 4,
+    "message": "Your purchase request #1 was revised.",
+    "link": "/requests/1",
+    "is_read": false,
+    "created_at": "2026-10-26T11:46:09.104711+00:00",
+    "id": 131
+  },
+  {
+    "user_id": 4,
+    "message": "PO PR1 prepared for your request #1 (Agusan Cacao Growers).",
+    "link": "/requests/1",
+    "is_read": false,
+    "created_at": "2026-10-26T15:32:36.422395+00:00",
+    "id": 132
+  },
+  {
+    "user_id": 2,
+    "message": "PO PR1 to Agusan Cacao Growers (₱14,510.00) prepared by Amamio Admin — awaiting your check.",
+    "link": "/purchasing/1",
+    "is_read": false,
+    "created_at": "2026-10-26T15:32:36.454403+00:00",
+    "id": 133
+  },
+  {
+    "user_id": 1,
+    "message": "PO PR1 to Agusan Cacao Growers was checked by Amamio Admin — awaiting your final approval.",
+    "link": "/purchasing/1",
+    "is_read": false,
+    "created_at": "2026-10-26T15:33:06.709756+00:00",
+    "id": 134
+  },
+  {
+    "user_id": 2,
+    "message": "PO PR1 to Agusan Cacao Growers is approved — print it and send it to the supplier.",
+    "link": "/purchasing/1",
+    "is_read": false,
+    "created_at": "2026-10-26T15:35:09.102934+00:00",
+    "id": 135
+  },
+  {
+    "user_id": 3,
+    "message": "PO PR1 from Agusan Cacao Growers is approved — expect the delivery on 2026-10-30.",
+    "link": "/receiving/",
+    "is_read": false,
+    "created_at": "2026-10-26T15:35:09.153255+00:00",
+    "id": 136
   }
 ]

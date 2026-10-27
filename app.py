@@ -61,6 +61,7 @@ def create_app():
     from supplies import supplies_bp
     from facility import facility_bp
     from purchasing import purchasing_bp
+    from ledger import ledger_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(catalog_bp, url_prefix="/catalog")
@@ -68,6 +69,7 @@ def create_app():
     app.register_blueprint(requests_bp, url_prefix="/requests")
     app.register_blueprint(approvals_bp, url_prefix="/approvals")
     app.register_blueprint(purchasing_bp, url_prefix="/purchasing")
+    app.register_blueprint(ledger_bp, url_prefix="/ledger")
     app.register_blueprint(qr_bp, url_prefix="/qr")
     app.register_blueprint(production_bp, url_prefix="/production")
     app.register_blueprint(sales_bp, url_prefix="/sales")

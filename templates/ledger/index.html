@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Supplier Ledger{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Supplier Ledger</h1>
+    <p class="page-sub">Every supplier's purchases and payments. A purchase order is posted once the Super Admin approves it; the balance is what is still owed.</p>
+  </div>
+</div>
+
+<div class="figures mb">
+  <div class="figure"><div class="figure-label">Purchases (issued POs)</div><div class="figure-value">{{ totals.purchases|peso }}</div></div>
+  <div class="figure"><div class="figure-label">Paid</div><div class="figure-value">{{ totals.payments|peso }}</div></div>
+  <div class="figure {{ 'is-bad' if totals.balance > 0.005 }}"><div class="figure-label">Balance owed · {{ totals.owing }} supplier(s)</div><div class="figure-value">{{ totals.balance|peso }}</div></div>
+</div>
+
+<div class="toolbar">
+  <div class="seg">
+    <a href="{{ url_for('ledger.index', show='active') }}" class="{{ 'is-active' if show == 'active' }}">With purchases</a>
+    <a href="{{ url_for('ledger.index', show='all') }}" class="{{ 'is-active' if show != 'active' }}">Every supplier</a>
+  </div>
+</div>
+
+{% if rows %}
+<div class="card">
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Supplier</th><th>Category</th><th class="num">Purchases (credit)</th>
+        <th class="num">Paid (debit)</th><th class="num">Balance</th><th>Last activity</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td><a href="{{ url_for('ledger.supplier', supplier_id=r.id) }}"><b>{{ r.name }}</b></a></td>
+          <td>{{ r.category or '—' }}</td>
+          <td class="num">{{ r.purchases|peso }}</td>
+          <td class="num">{{ r.payments|peso }}</td>
+          <td class="num"><b>{{ r.balance|peso }}</b></td>
+          <td>{{ r.last or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card"><div class="empty">
+  <div class="empty-icon">{{ icon('ledger', 30) }}</div>
+  <div class="empty-title">No purchases posted yet</div>
+  <p class="muted">A supplier's ledger starts when the Super Admin approves its first purchase order. <a href="{{ url_for('ledger.index', show='all') }}">See every supplier</a>.</p>
+</div></div>
+{% endif %}
+{% endblock %}

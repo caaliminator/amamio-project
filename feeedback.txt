@@ -1,0 +1,58 @@
+
+
+Receiving Area
+- Received by
+
+
+Inspection & cleaning
+PASS - FAILED - HOLD
+
+- Auto generate Quality checks fields for each Items ( No data for now )
+- Parameters
+- Insert Honey containers to Inspection and Cleaning
+- note / remarks with image
+
+HOney containers
+ADD ( STEP 3 )
+- Harvested From
+
+
+QR Code
+- Clickable for viewing and printing
+-
+
+
+Supplier Directory
+- Add FARMERS
+
+
+Inventory units
+- jar is bottles unit
+
+
+
+
+FLOW
+
+PR - ADMIN - SUPER ADMIN
+
+Purchase request
+- Item request should be dropdown
+- Prederred supplier should be dropdown
+- STEP 3 ( ADD EXPECTED DAT FIELD , Requestor name)
+- SUBMIT FOR APPROVal
+
+SUPER ADMIN / ADMIN
+- APPROVED
+
+Purchse Order
+- Supplier Refference  (Dropdown)
+- STEP 2 ( Partial payment , advance payment
+- STEP 3 ( Description should be dropdown )
+- STEP 4 ( Labor cost  ( optional )  checked by , prepared by auto fill)
+- Initial Approval PO ( admin first , Super admin last ) prepared and checked by
+
+
+After Issuance of PO ( SUPPLIERS LEDGER)
+- Every supplier
+- Ledger creation for tracking for payments balances , debit

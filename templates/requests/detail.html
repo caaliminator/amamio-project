@@ -16,8 +16,8 @@
   </div>
 </div>
 
-{% set steps = ['Requested', 'Approved', 'PO prepared', 'Received'] %}
-{% set reached = {'Pending Approval': 0, 'Approved': 1, 'Revised': 1, 'Ordered': 2, 'Received': 3}.get(req.status, 0) %}
+{% set steps = ['Requested', 'Checked by Admin', 'Approved by Super Admin', 'PO prepared', 'Received'] %}
+{% set reached = {'Pending Approval': 1, 'For Final Approval': 2, 'Approved': 3, 'Revised': 3, 'Ordered': 4, 'Received': 5}.get(req.status, 0) %}
 <div class="track mb">
   {% if req.status == 'Rejected' %}
     <span class="track-step is-done">Requested</span><span class="track-step is-now">Rejected</span>
@@ -26,19 +26,24 @@
   {% endif %}
 </div>
 
-{% if is_admin and req.status == 'Pending Approval' %}
+{% if can_decide and req.status == 'Pending Approval' %}
 <div class="next-action">
-  <div class="next-action-text"><b>Next: check and approve it</b><span>Approve, change quantities, or reject — the requester is told.</span></div>
-  <a class="btn btn-primary" href="{{ url_for('approvals.decide', request_id=req.id) }}">Review request</a>
+  <div class="next-action-text"><b>Next: check it (initial approval)</b><span>Approve, change quantities, or reject. Once you approve it, it goes to the Super Admin for the final approval.</span></div>
+  <a class="btn btn-primary" href="{{ url_for('approvals.decide', request_id=req.id) }}">Check request</a>
+</div>
+{% elif can_decide %}
+<div class="next-action">
+  <div class="next-action-text"><b>Next: final approval</b><span>Checked by {{ req.checked_by_name or 'the Admin' }}. Approve, change quantities, or reject; the requester is told.</span></div>
+  <a class="btn btn-primary" href="{{ url_for('approvals.decide', request_id=req.id) }}">Review for final approval</a>
 </div>
 {% elif can_order %}
 <div class="next-action">
   <div class="next-action-text"><b>Next: prepare the purchase order</b><span>The approved items go onto a PO for the supplier.</span></div>
   <a class="btn btn-primary" href="{{ url_for('purchasing.new', request_id=req.id) }}">Prepare purchase order</a>
 </div>
-{% elif req.status == 'Pending Approval' %}
+{% elif waiting_on %}
 <div class="next-action">
-  <div class="next-action-text"><b>Waiting for approval</b><span>The admin has been notified. You'll get a notification once it is decided.</span></div>
+  <div class="next-action-text"><b>Waiting for {{ waiting_on }}</b><span>{% if req.checked_by_name %}Checked by {{ req.checked_by_name }}. {% endif %}They have been notified. The requester gets a notification once it is decided.</span></div>
 </div>
 {% endif %}
 
@@ -79,6 +84,7 @@
   <div class="card-title">Requester's notes / special instructions</div>
   <p>{{ req.notes or (req.remarks if req.type != 'general') or '—' }}</p>
   {% if req.type == 'production' %}<p class="muted small">Ingredients for {{ req.product_name or 'a production run' }}{% if req.qty %} × {{ req.qty|qty }}{% endif %}.</p>{% endif %}
+  {% if req.check_remarks %}<div class="form-label mt">Admin's remarks (check)</div><p>{{ req.check_remarks }}</p>{% endif %}
   {% if req.remarks and req.type == 'general' %}<div class="form-label mt">Approver's remarks</div><p>{{ req.remarks }}</p>{% endif %}
 </div>
 
@@ -86,7 +92,7 @@
   <div class="card-title">Sign-offs</div>
   <dl class="review-list">
     <dt>Requested by</dt><dd>{{ row.requested_by }} · {{ row.date_requested }}</dd>
-    <dt>Checked by</dt><dd>{{ req.checked_by_name or '—' }}{% if req.checked_by_name and decided_on %} · {{ decided_on }}{% endif %}</dd>
+    <dt>Checked by</dt><dd>{{ req.checked_by_name or '—' }}{% if req.checked_by_name and (req.checked_at or decided_on) %} · {{ (req.checked_at or decided_on)[:10] }}{% endif %}</dd>
     <dt>Approved by</dt><dd>{{ req.approved_by_name or '—' }}{% if req.approved_by_name and decided_on %} · {{ decided_on }}{% endif %}</dd>
     <dt>Purchasing / Procurement</dt><dd>{{ req.purchasing_by_name or '—' }}{% if req.purchasing_date %} · {{ req.purchasing_date }}{% endif %}</dd>
   </dl>

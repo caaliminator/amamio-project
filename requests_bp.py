@@ -1,8 +1,9 @@
 """Purchase requests — the client's Purchase Request Form.
 
-A head raises a PR in a short step-by-step flow (what it's for → the items →
-notes → check); an admin approves it under Approvals; an admin then prepares
-the Purchase Order from it (purchasing.py).  Also kept: the recipe-shortfall
+A head raises a PR in a short step-by-step flow (what it's for → the items,
+picked from dropdowns → expected date, requestor and notes → check); the
+Admin checks it and the Super Admin gives the final approval under
+Approvals; an admin then prepares the Purchase Order from it (purchasing.py).  Also kept: the recipe-shortfall
 request for a production run, and the BOM auto-calc it uses.
 """
 from flask import (Blueprint, abort, flash, jsonify, redirect, render_template,
@@ -16,7 +17,7 @@ from security import (current_user, is_admin, module_required,
 
 requests_bp = Blueprint("requests", __name__)
 
-OPEN_STATUSES = ("Pending Approval", "Approved", "Revised", "Ordered")
+OPEN_STATUSES = (pur.PR_PENDING, pur.FOR_FINAL, "Approved", "Revised", "Ordered")
 
 
 def _row(r, users):
@@ -55,8 +56,8 @@ def index():
 
 
 def _lines_from_form(form):
-    keys = ("description", "purpose_use", "qty", "unit", "est_unit_cost",
-            "preferred_supplier", "budget_category", "remark")
+    keys = ("material_id", "description", "purpose_use", "qty", "unit",
+            "est_unit_cost", "preferred_supplier", "budget_category", "remark")
     cols = {k: form.getlist(k) for k in keys}
     return [{k: (cols[k][i] if i < len(cols[k]) else "") for k in keys}
             for i in range(len(cols["description"]))]
@@ -74,17 +75,19 @@ def new():
         req, err = pur.create_purchase_request(
             user, form.get("department") or "", form.get("purpose") or "",
             form.get("needed_by") or "", lines, notes=form.get("notes") or "",
-            urgency=form.get("urgency") or "Normal")
+            urgency=form.get("urgency") or "Normal",
+            requested_by_name=form.get("requested_by_name") or "")
         if not err:
-            flash("Purchase request %s submitted — the admin has been notified."
-                  % req["pr_no"], "success")
+            flash("Purchase request %s submitted for approval — the Admin has "
+                  "been notified to check it." % req["pr_no"], "success")
             return redirect(url_for("requests.detail", id=req["id"]))
         flash(err, "error")
+    catalog = pur.item_choices()
     return render_template(
         "requests/new.html", form=form, lines=lines, me=user,
         departments=pur.DEPARTMENTS, my_department=pur.department_for(user),
-        units=pur.UNITS, categories=pur.BUDGET_CATEGORIES,
-        suppliers=sorted({s.get("name") for s in db.read("suppliers") if s.get("name")}),
+        catalog=catalog, units=pur.units_for(catalog),
+        categories=pur.BUDGET_CATEGORIES, suppliers=pur.supplier_names(),
         urgencies=services.URGENCY_LEVELS, today=services.today_iso(),
         next_no=pur.next_pr_no(), start=1 if request.method == "POST" else 0)
 
@@ -196,6 +199,8 @@ def detail(id):
         status_badge=services.REQUEST_STATUS_BADGE,
         urgency_badge=services.URGENCY_BADGE,
         can_order=is_admin(current_user()) and bool(pur.orderable_items(req)),
+        can_decide=pur.can_approve(current_user(), req),
+        waiting_on=pur.waiting_on(req),
         decided_on=(req.get("decided_at") or "")[:10])
 
 

@@ -1,9 +1,13 @@
-"""Approvals blueprint: admin decisions on purchase requests.
+"""Approvals blueprint: the two-stage sign-off of purchase requests and
+purchase orders.
 
-Approving items sets them to 'Ordered' so they can go on a purchase order; NO
-stock moves here (stock only changes when the goods are received and pass
-inspection).  The decision also fills the PR form's "Checked by" and
-"Approved by" sign-offs."""
+Every PR and PO is approved twice: the Admin checks it first (initial
+approval, signed "Checked by"), then the Super Admin approves it last
+("Approved by").  Each sees only what waits for their own stage.  PR items
+only become orderable after the final approval; NO stock moves here (stock
+only changes when the goods are received and pass inspection).  POs are
+approved on their own page (purchasing.py); they are listed here so each
+approver has one queue."""
 from flask import (Blueprint, abort, flash, redirect, render_template, request,
                    url_for)
 
@@ -19,18 +23,28 @@ def _requestor_name(req):
     return req.get("requested_by_name") or services.user_name(req.get("requestor_id"))
 
 
+def _queue_row(r):
+    r["requestor_name"] = _requestor_name(r)
+    r["pr_label"] = pur.pr_number(r)
+    r["summary"] = pur.summary_line(r)
+    r["total"] = pur.total_estimated(r)
+    r["stage"] = pur.approval_stage(r)
+    return r
+
+
 @approvals_bp.route("/")
 @module_required("approvals")
 def index():
-    pending = [r for r in db.read("purchase_requests")
-               if r.get("status") == "Pending Approval"]
-    pending = sorted(pending, key=lambda r: r.get("created_at", ""))
-    for r in pending:
-        r["requestor_name"] = _requestor_name(r)
-        r["pr_label"] = pur.pr_number(r)
-        r["summary"] = pur.summary_line(r)
-        r["total"] = pur.total_estimated(r)
-    return render_template("approvals/index.html", requests=pending,
+    user = current_user()
+    mine, orders = pur.approvals_for(user)
+    # What sits at the other stage, so each approver sees the whole queue.
+    others = [r for r in db.read("purchase_requests")
+              if pur.approval_stage(r) and not pur.can_approve(user, r)]
+    others.sort(key=lambda r: r.get("created_at", ""))
+    return render_template("approvals/index.html",
+                           requests=[_queue_row(r) for r in mine],
+                           others=[_queue_row(r) for r in others],
+                           orders=orders, waiting_on=pur.waiting_on,
                            urgency_badge=services.URGENCY_BADGE)
 
 
@@ -40,15 +54,20 @@ def decide(request_id):
     req = db.get("purchase_requests", request_id)
     if not req:
         abort(404)
-    if req.get("status") != "Pending Approval":
+    user = current_user()
+    stage = pur.approval_stage(req)
+    if not stage:
         flash("Request %s has already been decided." % pur.pr_number(req), "error")
+        return redirect(url_for("requests.detail", id=request_id))
+    if not pur.can_approve(user, req):
+        flash("Request %s is waiting for %s." % (pur.pr_number(req), pur.waiting_on(req)),
+              "error")
         return redirect(url_for("requests.detail", id=request_id))
 
     materials_by_id = {m["id"]: m for m in db.read("raw_materials")}
 
     if request.method == "POST":
         action = request.form.get("action") or "approve"
-        remarks = request.form.get("remarks") or ""
         decisions = {}
         for it in req.get("items", []):
             iid = it["item_id"]
@@ -56,21 +75,23 @@ def decide(request_id):
                 "reject": request.form.get("reject_%d" % iid) == "1",
                 "approved_qty": request.form.get("approved_qty_%d" % iid),
             }
-        updated = services.apply_decision(request_id, decisions, remarks, action,
-                                          decider_id=current_user()["id"])
-        pur.record_signoff(request_id, request.form.get("checked_by_name"),
-                           current_user())
+        updated, err = pur.decide_request(request_id, user, decisions,
+                                          request.form.get("remarks") or "", action)
+        if err:
+            flash(err, "error")
+            return redirect(url_for("requests.detail", id=request_id))
+        if updated.get("status") == pur.FOR_FINAL:
+            flash("Request %s checked — sent to the Super Admin for final approval."
+                  % pur.pr_number(updated), "success")
+            return redirect(url_for("approvals.index"))
         flash("Request %s marked %s." % (pur.pr_number(updated),
                                          updated.get("status")), "success")
-        if pur.orderable_items(db.get("purchase_requests", request_id)):
+        if pur.orderable_items(updated):
             return redirect(url_for("requests.detail", id=request_id))
         return redirect(url_for("approvals.index"))
 
     # GET — enrich items for display
-    view = dict(req)
-    view["requestor_name"] = _requestor_name(req)
-    view["pr_label"] = pur.pr_number(req)
-    view["total"] = pur.total_estimated(req)
+    view = _queue_row(dict(req))
     items = []
     for it in req.get("items", []):
         row = dict(it)
@@ -79,6 +100,5 @@ def decide(request_id):
         row["display_unit"] = it.get("unit") or mat.get("unit", "pc")
         items.append(row)
     view["items"] = items
-    return render_template("approvals/decide.html", req=view,
-                           me=current_user(),
-                           urgency_badge=services.URGENCY_BADGE)
+    return render_template("approvals/decide.html", req=view, me=user,
+                           stage=stage, urgency_badge=services.URGENCY_BADGE)

@@ -15,6 +15,7 @@ import security
 # --- Status badge maps (shared with templates) -----------------------------
 REQUEST_STATUS_BADGE = {
     "Pending Approval": "badge-warn",
+    "For Final Approval": "badge-warn",
     "Approved": "badge-ok",
     "Revised": "badge-warn",
     "Rejected": "badge-danger",
@@ -526,10 +527,28 @@ def create_production_request(requestor_id, product_id, qty, item_lines,
         "items": items,
         "created_at": now_iso(),
     })
-    notify_admins("New production request %s awaiting approval — %s."
-                  % (req["pr_no"], (reason or "no reason given")[:80]),
-                  link="/approvals/%d" % req["id"])
+    notify_team(["admin"], "New production request %s awaiting the Admin's check — %s."
+                % (req["pr_no"], (reason or "no reason given")[:80]),
+                link="/approvals/%d" % req["id"], admins=False)
     return req
+
+
+def decided_qty(item, decision, action="approve"):
+    """The quantity an approver allows for one request line: the typed
+    quantity, the requested (or earlier approved) one when left blank, or 0
+    when the line or the whole request is rejected."""
+    if action == "reject" or decision.get("reject"):
+        return 0
+    default = item.get("approved_qty")
+    if default in (None, ""):
+        default = item.get("requested_qty", 0)
+    default = _to_float(default)
+    raw = decision.get("approved_qty")
+    if raw is None or str(raw).strip() == "":
+        approved = default
+    else:
+        approved = max(0.0, _to_float(raw, default))
+    return int(approved) if float(approved).is_integer() else approved
 
 
 def apply_decision(request_id, decisions, remarks, action, decider_id=None):
@@ -546,24 +565,8 @@ def apply_decision(request_id, decisions, remarks, action, decider_id=None):
     any_revised = False
 
     for it in items:
-        iid = it["item_id"]
         requested = _to_float(it.get("requested_qty", 0))
-        if action == "reject":
-            approved = 0.0
-        else:
-            d = decisions.get(iid, {})
-            if d.get("reject"):
-                approved = 0.0
-            else:
-                raw = d.get("approved_qty")
-                if raw is None or str(raw).strip() == "":
-                    approved = requested
-                else:
-                    approved = _to_float(raw, requested)
-                    if approved < 0:
-                        approved = 0.0
-        if float(approved).is_integer():
-            approved = int(approved)
+        approved = decided_qty(it, decisions.get(it["item_id"], {}), action)
         it["approved_qty"] = approved
         if approved and approved > 0:
             it["status"] = "Ordered"

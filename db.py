@@ -474,7 +474,8 @@ SCHEMA = {
             "date_requested": DATE, "product_id": FK, "product_name": STR,
             "qty": NUM, "reason": TEXT, "needed_by": DATE, "urgency": SHORT,
             "notes": TEXT, "total_estimated": MONEY, "status": SHORT,
-            "remarks": TEXT, "checked_by_name": STR, "approved_by_name": STR,
+            "remarks": TEXT, "check_remarks": TEXT, "checked_by_name": STR,
+            "checked_at": TS, "approved_by_name": STR,
             "purchasing_by_name": STR, "purchasing_date": DATE,
             "decided_by": FK, "decided_at": TS, "created_at": TS,
         },
@@ -502,18 +503,20 @@ SCHEMA = {
         "columns": {
             "id": ID, "po_no": SHORT, "purchase_request_id": FK,
             "pr_no": SHORT, "po_date": DATE, "expected_delivery": DATE,
-            "payment_terms": STR, "supplier_id": FK, "supplier_name": STR,
+            "payment_terms": STR, "advance_amount": MONEY,
+            "supplier_id": FK, "supplier_name": STR,
             "supplier_address": TEXT, "supplier_contact": STR,
             "supplier_tin": SHORT, "supplier_contact_person": STR,
             "supplier_reference": STR, "deliver_to": STR,
             "delivery_address": TEXT, "delivery_instructions": TEXT,
             "delivery_contact": STR, "subtotal": MONEY, "discount": MONEY,
-            "freight": MONEY, "tax": MONEY, "grand_total": MONEY,
+            "freight": MONEY, "labor": MONEY, "tax": MONEY,
+            "grand_total": MONEY,
             "terms": TEXT, "prepared_by_name": STR, "prepared_at": DATE,
-            "checked_by_name": STR, "approved_by_name": STR,
+            "checked_by_name": STR, "checked_at": DATE, "approved_by_name": STR,
             "approved_at": DATE, "supplier_ack_name": STR,
             "supplier_ack_date": DATE, "status": SHORT, "delivered_at": DATE,
-            "created_by": FK, "created_at": TS,
+            "cancelled_at": DATE, "created_by": FK, "created_at": TS,
         },
         "children": {"items": "purchase_order_items"},
         "unique": ["po_no"],
@@ -530,6 +533,18 @@ SCHEMA = {
         },
         "foreign_keys": {"purchase_order_id": "purchase_orders",
                          "material_id": "raw_materials"},
+    },
+    # Payments to suppliers; with the issued POs they make up each
+    # supplier's ledger (purchasing_service.ledger_entries).
+    "supplier_payments": {
+        "columns": {
+            "id": ID, "supplier_id": FK, "supplier_name": STR, "po_id": FK,
+            "amount": MONEY, "paid_on": DATE, "kind": SHORT, "method": SHORT,
+            "reference": STR, "notes": TEXT, "recorded_by": FK,
+            "recorded_by_name": STR, "created_at": TS,
+        },
+        "foreign_keys": {"supplier_id": "suppliers", "po_id": "purchase_orders",
+                         "recorded_by": "users"},
     },
 
     # --- Ledgers & system ---------------------------------------------------

@@ -4,7 +4,7 @@
 <div class="page-head">
   <div>
     <h1 class="page-title">Approvals</h1>
-    <p class="page-sub">Purchase requests waiting to be checked and approved — oldest first.</p>
+    <p class="page-sub">The Admin checks each purchase request and purchase order first; the Super Admin gives the final approval.</p>
   </div>
   {% if can('purchasing') %}
   <div class="page-head-actions">
@@ -13,26 +13,68 @@
   {% endif %}
 </div>
 
+{% set my_step = 'final approval' if is_super_admin else 'check (initial approval)' %}
+
+<div class="section-label">Purchase requests waiting for your {{ my_step }} ({{ requests|length }})</div>
 {% if requests %}
-<div class="queue">
+<div class="queue mb">
   {% for r in requests %}
   <a class="queue-item" href="{{ url_for('approvals.decide', request_id=r.id) }}">
     <span class="code" style="min-width:96px">{{ r.pr_label }}</span>
     <span class="queue-main">
       <span class="queue-title">{{ r.purpose or r.reason or r.summary }}</span>
-      <span class="queue-sub">{{ r.summary }} · {{ r.department or ('Production' if r.type == 'production' else '—') }} · {{ r.requestor_name }}{% if r.needed_by %} · needed {{ r.needed_by }}{% endif %}</span>
+      <span class="queue-sub">{{ r.summary }} · {{ r.department or ('Production' if r.type == 'production' else '—') }} · {{ r.requestor_name }}{% if r.needed_by %} · expected {{ r.needed_by }}{% endif %}{% if r.checked_by_name %} · checked by {{ r.checked_by_name }}{% endif %}</span>
     </span>
     {% if r.total %}<b class="nowrap">{{ r.total|peso }}</b>{% endif %}
     {% if (r.urgency or 'Normal') != 'Normal' %}<span class="badge {{ urgency_badge.get(r.urgency, 'badge-warn') }}">{{ r.urgency }}</span>{% endif %}
-    <span class="queue-go">Review {{ icon('arrow-right', 14) }}</span>
+    <span class="queue-go">{{ 'Final approval' if r.stage == 'final' else 'Check' }} {{ icon('arrow-right', 14) }}</span>
   </a>
   {% endfor %}
 </div>
 {% else %}
-<div class="card"><div class="empty">
+<div class="card mb"><div class="empty" style="padding:24px">
   <div class="empty-icon">{{ icon('approvals', 30) }}</div>
-  <div class="empty-title">Nothing waiting</div>
-  <p class="muted">Every purchase request has been decided.</p>
+  <div class="empty-title">Nothing waiting for you</div>
+  <p class="muted">No purchase request is waiting for your {{ my_step }}.</p>
 </div></div>
+{% endif %}
+
+<div class="section-label">Purchase orders waiting for your {{ my_step }} ({{ orders|length }})</div>
+{% if orders %}
+<div class="queue mb">
+  {% for po in orders %}
+  <a class="queue-item" href="{{ url_for('purchasing.detail', po_id=po.id) }}">
+    <span class="code" style="min-width:96px">{{ po.po_no }}</span>
+    <span class="queue-main">
+      <span class="queue-title">{{ po.supplier_name }}</span>
+      <span class="queue-sub">{{ po['items']|length }} item(s) · prepared by {{ po.prepared_by_name or '—' }}{% if po.checked_by_name %} · checked by {{ po.checked_by_name }}{% endif %}{% if po.payment_terms %} · {{ po.payment_terms }}{% endif %}</span>
+    </span>
+    <b class="nowrap">{{ po.grand_total|peso }}</b>
+    <span class="queue-go">Open PO {{ icon('arrow-right', 14) }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card mb"><div class="empty" style="padding:24px">
+  <div class="empty-title">Nothing waiting for you</div>
+  <p class="muted">No purchase order is waiting for your {{ my_step }}.</p>
+</div></div>
+{% endif %}
+
+{% if others %}
+<div class="section-label">Waiting at the other stage ({{ others|length }})</div>
+<div class="queue">
+  {% for r in others %}
+  <a class="queue-item" href="{{ url_for('requests.detail', id=r.id) }}">
+    <span class="code" style="min-width:96px">{{ r.pr_label }}</span>
+    <span class="queue-main">
+      <span class="queue-title">{{ r.purpose or r.reason or r.summary }}</span>
+      <span class="queue-sub">{{ r.summary }} · {{ r.requestor_name }} · waiting for {{ waiting_on(r) }}</span>
+    </span>
+    {% if r.total %}<b class="nowrap">{{ r.total|peso }}</b>{% endif %}
+    <span class="badge badge-muted">{{ r.status }}</span>
+  </a>
+  {% endfor %}
+</div>
 {% endif %}
 {% endblock %}

@@ -38,6 +38,11 @@ def login(c, u, p):
                   follow_redirects=True)
 
 
+def pur_orderable(req):
+    import purchasing_service
+    return purchasing_service.orderable_items(req)
+
+
 def stock(name, kind="material"):
     table = "raw_materials" if kind == "material" else "products"
     item = db.query(table, name=name)[0]
@@ -56,6 +61,17 @@ for u, p in ACCOUNTS:
         r = c.get("/dashboard")
         check(r.status_code == 200 and b"task-card" in r.data,
               "home screen for %s" % u)
+
+# 1a) the sidebar shows only the purchasing flow, in order
+with application.test_client() as c:
+    login(c, "superadmin", "super123")
+    page = c.get("/approvals/").data.decode("utf-8")
+    nav = page.split('class="sidebar-nav"', 1)[1].split("</nav>", 1)[0]
+    order = [nav.find(x) for x in ("Purchase Requests", "Approvals",
+                                   "Purchase Orders", "Supplier Ledger")]
+    check(all(i > 0 for i in order) and order == sorted(order)
+          and "Receiving Area" not in nav and "Packing" not in nav,
+          "the sidebar shows only Purchase Requests, Approvals, POs, Ledger")
 
 # 1b) each user picks light, dark or "match my device"; it is remembered
 with application.test_client() as c:
@@ -119,6 +135,8 @@ GUARDS = [
     ("admin", "admin123", "/packing/", 403),
     ("superadmin", "super123", "/packing/new", 200),
     ("admin", "admin123", "/purchasing/", 200),
+    ("admin", "admin123", "/ledger/", 200),
+    ("production", "prod123", "/ledger/", 403),
     ("production", "prod123", "/receiving/new", 403),
     ("production", "prod123", "/receiving/inspection", 200),
     ("receiving", "recv123", "/receiving/new", 200),
@@ -307,10 +325,15 @@ check(demo_po and abs(demo_po[0]["grand_total"] - 1100) < 0.01
       "its PO to Trimix Butuan totals P1,100.00")
 with application.test_client() as c:
     login(c, "production", "prod123")
-    check(c.get("/requests/new").status_code == 200, "PR form opens")
+    page = c.get("/requests/new").data.decode("utf-8")
+    check('name="material_id"' in page and '<select name="preferred_supplier"' in page
+          and 'name="requested_by_name"' in page and "Expected date" in page,
+          "PR form has the item and supplier dropdowns, expected date and requestor")
     c.post("/requests/new", data={
         "department": "Production", "purpose": "Spare parts for the sealer",
         "needed_by": "", "notes": "Heating element burnt", "urgency": "Urgent",
+        "requested_by_name": "Aldren Ocate",
+        "material_id": ["other", "other"],
         "description": ["Heating element", "Teflon tape"],
         "purpose_use": ["Band sealer", "Band sealer"], "qty": ["2", "3"],
         "unit": ["pc", "roll"], "est_unit_cost": ["450", "80"],
@@ -319,45 +342,143 @@ with application.test_client() as c:
     pr = db.read("purchase_requests")[-1]
     check(pr.get("purpose") == "Spare parts for the sealer"
           and len(pr["items"]) == 2 and abs(pr["total_estimated"] - 1140) < 0.01
-          and pr["pr_no"].startswith(services.today_iso()[:7]),
-          "PR saved with its number, items and estimated total")
+          and pr["pr_no"].startswith(services.today_iso()[:7])
+          and pr["requested_by_name"] == "Aldren Ocate",
+          "PR saved with its number, items, estimated total and requestor")
+    sugar = db.query("raw_materials", name="Sugar") or db.read("raw_materials")[:1]
+    c.post("/requests/new", data={
+        "department": "Production", "purpose": "Restock", "requested_by_name": "",
+        "material_id": [str(sugar[0]["id"])], "description": [""], "qty": ["1"],
+        "unit": ["kg"], "est_unit_cost": [""], "preferred_supplier": [""],
+        "budget_category": [""], "remark": [""], "purpose_use": [""]})
+    picked = db.read("purchase_requests")[-1]
+    check(picked["items"][0]["name"] == sugar[0]["name"]
+          and picked["items"][0]["material_id"] == sugar[0]["id"]
+          and picked["requested_by_name"],
+          "an item picked from the dropdown is saved as that stocked item")
     check(c.get("/requests/%d/print" % pr["id"]).status_code == 200,
           "PR prints as the Purchase Request Form")
     check(c.get("/purchasing/").status_code == 403,
           "a team head cannot open purchase orders")
+admin_name = db.query("users", username="admin")[0]["name"]
+super_name = db.query("users", username="superadmin")[0]["name"]
+with application.test_client() as c:
+    login(c, "superadmin", "super123")
+    c.post("/approvals/%d" % pr["id"], data={"action": "approve"})
+    check(db.get("purchase_requests", pr["id"])["status"] == "Pending Approval",
+          "the Super Admin can't approve before the Admin has checked it")
 with application.test_client() as c:
     login(c, "admin", "admin123")
-    c.post("/approvals/%d" % pr["id"], data={
-        "action": "approve", "checked_by_name": "Jefrey S. Pabillore"})
+    c.post("/approvals/%d" % pr["id"], data={"action": "approve"})
     pr = db.get("purchase_requests", pr["id"])
-    check(pr["status"] == "Approved" and pr["checked_by_name"] == "Jefrey S. Pabillore"
-          and pr["approved_by_name"], "approval records Checked by and Approved by")
+    check(pr["status"] == "For Final Approval" and pr["checked_by_name"] == admin_name
+          and not pr["approved_by_name"] and not pur_orderable(pr),
+          "the Admin's check signs Checked by and sends it for final approval")
+    c.post("/approvals/%d" % pr["id"], data={"action": "approve"})
+    check(db.get("purchase_requests", pr["id"])["status"] == "For Final Approval",
+          "the Admin can't give the final approval")
+with application.test_client() as c:
+    login(c, "superadmin", "super123")
+    check(pr["pr_no"] in c.get("/approvals/").data.decode("utf-8"),
+          "the checked PR is in the Super Admin's queue")
+    c.post("/approvals/%d" % pr["id"], data={"action": "approve"})
+    pr = db.get("purchase_requests", pr["id"])
+    check(pr["status"] == "Approved" and pr["approved_by_name"] == super_name
+          and pr["checked_by_name"] == admin_name,
+          "the Super Admin's final approval signs Approved by")
+trimix = db.query("suppliers", name="Trimix Butuan")[0]
+with application.test_client() as c:
+    login(c, "admin", "admin123")
     check(c.get("/purchasing/new?request_id=%d" % pr["id"]).status_code == 200,
           "PO form opens for the approved PR")
+    pos_before = len(db.read("purchase_orders"))
     c.post("/purchasing/new?request_id=%d" % pr["id"], data={
-        "request_id": pr["id"], "supplier_name": "Trimix Butuan",
+        "request_id": pr["id"], "supplier_name": "Typed Supplier",
+        "po_date": services.today_iso(), "payment_terms": "Cash on delivery",
+        "pr_item_id": ["1"], "include": ["1"], "description": ["Heating element"],
+        "qty": ["2"], "unit": ["pc"], "unit_price": ["430"]})
+    check(len(db.read("purchase_orders")) == pos_before,
+          "a PO needs a supplier from the Supplier Directory")
+    c.post("/purchasing/new?request_id=%d" % pr["id"], data={
+        "request_id": pr["id"], "supplier_id": str(trimix["id"]),
+        "po_date": services.today_iso(), "payment_terms": "Advance payment",
+        "advance_amount": "", "pr_item_id": ["1"], "include": ["1"],
+        "description": ["Heating element"], "qty": ["2"], "unit": ["pc"],
+        "unit_price": ["430"]})
+    check(len(db.read("purchase_orders")) == pos_before,
+          "advance payment terms need the amount paid up front")
+    c.post("/purchasing/new?request_id=%d" % pr["id"], data={
+        "request_id": pr["id"], "supplier_id": str(trimix["id"]),
         "supplier_address": "Butuan", "po_date": services.today_iso(),
-        "payment_terms": "Cash on delivery", "deliver_to": "Amamio Farm Products",
-        "delivery_address": "Nasipit", "freight": "60",
+        "payment_terms": "Advance payment", "advance_amount": "500",
+        "deliver_to": "Amamio Farm Products",
+        "delivery_address": "Nasipit", "freight": "60", "labor": "150",
         "pr_item_id": ["1", "2"], "include": ["1", "0"],
         "description": ["Heating element", "Teflon tape"], "brand_model": ["", ""],
         "qty": ["2", "3"], "unit": ["pc", "roll"], "unit_price": ["430", "80"],
         "requested_delivery": ["", ""], "vat": ["", ""], "remarks": ["", ""],
-        "prepared_by": "Bernadith Frianeza", "checked_by": "Fe Amor Eballar"})
+        "prepared_by": "Someone Else", "checked_by": "Someone Else"})
     po = db.read("purchase_orders")[-1]
     pr = db.get("purchase_requests", pr["id"])
     check(po["po_no"] == pr["pr_no"] and len(po["items"]) == 1
-          and abs(po["grand_total"] - 920) < 0.01,
-          "PO prepared from the approved lines (unticked line left out)")
+          and abs(po["grand_total"] - 1070) < 0.01 and po["labor"] == 150
+          and po["supplier_id"] == trimix["id"] and po["advance_amount"] == 500,
+          "PO prepared from the approved lines, with labor cost and advance payment")
+    check(po["prepared_by_name"] == admin_name and not po["checked_by_name"],
+          "Prepared by is the person signed in; Checked by waits for the check")
     check(pr["status"] == "Approved" and pr["items"][0]["po_no"] == po["po_no"]
           and not pr["items"][1].get("po_id"),
           "the PR shows which line is on the PO and which still needs one")
-    c.post("/purchasing/%d/approve" % po["id"], data={"approved_by_name": "Janice Nilda A. Mira"})
-    check(db.get("purchase_orders", po["id"])["status"] == "Approved",
-          "PO approved")
+    import purchasing_service as pur_svc  # noqa: E402
+    check(not any(e["ref"] == po["po_no"] for e in pur_svc.ledger_entries(trimix["id"])),
+          "a PO is not on the ledger before it is approved")
+    c.post("/purchasing/%d/approve" % po["id"])
+    po = db.get("purchase_orders", po["id"])
+    check(po["status"] == "For Final Approval" and po["checked_by_name"] == admin_name,
+          "the Admin's check of the PO signs Checked by")
+    c.post("/purchasing/%d/approve" % po["id"])
+    check(db.get("purchase_orders", po["id"])["status"] == "For Final Approval",
+          "the Admin can't give the PO its final approval")
+with application.test_client() as c:
+    login(c, "superadmin", "super123")
+    check(po["po_no"] in c.get("/approvals/").data.decode("utf-8"),
+          "the checked PO is in the Super Admin's queue")
+    c.post("/purchasing/%d/approve" % po["id"])
+    po = db.get("purchase_orders", po["id"])
+    check(po["status"] == "Approved" and po["approved_by_name"] == super_name,
+          "the Super Admin's final approval signs Approved by and issues the PO")
+with application.test_client() as c:
+    login(c, "admin", "admin123")
     page = c.get("/purchasing/%d/print" % po["id"]).data.decode("utf-8")
-    check("Purchase Order" in page and "Janice Nilda A. Mira" in page,
+    check("Purchase Order" in page and super_name in page and "Labor Cost" in page,
           "PO prints as the Purchase Order form")
+    # Supplier ledger: the issued PO is a credit; payments are debits.
+    before = pur_svc.ledger_entries(trimix["id"])
+    check(any(e["ref"] == po["po_no"] and abs(e["credit"] - 1070) < 0.01 for e in before),
+          "the issued PO is posted to the supplier's ledger")
+    page = c.get("/ledger/%d?po=%d" % (trimix["id"], po["id"])).data.decode("utf-8")
+    check(po["po_no"] in page and 'value="500.00"' in page,
+          "the ledger offers the advance payment that is due")
+    c.post("/ledger/%d/pay" % trimix["id"], data={
+        "po_id": str(po["id"]), "amount": "5000", "kind": "Full payment",
+        "method": "Cash"})
+    check(pur_svc.po_paid(po["id"]) == 0, "a payment can't be more than the PO's balance")
+    c.post("/ledger/%d/pay" % trimix["id"], data={
+        "po_id": str(po["id"]), "amount": "500", "kind": "Advance payment",
+        "method": "GCash", "reference": "GC-1001"})
+    c.post("/ledger/%d/pay" % trimix["id"], data={
+        "po_id": str(po["id"]), "amount": "200", "kind": "Partial payment",
+        "method": "Cash"})
+    summary = pur_svc.po_payment_summary(db.get("purchase_orders", po["id"]))
+    entries = pur_svc.ledger_entries(trimix["id"])
+    check(summary["paid"] == 700 and abs(summary["balance"] - 370) < 0.01
+          and abs(entries[-1]["balance"] - (before[-1]["balance"] - 700)) < 0.01,
+          "advance and partial payments lower the PO's and the supplier's balance")
+    row = [r for r in pur_svc.ledger_summary() if r["id"] == trimix["id"]][0]
+    check(abs(row["balance"] - entries[-1]["balance"]) < 0.01,
+          "the ledger list shows the same balance as the supplier's ledger")
+    for route in ("/ledger/", "/ledger/?show=all", "/ledger/%d" % trimix["id"]):
+        check(c.get(route).status_code == 200, "%s renders" % route)
     c.post("/purchasing/%d/delivered" % po["id"])
     check(db.get("purchase_orders", po["id"])["status"] == "Delivered",
           "PO marked delivered")
@@ -543,6 +664,11 @@ with application.test_client() as c:
            and r["items"][0].get("material_id")][0]
     item = req["items"][0]
     c.post("/approvals/%d" % req["id"], data={"action": "approve"})
+with application.test_client() as c:
+    login(c, "superadmin", "super123")
+    c.post("/approvals/%d" % req["id"], data={"action": "approve"})
+with application.test_client() as c:
+    login(c, "admin", "admin123")
     check(not db.get("purchase_requests", req["id"])["items"][0].get("qr_token"),
           "approval no longer mints a scan-to-stock QR code")
     check(c.post("/qr/receive", json={"token": "PR-%d-1" % req["id"]}).status_code
@@ -550,7 +676,8 @@ with application.test_client() as c:
     lines = [i for i in db.get("purchase_requests", req["id"])["items"]
              if i["status"] == "Ordered"]
     c.post("/purchasing/new?request_id=%d" % req["id"], data={
-        "request_id": req["id"], "supplier_name": "Highland Produce Traders",
+        "request_id": req["id"],
+        "supplier_id": str(db.query("suppliers", name="Highland Produce Traders")[0]["id"]),
         "po_date": services.today_iso(), "payment_terms": "Cash on delivery",
         "pr_item_id": [str(i["item_id"]) for i in lines],
         "include": ["1"] * len(lines),
@@ -561,6 +688,10 @@ with application.test_client() as c:
         "remarks": [""] * len(lines)})
     po = db.read("purchase_orders")[-1]
     c.post("/purchasing/%d/approve" % po["id"])
+with application.test_client() as c:
+    login(c, "superadmin", "super123")
+    c.post("/purchasing/%d/approve" % po["id"])
+    po = db.get("purchase_orders", po["id"])
 with application.test_client() as c:
     login(c, "receiving", "recv123")
     page = c.get("/receiving/new").data.decode("utf-8")
@@ -609,6 +740,32 @@ with application.test_client() as c:
     c.post("/purchasing/%d/delivered" % po["id"])
     check(db.get("purchase_orders", po["id"])["status"] == "Delivered",
           "a short PO can be closed as delivered")
+
+# 9a) a PO for an older production request, whose lines only carry the
+# material id, gets the item names from the materials list
+_lemon, _ginger = (db.query("raw_materials", name=n)[0] for n in ("Lemon", "Ginger"))
+lines = [{"item_id": n, "material_id": m["id"], "requested_qty": 5.0,
+          "approved_qty": 5, "status": "Ordered", "note": ""}
+         for n, m in ((1, _lemon), (2, _ginger))]
+old = [db.insert("purchase_requests", {
+    "type": "production", "status": "Approved", "items": lines,
+    "requestor_id": db.query("users", username="production")[0]["id"],
+    "created_at": services.now_iso()})]
+with application.test_client() as c:
+    login(c, "admin", "admin123")
+    check(c.get("/purchasing/new?request_id=%d" % old[0]["id"]).status_code == 200,
+          "the PO form opens for an older production request")
+    c.post("/purchasing/new?request_id=%d" % old[0]["id"], data={
+        "request_id": old[0]["id"], "supplier_id": str(db.read("suppliers")[0]["id"]),
+        "payment_terms": "Cash on delivery",
+        "pr_item_id": [str(i["item_id"]) for i in lines],
+        "include": ["1"] * len(lines), "description": [""] * len(lines),
+        "qty": [str(i["requested_qty"]) for i in lines],
+        "unit": ["pc"] * len(lines), "unit_price": ["1"] * len(lines)})
+po = db.read("purchase_orders")[-1]
+check(po["purchase_request_id"] == old[0]["id"]
+      and [i["description"] for i in po["items"]] == ["Lemon", "Ginger"],
+      "a PO for an older production request is named from the materials")
 
 # 9b) the client's PO 2026-09-017 (switches, not stocked yet) received in full
 demo_po = db.query("purchase_orders", po_no="2026-09-017")[0]

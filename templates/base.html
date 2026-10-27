@@ -87,12 +87,8 @@
   </nav>
 
   <div class="sidebar-foot">
-    {% if can('chatbot') %}
-    <button class="side-link side-link-btn" type="button" data-chat-open>
-      <span class="side-ico">{{ icon('assistant', 18) }}</span>
-      <span class="side-text">AI Assistant</span>
-    </button>
-    {% endif %}
+    {# The AI Assistant link is hidden while the sidebar shows only the
+       purchasing flow; the floating button still opens it. #}
     <a class="side-link" href="{{ url_for('auth.logout') }}">
       <span class="side-ico">{{ icon('logout', 18) }}</span>
       <span class="side-text">Log out</span>

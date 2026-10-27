@@ -17,13 +17,20 @@
   {% for label, state in track %}<span class="track-step is-{{ state }}">{{ label }}</span>{% endfor %}
 </div>
 
-{% if po.status == 'Prepared' %}
+{% if can_approve %}
 <div class="next-action">
-  <div class="next-action-text"><b>Next: approve this PO</b><span>Then print it and send it to {{ po.supplier_name }}.</span></div>
-  <form method="post" action="{{ url_for('purchasing.approve', po_id=po.id) }}" class="flex gap-sm wrap" style="align-items:center">
-    <input type="text" name="approved_by_name" value="{{ me.name }}" maxlength="80" aria-label="Approved by" style="max-width:220px">
-    <button class="btn btn-primary" type="submit">Approve PO</button>
+  {% if stage == 'initial' %}
+  <div class="next-action-text"><b>Next: check this PO (initial approval)</b><span>You sign it as Checked by; the Super Admin then gives the final approval.</span></div>
+  {% else %}
+  <div class="next-action-text"><b>Next: final approval</b><span>Checked by {{ po.checked_by_name or 'the Admin' }}. You sign it as Approved by; it is then issued: printed for {{ po.supplier_name }} and posted to its ledger.</span></div>
+  {% endif %}
+  <form method="post" action="{{ url_for('purchasing.approve', po_id=po.id) }}">
+    <button class="btn btn-primary" type="submit">{{ 'Check and approve' if stage == 'initial' else 'Give final approval' }}</button>
   </form>
+</div>
+{% elif stage %}
+<div class="next-action">
+  <div class="next-action-text"><b>Waiting for {{ waiting_on }}</b><span>{% if po.checked_by_name %}Checked by {{ po.checked_by_name }}. {% endif %}They have been notified.</span></div>
 </div>
 {% elif po.status == 'Approved' %}
 {% set waiting = lines | selectattr('pending') | list %}
@@ -67,6 +74,7 @@
         <tr><td colspan="4">Subtotal</td><td class="num">{{ po.subtotal|peso }}</td><td colspan="2"></td></tr>
         {% if po.discount %}<tr><td colspan="4">Discount</td><td class="num">−{{ po.discount|peso }}</td><td colspan="2"></td></tr>{% endif %}
         {% if po.freight %}<tr><td colspan="4">Delivery / freight</td><td class="num">{{ po.freight|peso }}</td><td colspan="2"></td></tr>{% endif %}
+        {% if po.labor %}<tr><td colspan="4">Labor cost</td><td class="num">{{ po.labor|peso }}</td><td colspan="2"></td></tr>{% endif %}
         {% if po.tax %}<tr><td colspan="4">VAT / other tax</td><td class="num">{{ po.tax|peso }}</td><td colspan="2"></td></tr>{% endif %}
         <tr><td colspan="4"><b>Grand total</b></td><td class="num"><b>{{ po.grand_total|peso }}</b></td><td colspan="2"></td></tr>
       </tfoot>
@@ -113,10 +121,41 @@
 {% endif %}
 
 <div class="card mb">
+  <div class="card-title">Payments</div>
+  <dl class="review-list">
+    <dt>Payment terms</dt><dd>{{ po.payment_terms or '—' }}{% if po.advance_amount %} · {{ po.advance_amount|peso }} up front{% endif %}</dd>
+    {% if pay.issued %}
+    <dt>Paid</dt><dd>{{ pay.paid|peso }}</dd>
+    <dt>Balance</dt><dd><b>{{ pay.balance|peso }}</b>{% if pay.advance_due %} · {{ pay.advance_due|peso }} of the up-front payment still due{% endif %}</dd>
+    {% else %}
+    <dt>Ledger</dt><dd class="muted">Posted to the supplier's ledger once the Super Admin approves it.</dd>
+    {% endif %}
+  </dl>
+  {% if payments %}
+  <div class="table-wrap mt">
+    <table class="table" data-no-paginate>
+      <thead><tr><th>Date</th><th>Payment</th><th>Reference</th><th class="num">Amount</th></tr></thead>
+      <tbody>
+        {% for p in payments %}
+        <tr><td>{{ p.paid_on }}</td><td>{{ p.kind }} · {{ p.method }}</td><td>{{ p.reference or '—' }}</td><td class="num">{{ p.amount|peso }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% if supplier_id and pay.issued and can('ledger') %}
+  <div class="flex gap-sm wrap mt">
+    {% if pay.can_pay %}<a class="btn btn-primary btn-sm" href="{{ url_for('ledger.supplier', supplier_id=supplier_id, po=po.id) }}#pay">Record a payment</a>{% endif %}
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('ledger.supplier', supplier_id=supplier_id) }}">{{ icon('ledger', 14) }} Supplier ledger</a>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card mb">
   <div class="card-title">Sign-offs</div>
   <dl class="review-list">
     <dt>Prepared by</dt><dd>{{ po.prepared_by_name or '—' }}{% if po.prepared_at %} · {{ po.prepared_at }}{% endif %}</dd>
-    <dt>Checked by</dt><dd>{{ po.checked_by_name or '—' }}</dd>
+    <dt>Checked by</dt><dd>{{ po.checked_by_name or '—' }}{% if po.checked_at %} · {{ po.checked_at }}{% endif %}</dd>
     <dt>Approved by</dt><dd>{{ po.approved_by_name or '—' }}{% if po.approved_at %} · {{ po.approved_at }}{% endif %}</dd>
   </dl>
   {% if po.terms %}<div class="form-label mt">Terms / special instructions</div><p class="muted small">{{ po.terms }}</p>{% endif %}
@@ -124,7 +163,7 @@
 
 <div class="flex gap-sm wrap">
   <a class="btn btn-ghost btn-sm" href="{{ url_for('purchasing.print_po', po_id=po.id) }}">{{ icon('printer', 14) }} Print Purchase Order</a>
-  {% if po.status in ('Prepared', 'Approved') %}
+  {% if po.status in ('Prepared', 'For Final Approval', 'Approved') %}
   <form method="post" action="{{ url_for('purchasing.cancel', po_id=po.id) }}"
         data-confirm="Cancel PO {{ po.po_no }}? Its items can be put on a new PO.">
     <button class="btn btn-ghost btn-sm" type="submit">Cancel PO</button>

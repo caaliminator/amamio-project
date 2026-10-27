@@ -233,7 +233,8 @@ def kpis():
         "pending_sales_approvals": sum(1 for r in sreqs
                                        if r.get("status") == "Pending Approval"),
         "pending_purchase_approvals": sum(1 for r in preqs
-                                          if r.get("status") == "Pending Approval"),
+                                          if r.get("status") in ("Pending Approval",
+                                                                 "For Final Approval")),
         "production_runs": len(db.read("production_orders")) or len(produced),
     }
 

@@ -4,6 +4,8 @@
 <a class="back-link" href="{{ url_for('requests.index') }}">{{ icon('arrow-left', 15) }} Purchase Requests</a>
 
 {% macro item_card(line) %}
+{% set picked = (line.material_id if line else '')|string %}
+{% set other = picked == 'other' %}
 <div class="line-card" data-line>
   <div class="line-card-head">
     <span class="line-card-num">Item</span>
@@ -11,13 +13,30 @@
   </div>
   <div class="form-grid cols-2">
     <div class="form-row">
-      <label class="form-label">Item description <span class="req">*</span></label>
-      <input type="text" name="description" maxlength="120" required value="{{ line.description if line else '' }}" placeholder="e.g. Timer switch">
+      <label class="form-label">Item requested <span class="req">*</span></label>
+      <select name="material_id" required class="js-item">
+        <option value="">— Choose an item —</option>
+        {% for group, rows in catalog %}
+        <optgroup label="{{ group }}">
+          {% for r in rows %}
+          <option value="{{ r.id }}" data-name="{{ r.name }}" data-unit="{{ r.unit }}"
+                  data-cost="{{ '%.2f'|format(r.cost) if r.cost else '' }}" data-supplier="{{ r.supplier }}"
+                  {{ 'selected' if picked == r.id|string }}>{{ r.name }}</option>
+          {% endfor %}
+        </optgroup>
+        {% endfor %}
+        <option value="other" {{ 'selected' if other }}>Other item — not on the list</option>
+      </select>
     </div>
     <div class="form-row">
       <label class="form-label">Purpose / use</label>
       <input type="text" name="purpose_use" maxlength="120" value="{{ line.purpose_use if line else '' }}" placeholder="e.g. Dehydrator">
     </div>
+  </div>
+  {# Filled in from the dropdown; typed only for an item not on the list. #}
+  <div class="form-row js-other"{{ '' if other else ' hidden' }}>
+    <label class="form-label">Name of the item <span class="req">*</span></label>
+    <input type="text" name="description" maxlength="120" required value="{{ line.description if line else '' }}" placeholder="e.g. Timer switch">
   </div>
   <div class="form-grid cols-3">
     <div class="form-row">
@@ -38,7 +57,10 @@
   <div class="form-grid cols-2">
     <div class="form-row">
       <label class="form-label">Preferred supplier</label>
-      <input type="text" name="preferred_supplier" maxlength="120" list="supplierList" value="{{ line.preferred_supplier if line else '' }}" placeholder="From the directory, or type a new one">
+      <select name="preferred_supplier" class="js-supplier">
+        <option value="">— No preference —</option>
+        {% for s in suppliers %}<option {{ 'selected' if line and line.preferred_supplier == s }}>{{ s }}</option>{% endfor %}
+      </select>
     </div>
     <div class="form-row">
       <label class="form-label">Budget / category</label>
@@ -75,14 +97,6 @@
         <label class="form-label" for="purpose">Purpose / justification <span class="req">*</span></label>
         <input type="text" id="purpose" name="purpose" maxlength="200" required value="{{ form.purpose or '' }}" placeholder="e.g. Machine accessories">
       </div>
-      <div class="form-row">
-        <label class="form-label" for="needed_by">Required date</label>
-        <input type="date" id="needed_by" name="needed_by" min="{{ today }}" value="{{ form.needed_by or '' }}">
-      </div>
-      <div class="form-row">
-        <label class="form-label" for="requested_by">Requested by</label>
-        <input type="text" id="requested_by" value="{{ me.name }} · {{ today }}" readonly class="locked-field" data-review-skip>
-      </div>
     </div>
   </section>
 
@@ -95,8 +109,19 @@
     <div class="tally is-even" id="grandTotal"></div>
   </section>
 
-  <section class="wz-step" data-title="Notes for the approver">
+  <section class="wz-step" data-title="When is it needed, and who is asking?">
     <div class="wz-body">
+      <div class="form-grid cols-2">
+        <div class="form-row">
+          <label class="form-label" for="needed_by">Expected date</label>
+          <input type="date" id="needed_by" name="needed_by" min="{{ today }}" value="{{ form.needed_by or '' }}">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="requested_by_name">Requestor name <span class="req">*</span></label>
+          <input type="text" id="requested_by_name" name="requested_by_name" maxlength="80" required
+                 value="{{ form.requested_by_name or me.name }}">
+        </div>
+      </div>
       <div class="form-row">
         <label class="form-label" for="notes">Requester's notes / special instructions</label>
         <textarea id="notes" name="notes" rows="3" maxlength="500" placeholder="e.g. Melted push button switch and damaged timer switch">{{ form.notes or '' }}</textarea>
@@ -112,13 +137,12 @@
     </div>
   </section>
 
-  <section class="wz-step" data-title="Check and submit" data-review
-           data-hint="The admin is notified to check and approve it.">
+  <section class="wz-step" data-title="Check and submit for approval" data-review
+           data-hint="The Admin checks it first, then the Super Admin gives the final approval.">
     <div class="wz-body"></div>
   </section>
 </form>
 
-<datalist id="supplierList">{% for s in suppliers %}<option value="{{ s }}">{% endfor %}</datalist>
 <template id="lineTpl">{{ item_card(none) }}</template>
 
 <script>
@@ -144,13 +168,37 @@
   }
   document.getElementById("addLine").addEventListener("click", function () {
     var node = tpl.content.firstElementChild.cloneNode(true);
-    cards.appendChild(node); update(); node.querySelector("input").focus();
+    cards.appendChild(node); update(); node.querySelector("select").focus();
   });
   cards.addEventListener("click", function (e) {
     var b = e.target.closest("[data-remove-line]");
     if (b) { b.closest("[data-line]").remove(); update(); }
   });
   cards.addEventListener("input", update);
+
+  // Picking an item fills in its name, unit, last cost and usual supplier;
+  // "Other" asks for the name instead.
+  function pickItem(sel, fill) {
+    var card = sel.closest("[data-line]");
+    var o = sel.options[sel.selectedIndex];
+    var other = sel.value === "other";
+    var name = card.querySelector("[name=description]");
+    card.querySelector(".js-other").hidden = !other;
+    if (other) { if (fill) { name.value = ""; name.focus(); } return; }
+    name.value = o.getAttribute("data-name") || "";
+    if (!fill || !sel.value) return;
+    card.querySelector("[name=unit]").value = o.getAttribute("data-unit") || "pc";
+    if (o.getAttribute("data-cost")) card.querySelector(".js-cost").value = o.getAttribute("data-cost");
+    var sup = card.querySelector(".js-supplier");
+    var want = o.getAttribute("data-supplier");
+    if (want && !sup.value && Array.prototype.some.call(sup.options, function (x) { return x.value === want; })) {
+      sup.value = want;
+    }
+  }
+  cards.addEventListener("change", function (e) {
+    if (e.target.classList.contains("js-item")) { pickItem(e.target, true); update(); }
+  });
+  cards.querySelectorAll(".js-item").forEach(function (sel) { pickItem(sel, false); });
   update();
 
   step.reviewHtml = function () {

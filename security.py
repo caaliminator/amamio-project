@@ -73,6 +73,7 @@ PERMISSIONS = {
     "analytics":     ADMIN_ROLES,
     "approvals":     ADMIN_ROLES,
     "purchasing":    ADMIN_ROLES,                # purchase orders
+    "ledger":        ADMIN_ROLES,                # supplier ledger / payments
     "reports":       ADMIN_ROLES,
     "users":         ADMIN_ROLES,
     "migration":     {"super_admin"},
@@ -116,7 +117,22 @@ PACKER_ROLES = ("packing_head", "packing_member")
 # Sidebar groups: (section label, [(module, label, icon name, endpoint), ...])
 # Icon names refer to icons.ICONS (monochrome line icons).  Each role only sees
 # the entries it may open, so a floor role gets a short, focused menu.
+#
+# For now the sidebar shows only the purchasing flow, in the order the work
+# happens: Purchase Request → Admin check → Super Admin approval → Purchase
+# Order → Supplier Ledger.  The other menus are parked in NAV_HIDDEN while the
+# flow is reworked; their pages still open by URL.  Move a group back into NAV
+# to show it again.
 NAV = [
+    ("Purchasing", [
+        ("requests",   "Purchase Requests", "requests", "requests.index"),
+        ("approvals",  "Approvals",         "approvals", "approvals.index"),
+        ("purchasing", "Purchase Orders",   "orders", "purchasing.index"),
+        ("ledger",     "Supplier Ledger",   "ledger", "ledger.index"),
+    ]),
+]
+
+NAV_HIDDEN = [
     ("Start", [
         ("dashboard", "Home",           "dashboard", "auth.dashboard"),
         ("qr",        "Scan a QR code", "qr", "qr.scan"),
@@ -149,9 +165,6 @@ NAV = [
         ("suppliers", "Supplier Directory",    "suppliers", "suppliers.index"),
     ]),
     ("Management", [
-        ("requests",   "Purchase Requests", "requests", "requests.index"),
-        ("approvals",  "Approvals",         "approvals", "approvals.index"),
-        ("purchasing", "Purchase Orders",   "orders", "purchasing.index"),
         ("reports",   "Reports",   "reports", "reports.index"),
         ("analytics", "Analytics", "analytics", "analytics.index"),
     ]),

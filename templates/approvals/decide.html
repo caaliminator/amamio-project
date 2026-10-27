@@ -17,6 +17,20 @@
   <span class="badge {{ urgency_badge.get(req.urgency or 'Normal', 'badge-muted') }}">{{ req.urgency or 'Normal' }}</span>
 </div>
 
+<div class="track mb">
+  <span class="track-step is-done">Requested</span>
+  <span class="track-step is-{{ 'now' if stage == 'initial' else 'done' }}">Checked by Admin</span>
+  <span class="track-step is-{{ 'now' if stage == 'final' else '' }}">Approved by Super Admin</span>
+</div>
+
+{% if stage == 'final' %}
+<div class="card mb">
+  <div class="card-title">Checked by {{ req.checked_by_name or 'the Admin' }}{% if req.checked_at %} · {{ req.checked_at[:10] }}{% endif %}</div>
+  <p>{{ req.check_remarks or 'No remarks.' }}</p>
+  <p class="muted small">The quantities below are what the Admin approved. Change them or tick Reject before giving the final approval.</p>
+</div>
+{% endif %}
+
 {% if req.notes or req.remarks %}
 <div class="card mb">
   <div class="card-title">Requester's notes / special instructions</div>
@@ -54,7 +68,7 @@
                      name="approved_qty_{{ it.item_id }}"
                      value="{{ "%g"|format((it.approved_qty if it.approved_qty not in (none, '') else it.requested_qty)|float) }}">
             </td>
-            <td class="approve-reject-cell"><input type="checkbox" name="reject_{{ it.item_id }}" value="1"></td>
+            <td class="approve-reject-cell"><input type="checkbox" name="reject_{{ it.item_id }}" value="1" {{ 'checked' if it.status == 'Rejected' }}></td>
           </tr>
           {% endfor %}
         </tbody>
@@ -66,13 +80,12 @@
   <div class="card">
     <div class="form-grid cols-2">
       <div class="form-row">
-        <label class="form-label" for="checked_by_name">Checked by</label>
-        <input type="text" id="checked_by_name" name="checked_by_name" maxlength="80"
-               value="{{ req.checked_by_name or '' }}" placeholder="Name of who checked the request">
+        <label class="form-label">Checked by (Admin)</label>
+        <input type="text" value="{{ me.name if stage == 'initial' else req.checked_by_name }}" readonly class="locked-field">
       </div>
       <div class="form-row">
-        <label class="form-label">Approved by</label>
-        <input type="text" value="{{ me.name }}" readonly class="locked-field">
+        <label class="form-label">Approved by (Super Admin)</label>
+        <input type="text" value="{{ me.name if stage == 'final' else 'Filled in at the final approval' }}" readonly class="locked-field">
       </div>
     </div>
     <div class="form-row">
@@ -81,14 +94,23 @@
                 placeholder="e.g. Requested 15, approved 10 — budget limit."></textarea>
     </div>
     <div class="flex gap wrap">
-      <button class="btn btn-primary" type="submit" name="action" value="approve">Approve</button>
+      {% if stage == 'initial' %}
+      <button class="btn btn-primary" type="submit" name="action" value="approve">Approve — send for final approval</button>
+      {% else %}
+      <button class="btn btn-primary" type="submit" name="action" value="approve">Give final approval</button>
       <button class="btn" type="submit" name="action" value="revise">Approve with changes</button>
+      {% endif %}
       <button class="btn btn-danger" type="submit" name="action" value="reject"
               data-confirm="Reject the whole request {{ req.pr_label }}?">Reject</button>
     </div>
     <p class="muted small mt">
-      Approved items can then be put on a purchase order. Changing a quantity marks the request
-      <strong>Revised</strong>. No stock changes until the goods are received.
+      {% if stage == 'initial' %}
+      Your name goes on the form as <strong>Checked by</strong>. The Super Admin is then notified to give the final approval.
+      {% else %}
+      Your name goes on the form as <strong>Approved by</strong>. Approved items can then be put on a purchase order;
+      a quantity below what was requested marks the request <strong>Revised</strong>.
+      {% endif %}
+      No stock changes until the goods are received.
     </p>
   </div>
 </form>

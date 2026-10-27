@@ -15,7 +15,7 @@
     <div><b>PO No.</b><span>{{ po.po_no }}</span></div>
     <div><b>PO Date</b><span>{{ po.po_date|longdate }}</span></div>
     <div><b>Expected Delivery Date</b><span>{{ po.expected_delivery|longdate }}</span></div>
-    <div><b>Payment Terms</b><span>{{ po.payment_terms }}</span></div>
+    <div><b>Payment Terms</b><span>{{ po.payment_terms }}{% if po.advance_amount %} ({{ po.advance_amount|peso }} up front){% endif %}</span></div>
   </div>
   <div class="gform-bar">Supplier Information</div>
   <div class="gform-fields white">
@@ -53,6 +53,7 @@
       <tr class="total"><td colspan="6" class="num">SUBTOTAL</td><td class="num">{{ po.subtotal|peso }}</td><td colspan="3"></td></tr>
       <tr class="total"><td colspan="6" class="num">Discount</td><td class="num">{{ po.discount|peso if po.discount else '' }}</td><td colspan="3"></td></tr>
       <tr class="total"><td colspan="6" class="num">Delivery / Freight</td><td class="num">{{ po.freight|peso if po.freight else '' }}</td><td colspan="3"></td></tr>
+      {% if po.labor %}<tr class="total"><td colspan="6" class="num">Labor Cost</td><td class="num">{{ po.labor|peso }}</td><td colspan="3"></td></tr>{% endif %}
       <tr class="total"><td colspan="6" class="num">VAT / Other Tax</td><td class="num">{{ po.tax|peso if po.tax else '' }}</td><td colspan="3"></td></tr>
       <tr class="grand"><td colspan="6" class="num">GRAND TOTAL</td><td class="num">{{ po.grand_total|peso }}</td><td colspan="3"></td></tr>
     </tbody>
@@ -62,7 +63,7 @@
   <div class="gform-sign">
     {% for who, name, on in [
          ('Prepared By', po.prepared_by_name, po.prepared_at),
-         ('Checked By', po.checked_by_name, po.prepared_at if po.checked_by_name else ''),
+         ('Checked By', po.checked_by_name, po.checked_at or (po.prepared_at if po.checked_by_name else '')),
          ('Approved By', po.approved_by_name, po.approved_at),
          ('Supplier Acknowledgment', po.supplier_ack_name, po.supplier_ack_date)] %}
     <div>

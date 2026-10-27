@@ -4,13 +4,14 @@
 <div class="page-head">
   <div>
     <h1 class="page-title">Purchase Orders</h1>
-    <p class="page-sub">Approved purchase requests become purchase orders for the supplier.</p>
+    <p class="page-sub">Approved purchase requests become purchase orders for the supplier. The Admin checks each PO, the Super Admin approves it, and it is issued.</p>
   </div>
 </div>
 
 <div class="figures mb">
   <div class="figure {{ 'is-bad' if counts.awaiting_po }}"><div class="figure-label">Approved PRs waiting for a PO</div><div class="figure-value">{{ counts.awaiting_po }}</div></div>
-  <div class="figure"><div class="figure-label">POs to approve</div><div class="figure-value">{{ counts.prepared }}</div></div>
+  <div class="figure"><div class="figure-label">POs to check (Admin)</div><div class="figure-value">{{ counts.prepared }}</div></div>
+  <div class="figure"><div class="figure-label">POs for final approval (Super Admin)</div><div class="figure-value">{{ counts.for_final }}</div></div>
   <div class="figure"><div class="figure-label">Approved, waiting for delivery</div><div class="figure-value">{{ counts.approved }}</div></div>
 </div>
 

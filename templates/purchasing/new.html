@@ -11,25 +11,21 @@
   <input type="hidden" name="request_id" value="{{ req.id }}">
 
   <section class="wz-step" data-title="Who is the supplier?"
-           data-hint="PO No. {{ po_no }} · from PR {{ pr_no }}. Pick from the Supplier Directory to fill in the details.">
+           data-hint="PO No. {{ po_no }} · from PR {{ pr_no }}. Pick the supplier from the Supplier Directory; its details fill in by themselves.">
     <div class="wz-body">
       <div class="form-row">
-        <label class="form-label" for="supplier_id">From the Supplier Directory</label>
-        <select id="supplier_id" name="supplier_id" data-review-skip>
-          <option value="">— A supplier not in the directory —</option>
+        <label class="form-label" for="supplier_id">Supplier <span class="req">*</span></label>
+        <select id="supplier_id" name="supplier_id" required>
+          <option value="">— Choose from the Supplier Directory —</option>
           {% for s in suppliers %}
           <option value="{{ s.id }}" {{ 'selected' if chosen|string == s.id|string }}
                   data-name="{{ s.name }}" data-address="{{ s.address }}" data-contact="{{ s.contact }}"
                   data-tin="{{ s.tin }}" data-person="{{ s.contact_person }}">{{ s.name }}</option>
           {% endfor %}
         </select>
+        <p class="muted small">Not listed? Add it to the <a href="{{ url_for('suppliers.index') }}">Supplier Directory</a> first, so its ledger can track the payments.</p>
       </div>
       <div class="form-grid cols-2">
-        <div class="form-row">
-          <label class="form-label" for="supplier_name">Supplier name <span class="req">*</span></label>
-          <input type="text" id="supplier_name" name="supplier_name" required maxlength="120"
-                 value="{{ sv('supplier_name', suggested.name if suggested else (items[0].preferred_supplier or '')) }}">
-        </div>
         <div class="form-row">
           <label class="form-label" for="supplier_tin">TIN</label>
           <input type="text" id="supplier_tin" name="supplier_tin" maxlength="40" value="{{ sv('supplier_tin', suggested.tin if suggested else '') }}">
@@ -48,7 +44,7 @@
         </div>
         <div class="form-row">
           <label class="form-label" for="supplier_reference">Supplier reference</label>
-          <input type="text" id="supplier_reference" name="supplier_reference" maxlength="80" value="{{ sv('supplier_reference') }}" placeholder="Quotation no., if any">
+          <input type="text" id="supplier_reference" name="supplier_reference" maxlength="80" value="{{ sv('supplier_reference') }}" placeholder="Quotation / invoice no., if any">
         </div>
       </div>
     </div>
@@ -73,6 +69,13 @@
           <label class="chip-choice"><input type="radio" name="payment_terms" value="{{ t }}" {{ 'checked' if sv('payment_terms', payment_terms[0]) == t }}><span>{{ t }}</span></label>
           {% endfor %}
         </div>
+      </div>
+      {% set upfront = sv('payment_terms', payment_terms[0]) in upfront_terms %}
+      <div class="form-row" id="advanceRow"{{ '' if upfront else ' hidden' }}>
+        <label class="form-label" for="advance_amount"><span id="advanceLabel">Amount paid up front</span> (₱) <span class="req">*</span></label>
+        <input type="number" id="advance_amount" name="advance_amount" min="0.01" step="0.01" inputmode="decimal"
+               value="{{ sv('advance_amount') }}" placeholder="0.00" {{ 'required' if upfront else 'disabled' }}>
+        <p class="muted small">Once the PO is approved it shows as due on the supplier's ledger; record the payment there when it is paid. The rest stays as the balance.</p>
       </div>
       <div class="form-grid cols-2">
         <div class="form-row">
@@ -112,7 +115,16 @@
         <div class="form-grid cols-2">
           <div class="form-row">
             <label class="form-label">Description / specification</label>
-            <input type="text" name="description" maxlength="160" value="{{ it.name }}">
+            <select name="description" required>
+              {% if it.name not in known_items %}
+              <optgroup label="As requested on the PR"><option selected>{{ it.name }}</option></optgroup>
+              {% endif %}
+              {% for group, rows in catalog %}
+              <optgroup label="{{ group }}">
+                {% for r in rows %}<option {{ 'selected' if r.name == it.name }}>{{ r.name }}</option>{% endfor %}
+              </optgroup>
+              {% endfor %}
+            </select>
           </div>
           <div class="form-row">
             <label class="form-label">Brand / model</label>
@@ -126,7 +138,10 @@
           </div>
           <div class="form-row">
             <label class="form-label">Unit</label>
-            <input type="text" name="unit" maxlength="20" value="{{ it.unit or 'pc' }}">
+            <select name="unit">
+              {% for u in units %}<option {{ 'selected' if (it.unit or 'pc') == u }}>{{ u }}</option>{% endfor %}
+              {% if it.unit and it.unit not in units %}<option selected>{{ it.unit }}</option>{% endif %}
+            </select>
           </div>
           <div class="form-row">
             <label class="form-label">Unit price (₱)</label>
@@ -156,7 +171,7 @@
 
   <section class="wz-step" id="totalsStep" data-title="Totals, terms and sign-offs">
     <div class="wz-body">
-      <div class="form-grid cols-3">
+      <div class="form-grid cols-2">
         <div class="form-row">
           <label class="form-label" for="discount">Discount (₱)</label>
           <input type="number" id="discount" name="discount" min="0" step="0.01" value="{{ sv('discount') }}" placeholder="0.00" class="js-adj">
@@ -164,6 +179,10 @@
         <div class="form-row">
           <label class="form-label" for="freight">Delivery / freight (₱)</label>
           <input type="number" id="freight" name="freight" min="0" step="0.01" value="{{ sv('freight') }}" placeholder="0.00" class="js-adj">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="labor">Labor cost (₱) <span class="muted small">optional</span></label>
+          <input type="number" id="labor" name="labor" min="0" step="0.01" value="{{ sv('labor') }}" placeholder="0.00" class="js-adj">
         </div>
         <div class="form-row">
           <label class="form-label" for="tax">VAT / other tax (₱)</label>
@@ -175,22 +194,26 @@
         <label class="form-label" for="terms">Terms / special instructions</label>
         <textarea id="terms" name="terms" rows="3" maxlength="800">{{ sv('terms', default_terms) }}</textarea>
       </div>
-      <div class="form-grid cols-2">
+      <div class="form-grid cols-3" data-review-skip>
         <div class="form-row">
           <label class="form-label" for="prepared_by">Prepared by</label>
-          <input type="text" id="prepared_by" name="prepared_by" maxlength="80" value="{{ sv('prepared_by', me.name) }}">
+          <input type="text" id="prepared_by" value="{{ me.name }}" readonly class="locked-field">
         </div>
         <div class="form-row">
           <label class="form-label" for="checked_by">Checked by</label>
-          <input type="text" id="checked_by" name="checked_by" maxlength="80" value="{{ sv('checked_by') }}" placeholder="Name">
+          <input type="text" id="checked_by" value="The Admin, at the check" readonly class="locked-field">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="approved_by">Approved by</label>
+          <input type="text" id="approved_by" value="The Super Admin, at the final approval" readonly class="locked-field">
         </div>
       </div>
-      <p class="muted small">Approved by is filled in when the PO is approved. The supplier signs the acknowledgment on the printed copy.</p>
+      <p class="muted small">The names are filled in by themselves: you prepare it, the Admin checks it (initial approval), the Super Admin approves it last. The supplier signs the acknowledgment on the printed copy.</p>
     </div>
   </section>
 
   <section class="wz-step" data-title="Check and prepare" data-review
-           data-hint="The PO is saved as Prepared; approve it on the next page, then print it.">
+           data-hint="The PO is saved as Prepared and the Admin is notified to check it; the Super Admin approves it last.">
     <div class="wz-body"></div>
   </section>
 </form>
@@ -199,13 +222,26 @@
 (function () {
   var cards = document.getElementById("lineCards");
   var sel = document.getElementById("supplier_id");
-  var fields = { name: "supplier_name", address: "supplier_address", contact: "supplier_contact",
+  var fields = { address: "supplier_address", contact: "supplier_contact",
                  tin: "supplier_tin", person: "supplier_contact_person" };
   sel.addEventListener("change", function () {
     var o = sel.options[sel.selectedIndex];
-    if (!o.value) return;
     Object.keys(fields).forEach(function (k) { document.getElementById(fields[k]).value = o.getAttribute("data-" + k) || ""; });
   });
+
+  // Advance / partial payment asks how much is paid up front.
+  var UPFRONT = {{ upfront_terms|list|tojson }};
+  var advRow = document.getElementById("advanceRow");
+  var adv = document.getElementById("advance_amount");
+  function terms() {
+    var t = document.querySelector("[name=payment_terms]:checked");
+    var on = t && UPFRONT.indexOf(t.value) !== -1;
+    advRow.hidden = !on; adv.disabled = !on; adv.required = on;
+    if (on) document.getElementById("advanceLabel").textContent =
+      t.value === "Advance payment" ? "Advance payment amount" : "First (partial) payment amount";
+  }
+  document.querySelectorAll("[name=payment_terms]").forEach(function (r) { r.addEventListener("change", terms); });
+  terms();
 
   function peso(v) { return "₱" + v.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   function num(el) { return parseFloat(el.value) || 0; }
@@ -226,7 +262,7 @@
     var adj = function (id) { return num(document.getElementById(id)); };
     document.getElementById("subtotal").innerHTML = "<span>Subtotal</span><b>" + peso(sub) + "</b>";
     document.getElementById("grandTotal").innerHTML = "<span>Grand total</span><b>" +
-      peso(sub - adj("discount") + adj("freight") + adj("tax")) + "</b>";
+      peso(sub - adj("discount") + adj("freight") + adj("labor") + adj("tax")) + "</b>";
   }
   document.getElementById("poForm").addEventListener("input", update);
   document.getElementById("poForm").addEventListener("change", update);
@@ -252,9 +288,11 @@
   document.getElementById("totalsStep").reviewHtml = function () {
     var g = document.getElementById("grandTotal").querySelector("b").textContent;
     var esc = window.IMS.esc;
-    return "<dt>Grand total</dt><dd>" + g + "</dd>" +
-      "<dt>Prepared by</dt><dd>" + esc(document.getElementById("prepared_by").value || "—") + "</dd>" +
-      "<dt>Checked by</dt><dd>" + esc(document.getElementById("checked_by").value || "—") + "</dd>";
+    var labor = num(document.getElementById("labor"));
+    return (labor ? "<dt>Labor cost</dt><dd>" + peso(labor) + "</dd>" : "") +
+      "<dt>Grand total</dt><dd>" + g + "</dd>" +
+      "<dt>Prepared by</dt><dd>" + esc(document.getElementById("prepared_by").value) + "</dd>" +
+      "<dt>Checked by / Approved by</dt><dd>The Admin, then the Super Admin</dd>";
   };
 })();
 </script>

@@ -40,8 +40,10 @@ def _counts():
         "packing_open": sum(1 for r in runs if r.get("status") == "In Progress"),
         "packed_waiting": sum(1 for r in runs if r.get("status") == "Packed"),
         "batches_open": sum(1 for b in batches if b.get("status") == "In Progress"),
+        # Requests and POs at either approval stage; context() narrows this
+        # to the stage the signed-in user approves.
         "approvals": sum(1 for r in db.read("purchase_requests")
-                         if r.get("status") == "Pending Approval")
+                         if pur.approval_stage(r))
                      + sum(1 for r in db.read("sales_requests")
                            if r.get("status") == "Pending Approval"),
         "awaiting_po": len(pur.requests_awaiting_po()),
@@ -176,7 +178,7 @@ def waiting_for(user, c):
         "%d packed run(s) waiting to go out" % c["packed_waiting"],
         "Disburse or hand to the courier", "packing.index")
     add(can(user, "approvals") and c["approvals"],
-        "%d request(s) to approve" % c["approvals"], "", "approvals.index")
+        "%d request(s) / PO(s) to approve" % c["approvals"], "", "approvals.index")
     add(can(user, "purchasing") and c["awaiting_po"],
         "%d approved request(s) waiting for a PO" % c["awaiting_po"],
         "Prepare the purchase order for the supplier", "purchasing.index")
@@ -220,6 +222,10 @@ def admin_figures():
 
 def context(user):
     c = _counts()
+    if is_admin(user):
+        mine_pr, mine_po = pur.approvals_for(user)
+        c["approvals"] = len(mine_pr) + len(mine_po) + sum(
+            1 for r in db.read("sales_requests") if r.get("status") == "Pending Approval")
     return {
         "tasks": tasks_for(user, c),
         "waiting": waiting_for(user, c),
