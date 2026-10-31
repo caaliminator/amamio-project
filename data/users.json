@@ -22,10 +22,10 @@
     "phone": "",
     "team": "Admin",
     "active": true,
-    "last_login": "2026-10-26T15:34:05.315865+00:00",
+    "last_login": "2026-10-31T05:53:50.044794+00:00",
     "created_at": "2026-10-16T05:39:27.863422+00:00",
     "id": 2,
-    "theme": "system"
+    "theme": "light"
   },
   {
     "name": "Receiving Team Head",
@@ -36,9 +36,10 @@
     "phone": "",
     "team": "Receiving Team Head",
     "active": true,
-    "last_login": null,
+    "last_login": "2026-10-31T05:41:56.926348+00:00",
     "created_at": "2026-10-16T05:39:28.171588+00:00",
-    "id": 3
+    "id": 3,
+    "theme": "light"
   },
   {
     "name": "Production Team Head",
@@ -49,10 +50,10 @@
     "phone": "",
     "team": "Production Team Head",
     "active": true,
-    "last_login": "2026-10-26T15:27:09.875093+00:00",
+    "last_login": "2026-10-31T05:49:25.267832+00:00",
     "created_at": "2026-10-16T05:39:28.504636+00:00",
     "id": 4,
-    "theme": "system"
+    "theme": "light"
   },
   {
     "name": "Packing Team Head",
@@ -63,7 +64,7 @@
     "phone": "",
     "team": "Packing Team Head",
     "active": true,
-    "last_login": null,
+    "last_login": "2026-10-31T05:53:03.502964+00:00",
     "created_at": "2026-10-16T05:39:28.805061+00:00",
     "id": 5
   },
