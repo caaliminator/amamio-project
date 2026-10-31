@@ -201,6 +201,15 @@ _MONTHS = ("Jan.", "Feb.", "Mar.", "Apr.", "May", "June", "July", "Aug.",
            "Sept.", "Oct.", "Nov.", "Dec.")
 
 
+def fmt_mdy(value):
+    """'2026-09-22' -> '09-22-26', as written on the paper forms."""
+    text = str(value or "")[:10]
+    try:
+        return datetime.strptime(text, "%Y-%m-%d").strftime("%m-%d-%y")
+    except ValueError:
+        return text
+
+
 def fmt_date(value):
     """'2026-09-21' -> 'Sept. 21, 2026' (as written on the paper forms)."""
     text = str(value or "")[:10]
@@ -295,6 +304,170 @@ def record_adjustment(item_type, item_id, new_qty, reason, user_id=None):
     })
     return adjust_stock(item_type, item_id, delta, "adjusted",
                         reference_id="adjustment", user_id=user_id)
+
+
+# --- Products IN / OUT -----------------------------------------------------
+# Finished goods taken in or issued out by hand — everything that isn't a
+# production run, packing, a sale or a customer return (those move stock by
+# themselves).  Each movement goes through the ledger, so the Daily
+# Production Report shows it in its IN / OUT columns.
+PRODUCT_IN_REASONS = ["Returned unused", "Transferred in", "Count correction"]
+PRODUCT_OUT_REASONS = ["Samples / giveaway", "Issued to a team",
+                       "Transferred out", "Damaged / expired",
+                       "Count correction"]
+
+
+def record_product_movement(product_id, direction, qty, reason, person="",
+                            reference="", notes="", user_id=None):
+    """Take finished goods IN or issue them OUT.  Returns (movement, error)."""
+    product = db.get("products", product_id)
+    if not product:
+        return None, "Choose the product."
+    direction = (direction or "").upper()
+    if direction not in ("IN", "OUT"):
+        return None, "Choose IN or OUT."
+    if reason not in (PRODUCT_IN_REASONS if direction == "IN"
+                      else PRODUCT_OUT_REASONS):
+        return None, "Choose the reason."
+    qty = _to_float(qty)
+    if qty <= 0:
+        return None, "Enter a quantity above zero."
+    stock = _to_float(product.get("stock_qty"))
+    unit = product.get("unit") or ""
+    if direction == "OUT" and qty > stock + 1e-9:
+        return None, "Only %s in stock — you can't issue %s." % (
+            fmt_qty(stock, unit), fmt_qty(qty, unit))
+    delta = qty if direction == "IN" else -qty
+    movement = db.insert("product_movements", {
+        "product_id": product["id"], "product_name": product.get("name"),
+        "product_group": product.get("product_group") or "",
+        "direction": direction, "qty": qty, "unit": unit, "reason": reason,
+        "person": (person or "").strip()[:120],
+        "reference": (reference or "").strip()[:60],
+        "notes": (notes or "").strip()[:400],
+        "balance_after": round(stock + delta, 6),
+        "recorded_by": user_id, "moved_at": now_iso(),
+    })
+    adjust_stock("product", product["id"], delta,
+                 "stock_in" if direction == "IN" else "stock_out",
+                 reference_id="PM-%d" % movement["id"], user_id=user_id)
+    if direction == "OUT" and reason == "Damaged / expired":
+        record_damage("products", "PM-%d" % movement["id"], "product",
+                      product["id"], product.get("name"), qty, unit,
+                      notes or reason, stage="Products In / Out",
+                      user_id=user_id)
+    return movement, None
+
+
+def product_movement_rows(product_id=None, limit=None):
+    """Product movements, newest first, shaped for the templates."""
+    rows = db.read("product_movements")
+    if product_id is not None:
+        rows = [m for m in rows if m.get("product_id") == int(product_id)]
+    rows.sort(key=lambda m: (m.get("moved_at") or "", m.get("id") or 0),
+              reverse=True)
+    if limit:
+        rows = rows[:limit]
+    names = users_by_id()
+    return [dict(m, when=fmt_dt(m.get("moved_at")),
+                 recorded_by_name=(names.get(m.get("recorded_by")) or {}).get("name", ""))
+            for m in rows]
+
+
+# What each kind of ledger entry is called on the IN / OUT reports.
+TXN_LABELS = {
+    "produced": "Produced", "returned": "Returned", "sold": "Sold",
+    "packed": "Packed", "adjusted": "Count adjustment",
+    "received": "Received", "consumed": "Used in production",
+    "qc_passed": "Honey QC passed", "qc_failed": "Honey QC failed",
+    "stock_in": "IN (by hand)", "stock_out": "OUT (by hand)",
+}
+
+
+def product_in_out_report(date_from, date_to):
+    """Products IN / OUT for a date range, from the stock ledger: per product
+    Opening, IN, OUT and Closing with IN / OUT split by reason, the reason
+    totals, and every movement.  Hand-entered movements (Products In / Out)
+    show their own reason, person and reference."""
+    by_ref = {"PM-%d" % m["id"]: m for m in db.read("product_movements")}
+    users = users_by_id()
+    txns = {}
+    for t in db.read("inventory_transactions"):
+        if t.get("item_type") == "product":
+            txns.setdefault(t.get("item_id"), []).append(t)
+
+    def reason_of(t):
+        manual = by_ref.get(t.get("reference_id"))
+        if manual:
+            return manual.get("reason") or ""
+        label = TXN_LABELS.get(t.get("txn_type"))
+        if label:
+            return label
+        return (t.get("txn_type") or "Other").replace("_", " ").capitalize()
+
+    rows, movements = [], []
+    in_totals, out_totals = {}, {}
+    products = sorted(db.read("products"),
+                      key=lambda p: (p.get("product_group") or "",
+                                     p.get("sort_order") or 0, p.get("name") or ""))
+    for p in products:
+        stock = _to_float(p.get("stock_qty"))
+        after_from = after_to = 0.0
+        ins, outs = {}, {}
+        for t in txns.get(p["id"], []):
+            day = (t.get("timestamp") or "")[:10]
+            change = _to_float(t.get("change_qty"))
+            if day >= date_from:
+                after_from += change
+            if day > date_to:
+                after_to += change
+            if not (date_from <= day <= date_to) or not change:
+                continue
+            reason = reason_of(t)
+            bucket, totals = (ins, in_totals) if change > 0 else (outs, out_totals)
+            bucket[reason] = bucket.get(reason, 0.0) + abs(change)
+            totals[reason] = totals.get(reason, 0.0) + abs(change)
+            manual = by_ref.get(t.get("reference_id")) or {}
+            movements.append({
+                "timestamp": t.get("timestamp") or "",
+                "when": fmt_dt(t.get("timestamp")),
+                "product_name": p.get("name"), "unit": p.get("unit") or "",
+                "direction": "IN" if change > 0 else "OUT",
+                "qty": round(abs(change), 3), "reason": reason,
+                "reference": manual.get("reference") or t.get("reference_id") or "",
+                "person": manual.get("person") or "",
+                "recorded_by": (users.get(t.get("user_id")) or {}).get("name", ""),
+            })
+        opening = round(stock - after_from, 3)
+        closing = round(stock - after_to, 3)
+        total_in = round(sum(ins.values()), 3)
+        total_out = round(sum(outs.values()), 3)
+        if not (opening or closing or total_in or total_out):
+            continue
+        rows.append({
+            "product_name": p.get("name"), "unit": p.get("unit") or "",
+            "group": p.get("product_group") or "Others",
+            "opening": opening, "total_in": total_in, "total_out": total_out,
+            "closing": closing,
+            # A balance below zero means the ledger doesn't add up to the
+            # stock figure (a starting stock or movement never recorded).
+            "mismatch": opening < -1e-9 or closing < -1e-9,
+            "in_detail": sorted(((k, round(v, 3)) for k, v in ins.items()),
+                                key=lambda kv: -kv[1]),
+            "out_detail": sorted(((k, round(v, 3)) for k, v in outs.items()),
+                                 key=lambda kv: -kv[1]),
+        })
+    movements.sort(key=lambda m: m["timestamp"])
+    return {
+        "rows": rows, "movements": movements,
+        "in_totals": sorted(((k, round(v, 3)) for k, v in in_totals.items()),
+                            key=lambda kv: -kv[1]),
+        "out_totals": sorted(((k, round(v, 3)) for k, v in out_totals.items()),
+                             key=lambda kv: -kv[1]),
+        "total_in": round(sum(in_totals.values()), 3),
+        "total_out": round(sum(out_totals.values()), 3),
+        "mismatches": sum(1 for r in rows if r["mismatch"]),
+    }
 
 
 # --- Bill of materials -----------------------------------------------------
@@ -938,6 +1111,11 @@ SAMPLING_RESULTS = ["Passed", "Failed", "Pending result", "Not required"]
 # (AFP-WH-FRM-002); every box put on HOLD or REJECTED gets a Nonconforming
 # Material Hold / Rejection Report (AFP-WH-FRM-003).  A receipt is closed
 # only after the SOP's Quick Control Check.
+# Header of the paper Raw Materials Receiving and Inspection Report — blank on
+# the client's current form; fill these in once the document is registered.
+RIR_DOC_NO = ""
+RIR_REVISION = ""
+RIR_EFFECTIVE_DATE = ""
 RECEIVING_OPEN = "Open"
 RECEIVING_FOR_CLOSING = "For Closing"
 RECEIVING_CLOSED = "Completed"
@@ -1182,6 +1360,7 @@ def add_receiving_box(batch_id, material_id, declared_qty, user_id,
             "verified_by_name": "",
             # Incoming Material Inspection Checklist (AFP-WH-FRM-002)
             "inspection_no": "",
+            "visual_description": "",
             "checklist": {},
             "test_parameter": "",
             "test_spec": "",
@@ -1461,7 +1640,8 @@ def inspect_receiving_box(box_id, user_id, usable_qty, unusable_qty=0,
                           nonconformity="", action_taken="",
                           verified_by_name="", checklist=None,
                           test_parameter="", test_spec="", test_result="",
-                          test_method="", nc_types=None, nc_other=""):
+                          test_method="", nc_types=None, nc_other="",
+                          visual_description=""):
     """Part 2: record the inspection & cleaning of one box.
 
     With ``checklist`` ({point key: {result, remarks}}) this is the Incoming
@@ -1495,6 +1675,9 @@ def inspect_receiving_box(box_id, user_id, usable_qty, unusable_qty=0,
         return None, "Describe the nonconformity behind this decision."
     nc_types = [t for t in (nc_types or []) if t in NC_TYPES]
     if checklist is not None:
+        if not (visual_description or "").strip():
+            return None, ("Describe what the material looks like — e.g. free "
+                          "from molds, insects, decay and rot.")
         checklist, err = _clean_checklist(checklist)
         if err:
             return None, err
@@ -1529,8 +1712,10 @@ def inspect_receiving_box(box_id, user_id, usable_qty, unusable_qty=0,
         "sampling_test": sampling_test or "",
         "acceptance_status": acceptance,
         "nonconformity": (nonconformity or "").strip(),
-        "action_taken": (action_taken or "").strip(),
+        # As on the paper report, the decision is the action when none is given.
+        "action_taken": (action_taken or "").strip() or acceptance,
         "verified_by_name": (verified_by_name or "").strip(),
+        "visual_description": (visual_description or "").strip(),
         "inspection_no": box.get("inspection_no")
                          or _next_ref("INS", "receiving_boxes", "inspection_no"),
         "checklist": checklist or {},
@@ -1734,6 +1919,72 @@ def mrr_lines(batch):
                           else "Accepted" if line["accepted_qty"]
                           else "Rejected")
     return lines
+
+
+def receiving_report_rows(date_from, date_to):
+    """The paper Raw Materials Receiving and Inspection Report: one row per
+    item and lot of each delivery (its boxes added up), as the client writes
+    it — not one row per box."""
+    def distinct(values):
+        seen = []
+        for v in values:
+            v = ("%g" % v) if isinstance(v, float) else str(v or "").strip()
+            if v and v not in seen:
+                seen.append(v)
+        return "; ".join(seen)
+
+    rows, index = [], {}
+    boxes = [b for b in receiving_box_rows()
+             if date_from <= (b["received_date"] or "") <= date_to]
+    for b in boxes:
+        key = (b["batch_id"], b["material_id"], b["lot_no"] or "",
+               b["expiry_date"] or "")
+        if key not in index:
+            index[key] = len(rows)
+            rows.append({"first": b, "boxes": []})
+        rows[index[key]]["boxes"].append(b)
+    out = []
+    for group in rows:
+        b, items = group["first"], group["boxes"]
+        decided = [x for x in items if x["status"] != BOX_AWAITING]
+        statuses = {}
+        for x in items:
+            word = (x["acceptance_status"] or "Pending").upper()
+            statuses[word] = statuses.get(word, 0) + 1
+        out.append({
+            "received_date": b["received_date"],
+            "supplier_name": b["supplier_name"],
+            "po_dr": " / ".join(p for p in (b["po_no"], b["delivery_ref"]) if p),
+            "material_name": b["material_name"],
+            "lot_no": b["lot_no"] or "",
+            "qty": round(sum(_to_float(x["declared_qty"]) for x in items), 3),
+            "unit": b["unit"],
+            "boxes": len(items),
+            "expiry_date": b["expiry_date"] or "",
+            "packaging_condition": distinct(x["packaging_condition"] for x in items),
+            "visual": distinct(x["visual_description"] or x["visual_inspection"]
+                               for x in decided),
+            "cleaned": any(x["cleaned"] for x in decided),
+            "temperature": distinct(x["temperature_c"] for x in items
+                                    if x["temperature_c"] not in (None, "")),
+            "coa": distinct(x["coa_check"] for x in decided),
+            "sampling": distinct(x["sampling_test"] for x in decided),
+            "acceptance": (next(iter(statuses)) if len(statuses) == 1 else
+                           ", ".join("%s ×%d" % kv for kv in statuses.items())),
+            "good_qty": round(sum(_to_float(x["good_qty"]) for x in decided), 3),
+            "unusable_qty": round(sum(_to_float(x["unusable_qty"]) for x in decided), 3),
+            "damaged_qty": round(sum(_to_float(x["damaged_qty"]) for x in decided), 3),
+            "pending": len(items) - len(decided),
+            "remarks": distinct(v for x in decided for v in (
+                x["nonconformity"], x["unusable_reason"], x["damage_reason"])),
+            "action": distinct((x["action_taken"] or x["acceptance_status"] or "")
+                               .split("\n")[0] for x in decided),
+            "inspected_by": distinct(x["checked_by"] for x in decided
+                                     if x["checked_at"]),
+            "verified_by": distinct(x["verified_by_name"] for x in decided),
+        })
+    out.sort(key=lambda r: r["received_date"] or "")
+    return out
 
 
 def unavailable_stock():
@@ -2075,6 +2326,7 @@ def receiving_box_rows(batch_id=None, status=None, limit=None):
             "nonconformity": b.get("nonconformity"),
             "action_taken": b.get("action_taken"),
             "verified_by_name": b.get("verified_by_name"),
+            "visual_description": b.get("visual_description") or "",
             "inspection_no": b.get("inspection_no") or "",
             "checklist": b.get("checklist") or {},
             "test_parameter": b.get("test_parameter") or "",

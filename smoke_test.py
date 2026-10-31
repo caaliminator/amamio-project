@@ -52,7 +52,7 @@ def stock(name, kind="material"):
 def checklist(**fails):
     """Inspection checklist form fields: every point Pass, except those
     given as point=remark, which Fail with that remark."""
-    data = {}
+    data = {"visual_description": "Free from molds, insects, decay and rotten"}
     for key, _, _ in services.INSPECTION_POINTS:
         data["chk_" + key] = "Fail" if key in fails else "Pass"
         data["chk_%s_remarks" % key] = fails.get(key, "")
@@ -343,6 +343,29 @@ with application.test_client() as c:
     r = c.get("/receiving/report?from=2000-01-01")
     check(r.status_code == 200 and b"RECEIVING AND INSPECTION" in r.data.upper(),
           "receiving & inspection report renders")
+    page = r.data.decode("utf-8")
+    today = services.today_iso()
+    check(services.fmt_mdy(today) in page and "Document No.:" in page
+          and "Free from molds, insects, decay and rotten" in page,
+          "the report prints MM-DD-YY dates, the document header and the visual description")
+    lot_a = [row for row in services.receiving_report_rows(today, today)
+             if row["lot_no"] == "LOT-A"]
+    check(len(lot_a) == 1 and lot_a[0]["qty"] == 20 and lot_a[0]["boxes"] == 2,
+          "the report has one row per item and lot, its boxes added up")
+    check(db.get("receiving_boxes", boxes[2]["id"])["action_taken"] == "Rejected"
+          and "Accepted" in lot_a[0]["action"],
+          "Action Taken is filled in with the decision when left blank")
+    _, extra_boxes, _ = services.receive_delivery(
+        1, None, today, [{"material_id": ginger["id"], "qty_per_box": 5, "boxes": 1}])
+    no_desc = checklist()
+    no_desc.update({"visual_description": "", "usable_qty": "5",
+                    "acceptance": "Accepted", "cleaned": "1"})
+    c.post("/receiving/box/%d/inspect" % extra_boxes[0]["id"], data=no_desc)
+    check(db.get("receiving_boxes", extra_boxes[0]["id"])["status"]
+          == "Awaiting Inspection",
+          "an inspection without the visual / organoleptic description is refused")
+    inspect(c, extra_boxes[0]["id"], usable_qty="5", acceptance="Accepted",
+            cleaned="1")
 
 # 5b) closing the receipt — the SOP's Quick Control Check
 with application.test_client() as c:
@@ -400,6 +423,72 @@ with application.test_client() as c:
         "material_id": [ginger["id"]], "qty_per_box": ["5"], "boxes": ["1"]})
     check(len(db.read("receiving_batches")) == before + 1,
           "once approved, its deliveries are received")
+
+# 5f) Products In / Out — finished goods taken in or issued out by hand
+with application.test_client() as c:
+    login(c, "receiving", "recv123")
+    check(c.get("/products-in-out/").status_code == 403,
+          "Receiving can't open Products In / Out")
+with application.test_client() as c:
+    login(c, "packing", "pack123")
+    check(b"Products In / Out" in c.get("/dashboard").data,
+          "Products In / Out shows in the sidebar")
+    p_before, prod = stock("Pure Honey 250 mL", "product")
+    c.post("/products-in-out/move", data={
+        "direction": "IN", "product_id": prod["id"], "qty": "4",
+        "reason": "Returned unused", "person": "Sales team"})
+    check(services.current_stock("product", prod["id"]) == p_before + 4,
+          "products IN adds to stock")
+    c.post("/products-in-out/move", data={
+        "direction": "OUT", "product_id": prod["id"], "qty": "999999",
+        "reason": "Samples / giveaway"})
+    check(services.current_stock("product", prod["id"]) == p_before + 4,
+          "products OUT can't issue more than is in stock")
+    damage_before = len(db.read("damage_records"))
+    c.post("/products-in-out/move", data={
+        "direction": "OUT", "product_id": prod["id"], "qty": "1",
+        "reason": "Damaged / expired", "notes": "Cracked jar"})
+    check(services.current_stock("product", prod["id"]) == p_before + 3
+          and len(db.read("damage_records")) == damage_before + 1,
+          "products OUT damaged lowers stock and goes on the damage report")
+    moves = db.query("product_movements", product_id=prod["id"])
+    check(len(moves) == 2 and any(t.get("txn_type") == "stock_out"
+                                  for t in db.query("inventory_transactions",
+                                                    reference_id="PM-%d" % moves[-1]["id"])),
+          "each product movement is on the stock ledger")
+    for path in ("/products-in-out/", "/products-in-out/log",
+                 "/products-in-out/move?product_id=%d&direction=OUT" % prod["id"]):
+        check(c.get(path).status_code == 200, "%s renders" % path)
+    # The Products IN / OUT report: opening + IN - OUT = closing, by reason.
+    rep = services.product_in_out_report(services.today_iso(), services.today_iso())
+    row = [x for x in rep["rows"] if x["product_name"] == "Pure Honey 250 mL"][0]
+    check(abs(row["opening"] + row["total_in"] - row["total_out"] - row["closing"]) < 1e-6
+          and abs(row["closing"] - services.current_stock("product", prod["id"])) < 1e-6
+          and dict(row["in_detail"]).get("Returned unused") == 4
+          and dict(row["out_detail"]).get("Damaged / expired") == 1,
+          "products report: opening + IN - OUT = closing, split by reason")
+    page = c.get("/products-in-out/report").data.decode("utf-8")
+    check("Products IN / OUT Report" in page and "Returned unused" in page,
+          "the Products IN / OUT report prints")
+    import zipfile as _zip
+    r = c.get("/products-in-out/report.xlsx")
+    book = _zip.ZipFile(io.BytesIO(r.data))
+    check(r.status_code == 200 and "xl/worksheets/sheet3.xml" in book.namelist()
+          and b"Returned unused" in book.read("xl/worksheets/sheet3.xml"),
+          "the Products IN / OUT report downloads as Excel")
+    r = c.get("/products-in-out/report.csv")
+    check(r.status_code == 200 and "Pure Honey 250 mL" in r.data.decode("utf-8-sig"),
+          "the Products IN / OUT report downloads as CSV")
+with application.test_client() as c:
+    login(c, "assets", "assets123")
+    page = c.get("/supplies/movements?from=2000-01-01").data.decode("utf-8")
+    check("Supplies IN / OUT" in page and "Balance after" in page,
+          "the supplies IN / OUT log has a date range and prints")
+    r = c.get("/supplies/movements.xlsx?from=2000-01-01")
+    check(r.status_code == 200 and r.data[:2] == b"PK",
+          "the supplies IN / OUT log downloads as Excel")
+    check(c.get("/supplies/movements.csv?from=2000-01-01").status_code == 200,
+          "the supplies IN / OUT log downloads as CSV")
 
 # 5d) every box on hold or rejected has its report — even older ones
 legacy = db.query("receiving_boxes", batch_id=batch["id"])[2]

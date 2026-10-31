@@ -419,7 +419,8 @@ def _seed_receiving(users, suppliers, materials):
             box["id"], qa, good, unusable, damaged, ureason, dreason,
             cleaned=True, visual_inspection="Pass", coa_check="Not required",
             sampling_test="Not required", acceptance="Accepted",
-            verified_by_name="Amamio Admin")
+            verified_by_name="Amamio Admin",
+            visual_description="Free from molds, insects, decay and rotten")
 
     # Delivery 2 — bottles, one carton held for a missing document.
     batch2, boxes2, _ = services.receive_delivery(
@@ -439,7 +440,8 @@ def _seed_receiving(users, suppliers, materials):
             services.inspect_receiving_box(
                 box["id"], qa, 200.0, 0, 0, cleaned=False,
                 visual_inspection="Pass", coa_check="Complete",
-                sampling_test="Not required", acceptance="Accepted")
+                sampling_test="Not required", acceptance="Accepted",
+                visual_description="Clean, no cracks or chips")
 
     # Delivery 3 — arrived this morning, boxes waiting for inspection.
     services.receive_delivery(

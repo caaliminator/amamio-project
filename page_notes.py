@@ -73,6 +73,37 @@ NOTES = {
         "who": "Receiving Team Head",
         "flow": "Stick it next to the box's QR label. HOLD and REJECTED labels say not to use the material in production.",
     },
+    # --- Products In / Out --------------------------------------------------
+    "product_moves.index": {
+        "title": "Products In / Out",
+        "what": "Every finished product with its stock, and the latest products taken in or issued out by hand.",
+        "who": "Production Team Head · Packing Team Head · " + ADMINS,
+        "flow": "Production runs, packing, sales and customer returns move product stock by themselves. Use this page for everything else: samples, items issued to a team, transfers, damaged or expired goods, count corrections.",
+    },
+    "product_moves.move": {
+        "title": "Record products IN / OUT",
+        "what": "Take finished goods IN or issue them OUT: which product, how much, why, and who.",
+        "who": "Production Team Head · Packing Team Head · " + ADMINS,
+        "flow": "Stock changes as soon as you save and the movement shows in the stock ledger and the Daily Production Report. You can't issue more than is in stock. Damaged / expired goods also go on the damage report.",
+    },
+    "product_moves.report": {
+        "title": "Products IN / OUT Report",
+        "what": "For the dates you pick: each product's Opening, IN, OUT and Closing, with IN and OUT split by reason (produced, returned, packed, sold, samples, damaged…), the totals per reason, and every movement.",
+        "who": "Production Team Head · Packing Team Head · " + ADMINS,
+        "flow": "Pick the dates and print, or download it as Excel or CSV. It reads the stock ledger, so production, packing, sales and hand-entered movements are all in it.",
+    },
+    "product_moves.report_download": {
+        "title": "Products IN / OUT Report — download",
+        "what": "The Products IN / OUT Report as an Excel or CSV file: Summary, By reason and Movements.",
+        "who": "Production Team Head · Packing Team Head · " + ADMINS,
+        "flow": "Opens in Excel.",
+    },
+    "product_moves.log": {
+        "title": "Every products IN / OUT",
+        "what": "All finished goods taken in or issued out by hand, newest first, with the reason, person, reference and the balance after.",
+        "who": "Production Team Head · Packing Team Head · " + ADMINS,
+        "flow": "For production, packing and sales movements too, see the stock transaction ledger.",
+    },
     "receiving.checklist": {
         "title": "Incoming Material Inspection Checklist",
         "what": "The SOP's checklist for one inspected box, filled in: the 11 inspection points (Pass / Fail / N/A with remarks), the test result and the decision.",
@@ -486,9 +517,15 @@ NOTES = {
     },
     "supplies.movements": {
         "title": "Every supplies IN / OUT",
-        "what": "The full history of supplies taken in and issued out.",
+        "what": "Supplies taken in and issued out in the dates you pick: the IN and OUT total per item, then every movement.",
         "who": "Assets Maintenance Head · " + ADMINS,
-        "flow": "Newest first.",
+        "flow": "Pick the dates (this month by default) and a kind of supply, then print, or download it as Excel or CSV.",
+    },
+    "supplies.movements_download": {
+        "title": "Supplies IN / OUT — download",
+        "what": "The supplies IN / OUT log as an Excel or CSV file: Summary and Movements.",
+        "who": "Assets Maintenance Head · " + ADMINS,
+        "flow": "Opens in Excel.",
     },
     "supplies.count": {
         "title": "Month-end count",

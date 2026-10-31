@@ -402,7 +402,8 @@ def inspect(box_id):
             test_result=form.get("test_result") or "",
             test_method=form.get("test_method") or "",
             nc_types=form.getlist("nc_types"),
-            nc_other=form.get("nc_other") or "")
+            nc_other=form.get("nc_other") or "",
+            visual_description=form.get("visual_description") or "")
         if not err:
             flash("Box %s inspected — %s." % (box.get("box_code"),
                                               box.get("acceptance_status")),
@@ -519,11 +520,12 @@ def report():
         abort(403)
     date_from = request.args.get("from") or services.month_start_iso()
     date_to = request.args.get("to") or services.today_iso()
-    rows = [r for r in services.receiving_box_rows()
-            if date_from <= (r["received_date"] or "") <= date_to]
-    rows.sort(key=lambda r: (r["received_date"] or "", r["id"]))
-    return render_template("receiving/report.html", rows=rows,
-                           date_from=date_from, date_to=date_to)
+    return render_template(
+        "receiving/report.html",
+        rows=services.receiving_report_rows(date_from, date_to),
+        date_from=date_from, date_to=date_to,
+        doc_no=services.RIR_DOC_NO, revision=services.RIR_REVISION,
+        effective=services.RIR_EFFECTIVE_DATE)
 
 
 @receiving_bp.route("/damage")

@@ -682,12 +682,17 @@ def record_supply_movement(material_id, direction, qty, reason, person="",
     return movement, None
 
 
-def supply_movement_rows(material_id=None, category=None, limit=None):
+def supply_movement_rows(material_id=None, category=None, limit=None,
+                         date_from=None, date_to=None):
     rows = db.read("stock_movements")
     if material_id is not None:
         rows = [m for m in rows if m.get("material_id") == int(material_id)]
     if category:
         rows = [m for m in rows if m.get("category") == category]
+    if date_from:
+        rows = [m for m in rows if (m.get("moved_at") or "")[:10] >= date_from]
+    if date_to:
+        rows = [m for m in rows if (m.get("moved_at") or "")[:10] <= date_to]
     rows.sort(key=lambda m: (m.get("moved_at") or "", m.get("id") or 0),
               reverse=True)
     if limit:
@@ -702,6 +707,22 @@ def supply_movement_rows(material_id=None, category=None, limit=None):
         row["recorded_by_name"] = names[uid]
         out.append(row)
     return out
+
+
+def supply_movement_totals(moves):
+    """Per item: total IN and OUT of the given movements, in catalog order."""
+    totals, order = {}, []
+    for m in sorted(moves, key=lambda m: (m.get("category") or "",
+                                          m.get("material_name") or "")):
+        key = m.get("material_id")
+        if key not in totals:
+            totals[key] = {"material_name": m.get("material_name"),
+                           "unit": m.get("unit") or "", "in": 0.0, "out": 0.0,
+                           "category": m.get("category")}
+            order.append(key)
+        side = "in" if m.get("direction") == "IN" else "out"
+        totals[key][side] = round(totals[key][side] + _to_float(m.get("qty")), 3)
+    return [totals[k] for k in order]
 
 
 # ===========================================================================

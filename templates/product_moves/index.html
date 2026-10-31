@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Products In / Out{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Products In / Out</h1>
+    <p class="page-sub">Finished goods taken in or issued out by hand — samples, items issued to a team, transfers, damaged or expired goods, count corrections. Production, packing, sales and returns move stock by themselves.</p>
+  </div>
+  <div class="page-head-actions">
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('product_moves.report') }}">{{ icon('printer', 15) }} IN / OUT report</a>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('product_moves.log') }}">{{ icon('reports', 15) }} Every IN / OUT</a>
+    <a class="btn btn-primary" href="{{ url_for('product_moves.move') }}">{{ icon('swap', 16) }} Record IN / OUT</a>
+  </div>
+</div>
+
+{% if moves %}
+<div class="section-label" style="margin-top:0">Latest</div>
+<div class="queue mb">
+  {% for mv in moves %}
+  <div class="queue-item">
+    <span class="badge {{ 'badge-gold' if mv.direction == 'IN' else 'badge-muted' }}" style="min-width:44px;text-align:center">{{ mv.direction }}</span>
+    <span class="queue-main">
+      <span class="queue-title">{{ mv.qty|qty(mv.unit) }} · {{ mv.product_name }}</span>
+      <span class="queue-sub">{{ mv.reason }}{% if mv.person %} · {{ mv.person }}{% endif %}{% if mv.reference %} · {{ mv.reference }}{% endif %} · by {{ mv.recorded_by_name }}</span>
+    </span>
+    <span class="muted small nowrap">{{ mv.when }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% for group, products in groups %}
+<div class="section-label">{{ group }}</div>
+<div class="card mb">
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Product</th><th class="text-right">In stock</th><th></th></tr></thead>
+      <tbody>
+        {% for p in products %}
+        <tr>
+          <td>{{ p.name }}{% if is_low(p) %} <span class="badge badge-danger">LOW</span>{% endif %}</td>
+          <td class="text-right nowrap">{{ p.stock_qty|qty(p.unit) }}</td>
+          <td class="text-right nowrap">
+            <a class="btn btn-ghost btn-sm" href="{{ url_for('product_moves.move', product_id=p.id, direction='IN') }}">{{ icon('in', 14) }} IN</a>
+            <a class="btn btn-ghost btn-sm" href="{{ url_for('product_moves.move', product_id=p.id, direction='OUT') }}">{{ icon('out', 14) }} OUT</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card"><div class="empty">
+  <div class="empty-icon">{{ icon('box', 30) }}</div>
+  <div class="empty-title">No products yet</div>
+</div></div>
+{% endfor %}
+{% endblock %}

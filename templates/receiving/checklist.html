@@ -26,6 +26,7 @@
     <div><b>Inspector:</b> {{ box.checked_by }}</div>
   </div>
 
+  {% if box.visual_description %}<div class="paper-fields"><div style="grid-column:1 / -1"><b>Visual / organoleptic:</b> {{ box.visual_description }}</div></div>{% endif %}
   <div class="paper-section">A. Inspection Checklist</div>
   <table class="paper-table">
     <thead><tr><th>Inspection Point</th><th>Acceptable Requirement / Check</th><th>Pass</th><th>Fail</th><th>N/A</th><th>Remarks</th></tr></thead>

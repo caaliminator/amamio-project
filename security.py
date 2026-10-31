@@ -86,6 +86,8 @@ PERMISSIONS = {
     # Production records (batch manufacturing, daily report, retention).
     "production":    ADMIN_ROLES | {"production_head"},
     "catalog":       ADMIN_ROLES | {"production_head"},
+    # Finished goods taken in / issued out by hand.
+    "product_moves": ADMIN_ROLES | {"production_head", "packing_head"},
     # Module 3 — equipment and supplies, every movement in and out.
     "assets":        ADMIN_ROLES | {"assets_head"},
     "supplies":      ADMIN_ROLES | {"assets_head", "receiving_head"},
@@ -129,6 +131,9 @@ NAV = [
         ("approvals",  "Approvals",         "approvals", "approvals.index"),
         ("purchasing", "Purchase Orders",   "orders", "purchasing.index"),
         ("ledger",     "Supplier Ledger",   "ledger", "ledger.index"),
+    ]),
+    ("Stock", [
+        ("product_moves", "Products In / Out", "swap", "product_moves.index"),
     ]),
 ]
 

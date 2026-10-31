@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Products IN / OUT log{% endblock %}
+{% block content %}
+<div class="focus">
+<a class="back-link" href="{{ url_for('product_moves.index') }}">{{ icon('arrow-left', 15) }} Products In / Out</a>
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Every IN / OUT</h1>
+    <p class="page-sub">Finished goods taken in or issued out by hand, newest first.</p>
+  </div>
+  <div class="page-head-actions">
+    <a class="btn btn-primary" href="{{ url_for('product_moves.move') }}">{{ icon('swap', 16) }} Record IN / OUT</a>
+  </div>
+</div>
+
+{% if moves %}
+<div class="queue">
+  {% for mv in moves %}
+  <div class="queue-item">
+    <span class="badge {{ 'badge-gold' if mv.direction == 'IN' else 'badge-muted' }}" style="min-width:44px;text-align:center">{{ mv.direction }}</span>
+    <span class="queue-main">
+      <span class="queue-title">{{ mv.qty|qty(mv.unit) }} · {{ mv.product_name }}</span>
+      <span class="queue-sub">{{ mv.reason }}{% if mv.person %} · {{ mv.person }}{% endif %}{% if mv.reference %} · {{ mv.reference }}{% endif %} · {{ mv.balance_after|qty(mv.unit) }} after · by {{ mv.recorded_by_name }}{% if mv.notes %} · {{ mv.notes }}{% endif %}</span>
+    </span>
+    <span class="muted small nowrap">{{ mv.when }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card"><div class="empty">
+  <div class="empty-icon">{{ icon('swap', 30) }}</div>
+  <div class="empty-title">Nothing recorded yet</div>
+  <p class="muted">Record products taken in or issued out that don't go through production, packing or sales.</p>
+</div></div>
+{% endif %}
+</div>
+{% endblock %}

@@ -93,6 +93,7 @@
     {% if box.status != 'Awaiting Inspection' %}
     {% if box.inspection_no %}<dt>Inspection no.</dt><dd>{{ box.inspection_no }}</dd>{% endif %}
     <dt>Cleaned</dt><dd>{{ 'Yes' if box.cleaned else 'No' }}</dd>
+    {% if box.visual_description %}<dt>Visual / organoleptic</dt><dd>{{ box.visual_description }}</dd>{% endif %}
     {% if box.checklist %}
     <dt>Inspection checklist</dt><dd>{{ box.checklist.values()|selectattr('result', 'equalto', 'Pass')|list|length }} pass ·
       {{ failed|length }} fail · {{ box.checklist.values()|selectattr('result', 'equalto', 'N/A')|list|length }} N/A</dd>

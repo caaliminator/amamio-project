@@ -1,12 +1,13 @@
 {% extends "base.html" %}
+{% from "_paper.html" import paper_head, paper_signoff, range_filter %}
 {% block title %}Supplies IN / OUT log{% endblock %}
 {% block content %}
-<div class="focus">
+<div class="no-print">
 <a class="back-link" href="{{ url_for('supplies.index', cat=cat or none) }}">{{ icon('arrow-left', 15) }} Supplies In / Out</a>
 <div class="page-head">
   <div>
     <h1 class="page-title">Every IN / OUT</h1>
-    <p class="page-sub">Supplies taken in or issued out, newest first.</p>
+    <p class="page-sub">Supplies taken in or issued out in the chosen dates, newest first.</p>
   </div>
   <div class="page-head-actions">
     <a class="btn btn-primary" href="{{ url_for('supplies.move', category=cat or none) }}">{{ icon('swap', 16) }} Record IN / OUT</a>
@@ -14,31 +15,61 @@
 </div>
 
 <nav class="tabs">
-  <a href="{{ url_for('supplies.movements') }}" class="{{ 'is-active' if not cat }}">All</a>
+  <a href="{{ url_for('supplies.movements', **{'from': date_from, 'to': date_to}) }}" class="{{ 'is-active' if not cat }}">All</a>
   {% for key, label in categories %}
-  <a href="{{ url_for('supplies.movements', cat=key) }}" class="{{ 'is-active' if key == cat }}">{{ label }}</a>
+  <a href="{{ url_for('supplies.movements', cat=key, **{'from': date_from, 'to': date_to}) }}" class="{{ 'is-active' if key == cat }}">{{ label }}</a>
   {% endfor %}
 </nav>
-
-{% if moves %}
-<div class="queue">
-  {% for mv in moves %}
-  <a class="queue-item" href="{{ url_for('supplies.item', material_id=mv.material_id) }}">
-    <span class="badge {{ 'badge-gold' if mv.direction == 'IN' else 'badge-muted' }}" style="min-width:44px;text-align:center">{{ mv.direction }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ mv.qty|qty(mv.unit) }} · {{ mv.material_name }}</span>
-      <span class="queue-sub">{{ mv.reason }}{% if mv.person %} · {{ mv.person }}{% endif %}{% if mv.reference %} · {{ mv.reference }}{% endif %}</span>
-    </span>
-    <span class="muted small nowrap">{{ mv.when }}</span>
-  </a>
-  {% endfor %}
 </div>
-{% else %}
-<div class="card"><div class="empty">
-  <div class="empty-icon">{{ icon('swap', 30) }}</div>
-  <div class="empty-title">Nothing recorded yet</div>
-  <p class="muted">Record every delivery taken in and everything issued out.</p>
-</div></div>
-{% endif %}
+
+{% set extra %}
+  {% if cat %}<input type="hidden" name="cat" value="{{ cat }}">{% endif %}
+  <a class="btn btn-ghost" href="{{ url_for('supplies.movements_download', fmt='xlsx', cat=cat or none, **{'from': date_from, 'to': date_to}) }}">{{ icon('upload', 15) }} Excel</a>
+  <a class="btn btn-ghost" href="{{ url_for('supplies.movements_download', fmt='csv', cat=cat or none, **{'from': date_from, 'to': date_to}) }}">CSV</a>
+{% endset %}
+{{ range_filter(url_for('supplies.movements'), date_from, date_to, extra) }}
+
+<div class="paper">
+  {{ paper_head('Supplies IN / OUT', cat_label ~ ' · ' ~ date_from ~ ' to ' ~ date_to) }}
+
+  <table class="paper-table" style="max-width:640px">
+    <thead><tr><th>Item</th><th>Unit</th><th class="num">IN</th><th class="num">OUT</th></tr></thead>
+    <tbody>
+      {% for t in totals %}
+      <tr><td>{{ t.material_name }}</td><td>{{ t.unit }}</td>
+        <td class="num">{{ t['in']|qty if t['in'] else '' }}</td>
+        <td class="num">{{ t.out|qty if t.out else '' }}</td></tr>
+      {% else %}
+      <tr><td colspan="4" style="text-align:center;color:#666;padding:14px">Nothing taken in or issued out in this period.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="paper-section">Movements</div>
+  <table class="paper-table plain">
+    <thead><tr>
+      <th>Date</th><th>Item</th><th class="num">IN</th><th class="num">OUT</th><th>Unit</th>
+      <th>Reason</th><th>Person</th><th>Reference</th><th class="num">Balance after</th><th>Recorded by</th>
+    </tr></thead>
+    <tbody>
+      {% for mv in moves %}
+      <tr>
+        <td class="nowrap"><a href="{{ url_for('supplies.item', material_id=mv.material_id) }}">{{ mv.when }}</a></td>
+        <td>{{ mv.material_name }}</td>
+        <td class="num">{{ mv.qty|qty if mv.direction == 'IN' else '' }}</td>
+        <td class="num">{{ mv.qty|qty if mv.direction == 'OUT' else '' }}</td>
+        <td>{{ mv.unit }}</td>
+        <td>{{ mv.reason }}{% if mv.notes %}<br><span style="color:#666">{{ mv.notes }}</span>{% endif %}</td>
+        <td>{{ mv.person or '' }}</td>
+        <td>{{ mv.reference or '' }}</td>
+        <td class="num">{{ mv.balance_after|qty }}</td>
+        <td>{{ mv.recorded_by_name }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10" style="text-align:center;color:#666;padding:14px">No movements in this period.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {{ paper_signoff(['Prepared by:', 'Checked by:', 'Approved by:']) }}
 </div>
 {% endblock %}

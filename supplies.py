@@ -12,6 +12,7 @@ from flask import (Blueprint, abort, flash, redirect, render_template, request,
 import assets_service as svc
 import db
 import services
+import xlsx
 from security import current_user, module_required
 
 supplies_bp = Blueprint("supplies", __name__)
@@ -59,15 +60,52 @@ def item(material_id):
         moves=svc.supply_movement_rows(material_id=material_id, limit=12))
 
 
+def _movement_filters():
+    """Category and date range of the IN / OUT log (this month by default)."""
+    cat = request.args.get("cat")
+    cat = cat if cat in CATEGORY_KEYS else ""
+    date_from = request.args.get("from") or services.month_start_iso()
+    date_to = request.args.get("to") or services.today_iso()
+    if date_to < date_from:
+        date_from, date_to = date_to, date_from
+    moves = svc.supply_movement_rows(category=cat or None, date_from=date_from,
+                                     date_to=date_to)
+    return cat, date_from, date_to, moves
+
+
 @supplies_bp.route("/movements")
 @module_required("supplies")
 def movements():
-    cat = request.args.get("cat")
-    cat = cat if cat in CATEGORY_KEYS else ""
+    cat, date_from, date_to, moves = _movement_filters()
     return render_template(
-        "supplies/movements.html", cat=cat,
-        categories=services.MATERIAL_CATEGORIES,
-        moves=svc.supply_movement_rows(category=cat or None, limit=200))
+        "supplies/movements.html", cat=cat, date_from=date_from,
+        date_to=date_to, categories=services.MATERIAL_CATEGORIES,
+        cat_label=services.MATERIAL_CATEGORY_LABELS.get(cat, "All supplies"),
+        moves=moves, totals=svc.supply_movement_totals(moves))
+
+
+@supplies_bp.route("/movements.<fmt>")
+@module_required("supplies")
+def movements_download(fmt):
+    if fmt not in ("xlsx", "csv"):
+        abort(404)
+    cat, date_from, date_to, moves = _movement_filters()
+    summary = [["Item", "Category", "Unit", "IN", "OUT"]]
+    for t in svc.supply_movement_totals(moves):
+        summary.append([t["material_name"],
+                        services.MATERIAL_CATEGORY_LABELS.get(t["category"], ""),
+                        t["unit"], t["in"], t["out"]])
+    rows = [["Date", "Item", "IN / OUT", "Qty", "Unit", "Reason", "Person",
+             "Reference", "Balance after", "Notes", "Recorded by"]]
+    for m in sorted(moves, key=lambda m: m.get("moved_at") or ""):
+        rows.append([m["when"], m.get("material_name"), m.get("direction"),
+                     m.get("qty"), m.get("unit"), m.get("reason"),
+                     m.get("person"), m.get("reference"), m.get("balance_after"),
+                     m.get("notes"), m["recorded_by_name"]])
+    return xlsx.download(
+        [("Summary", summary), ("Movements", rows)],
+        "amamio-supplies-in-out-%s%s-to-%s" % (cat + "-" if cat else "",
+                                               date_from, date_to), fmt)
 
 
 @supplies_bp.route("/move", methods=["GET", "POST"])

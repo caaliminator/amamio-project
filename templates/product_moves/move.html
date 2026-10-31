@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Record products IN / OUT{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('product_moves.index') }}">{{ icon('arrow-left', 15) }} Products In / Out</a>
+
+<form method="post" action="{{ url_for('product_moves.move') }}" class="wizard" id="pmForm" data-wizard
+      data-wizard-start="{{ start }}" data-submit-label="Save" data-cancel="{{ url_for('product_moves.index') }}">
+
+  <section class="wz-step" data-title="Taking in or issuing out?">
+    <div class="choice-grid cols-2" data-review-label="Direction">
+      <label class="choice"><input type="radio" name="direction" value="IN" required data-autonext {{ 'checked' if form.direction == 'IN' }}>
+        <span class="choice-card"><span class="choice-icon">{{ icon('in', 20) }}</span>
+        <span><span class="choice-title">IN</span><span class="choice-sub">Returned unused, transferred in, count correction</span></span></span></label>
+      <label class="choice"><input type="radio" name="direction" value="OUT" data-autonext {{ 'checked' if form.direction == 'OUT' }}>
+        <span class="choice-card"><span class="choice-icon">{{ icon('out', 20) }}</span>
+        <span><span class="choice-title">OUT</span><span class="choice-sub">Samples, issued to a team, transferred out, damaged or expired</span></span></span></label>
+    </div>
+  </section>
+
+  <section class="wz-step" data-title="Which product?" id="stepItem">
+    <div class="wz-body">
+      <div class="form-row">
+        <label class="form-label" for="product_id">Product <span class="req">*</span></label>
+        <select id="product_id" name="product_id" required data-review-label="Product">
+          <option value="">Choose the product…</option>
+          {% for group, items in products|groupby('product_group', default='Others') %}
+          <optgroup label="{{ group or 'Others' }}">
+            {% for p in items %}
+            <option value="{{ p.id }}" data-unit="{{ p.unit or '' }}" data-stock="{{ p.stock_qty or 0 }}"
+                    {{ 'selected' if form.product_id|string == p.id|string }}>{{ p.name }}</option>
+            {% endfor %}
+          </optgroup>
+          {% endfor %}
+        </select>
+        <div class="form-hint" id="stockInfo">&nbsp;</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wz-step" data-title="How much, and why?" id="stepQty">
+    <div class="wz-body">
+      <div class="form-row" style="max-width:340px">
+        <label class="form-label" for="qty">Quantity <span class="req">*</span></label>
+        <div class="big-field">
+          <input type="number" id="qty" name="qty" min="0.001" step="0.001" required inputmode="decimal" value="{{ form.qty or '' }}" placeholder="0">
+          <span class="unit" id="qtyUnit">unit</span>
+        </div>
+        <div class="form-hint" id="qtyHint"></div>
+      </div>
+      <div class="form-row" id="reasonsIN">
+        <div class="form-label">Reason <span class="req">*</span></div>
+        <div class="chip-choices" data-review-label="Reason">
+          {% for r in in_reasons %}
+          <label class="chip-choice"><input type="radio" name="reason" value="{{ r }}" required {{ 'checked' if form.reason == r and form.direction == 'IN' }}><span>{{ r }}</span></label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-row" id="reasonsOUT">
+        <div class="form-label">Reason <span class="req">*</span></div>
+        <div class="chip-choices" data-review-label="Reason">
+          {% for r in out_reasons %}
+          <label class="chip-choice"><input type="radio" name="reason" value="{{ r }}" required {{ 'checked' if form.reason == r and form.direction == 'OUT' }}><span>{{ r }}</span></label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wz-step" data-title="Who, and any reference?" data-hint="Optional, but it helps when checking stock.">
+    <div class="wz-body">
+      <div class="form-row">
+        <label class="form-label" for="person" id="personLabel">Person</label>
+        <input type="text" id="person" name="person" maxlength="120" value="{{ form.person or '' }}">
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="reference">Reference no.</label>
+        <input type="text" id="reference" name="reference" maxlength="60" value="{{ form.reference or '' }}" placeholder="e.g. slip or request no.">
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="notes">Notes</label>
+        <textarea id="notes" name="notes" rows="2" maxlength="400">{{ form.notes or '' }}</textarea>
+      </div>
+    </div>
+  </section>
+
+  <section class="wz-step" data-title="Check and save" data-review
+           data-hint="Stock changes as soon as you save.">
+    <div class="wz-body"></div>
+  </section>
+</form>
+
+<script>
+(function () {
+  var form = document.getElementById("pmForm");
+  var select = document.getElementById("product_id");
+  function val(name) { var r = form.querySelector("[name=" + name + "]:checked"); return r ? r.value : ""; }
+  function n(v) { return Math.round(v * 1000) / 1000; }
+  function item() {
+    var o = select.options[select.selectedIndex];
+    if (!o || !o.value) return null;
+    return { name: o.textContent.trim(), unit: o.getAttribute("data-unit") || "",
+             stock: parseFloat(o.getAttribute("data-stock")) || 0 };
+  }
+  function sync() {
+    var d = val("direction"), it = item();
+    ["IN", "OUT"].forEach(function (k) {
+      var on = d === k;
+      document.getElementById("reasons" + k).style.display = on ? "" : "none";
+      document.querySelectorAll("#reasons" + k + " input").forEach(function (i) {
+        i.disabled = !on; if (!on) i.checked = false;
+      });
+    });
+    var unit = it ? it.unit : "unit";
+    document.getElementById("qtyUnit").textContent = unit || "unit";
+    document.getElementById("stockInfo").textContent = it ? "In stock: " + n(it.stock) + " " + unit : " ";
+    var q = parseFloat(document.getElementById("qty").value) || 0;
+    document.getElementById("qtyHint").textContent = it
+      ? "In stock now: " + n(it.stock) + " " + unit + (q > 0 ? " → after this: " + n(d === "OUT" ? it.stock - q : it.stock + q) + " " + unit : "")
+      : "";
+    document.getElementById("stepQty").setAttribute("data-hint", it ? it.name : "");
+    document.getElementById("personLabel").textContent = d === "OUT" ? "Issued to" : "Received from";
+    document.getElementById("person").placeholder = d === "OUT" ? "Person, team or customer" : "Person or team";
+  }
+  form.addEventListener("change", sync);
+  form.addEventListener("input", sync);
+  sync();
+  document.getElementById("stepQty").addEventListener("wz:validate", function (e) {
+    var it = item(), q = parseFloat(document.getElementById("qty").value) || 0;
+    if (it && val("direction") === "OUT" && q > it.stock + 1e-9) {
+      e.preventDefault();
+      e.detail.message = "Only " + n(it.stock) + " " + it.unit + " in stock — you can't issue " + q + ".";
+    }
+  });
+})();
+</script>
+{% endblock %}

@@ -62,6 +62,7 @@ def create_app():
     from assets import assets_bp
     from migration import migration_bp
     from supplies import supplies_bp
+    from product_moves import product_moves_bp
     from facility import facility_bp
     from purchasing import purchasing_bp
     from ledger import ledger_bp
@@ -91,12 +92,14 @@ def create_app():
     app.register_blueprint(assets_bp, url_prefix="/assets")
     app.register_blueprint(migration_bp, url_prefix="/migration")
     app.register_blueprint(supplies_bp, url_prefix="/supplies")
+    app.register_blueprint(product_moves_bp, url_prefix="/products-in-out")
     app.register_blueprint(facility_bp, url_prefix="/facility")
 
     app.jinja_env.globals["icon"] = icons.icon
     app.jinja_env.filters["qty"] = services.fmt_qty
     app.jinja_env.filters["peso"] = services.fmt_peso
     app.jinja_env.filters["longdate"] = services.fmt_date
+    app.jinja_env.filters["mdy"] = services.fmt_mdy
 
     # --- Global template context ------------------------------------------
     def _nav_active():

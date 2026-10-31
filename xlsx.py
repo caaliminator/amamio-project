@@ -1,4 +1,5 @@
-"""Minimal, dependency-free .xlsx reader for the sales-platform importer.
+"""Minimal, dependency-free .xlsx reader (sales-platform importer) and writer
+(IN / OUT report downloads).
 
 An .xlsx file is a zip of XML parts, so the standard library is enough: no
 pandas, no openpyxl, nothing to install on the client's machine.
@@ -332,3 +333,126 @@ def read_rows(path, sheet_index=0, header_row=None, max_rows=MAX_ROWS):
             record[name] = row[i] if i < len(row) else ""
         records.append(record)
     return headers, records
+
+
+# ---------------------------------------------------------------------------
+# Writing — the IN / OUT reports download as .xlsx (or CSV) the same way:
+# ``sheets`` is [(sheet name, [row, ...]), ...]; the first row of each sheet
+# is its header (bold).  Cells are text or numbers.
+# ---------------------------------------------------------------------------
+def _xml_escape(text):
+    return (str(text).replace("&", "&amp;").replace("<", "&lt;")
+            .replace(">", "&gt;").replace('"', "&quot;"))
+
+
+def _col_name(index):
+    name = ""
+    index += 1
+    while index:
+        index, rem = divmod(index - 1, 26)
+        name = chr(65 + rem) + name
+    return name
+
+
+def _sheet_xml(rows):
+    out = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+           '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+           '<sheetData>']
+    for r, row in enumerate(rows, start=1):
+        cells = []
+        for c, value in enumerate(row):
+            if value is None or value == "":
+                continue
+            ref = "%s%d" % (_col_name(c), r)
+            style = ' s="1"' if r == 1 else ""
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                cells.append('<c r="%s"%s><v>%s</v></c>' % (ref, style, repr(value)))
+            else:
+                cells.append('<c r="%s" t="inlineStr"%s><is><t xml:space="preserve">%s</t></is></c>'
+                             % (ref, style, _xml_escape(value)))
+        out.append('<row r="%d">%s</row>' % (r, "".join(cells)))
+    out.append("</sheetData></worksheet>")
+    return "".join(out)
+
+
+def write_xlsx(sheets):
+    """The workbook as .xlsx bytes."""
+    import io
+    # Excel refuses these characters in sheet names, and more than 31 of them.
+    names = [re.sub(r"[\[\]:*?/\\]", " ", n)[:31] or "Sheet%d" % (i + 1)
+             for i, (n, _) in enumerate(sheets)]
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml",
+                   '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                   '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+                   '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+                   '<Default Extension="xml" ContentType="application/xml"/>'
+                   '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+                   '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+                   + "".join('<Override PartName="/xl/worksheets/sheet%d.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+                             % (i + 1) for i in range(len(sheets)))
+                   + "</Types>")
+        z.writestr("_rels/.rels",
+                   '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                   '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                   '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+                   "</Relationships>")
+        z.writestr("xl/workbook.xml",
+                   '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                   '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+                   'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'
+                   + "".join('<sheet name="%s" sheetId="%d" r:id="rId%d"/>'
+                             % (_xml_escape(n), i + 1, i + 1) for i, n in enumerate(names))
+                   + "</sheets></workbook>")
+        z.writestr("xl/_rels/workbook.xml.rels",
+                   '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                   '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                   + "".join('<Relationship Id="rId%d" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet%d.xml"/>'
+                             % (i + 1, i + 1) for i in range(len(sheets)))
+                   + '<Relationship Id="rId%d" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+                   % (len(sheets) + 1)
+                   + "</Relationships>")
+        z.writestr("xl/styles.xml",
+                   '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                   '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+                   '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font>'
+                   '<font><b/><sz val="11"/><name val="Calibri"/></font></fonts>'
+                   '<fills count="2"><fill><patternFill patternType="none"/></fill>'
+                   '<fill><patternFill patternType="gray125"/></fill></fills>'
+                   '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
+                   '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+                   '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+                   '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>'
+                   "</styleSheet>")
+        for i, (_, rows) in enumerate(sheets):
+            z.writestr("xl/worksheets/sheet%d.xml" % (i + 1), _sheet_xml(rows))
+    return buf.getvalue()
+
+
+def write_csv(sheets):
+    """Every sheet one after another (a blank line between), as CSV text."""
+    import io
+    out = io.StringIO()
+    writer = csv.writer(out)
+    for i, (name, rows) in enumerate(sheets):
+        if i:
+            writer.writerow([])
+        if len(sheets) > 1:
+            writer.writerow([name])
+        writer.writerows([["" if v is None else v for v in row] for row in rows])
+    return out.getvalue()
+
+
+def download(sheets, filename, fmt="xlsx"):
+    """A Flask response that downloads ``sheets`` as .xlsx or .csv."""
+    from flask import Response
+    if fmt == "csv":
+        # Excel opens UTF-8 CSV correctly when it starts with a BOM.
+        return Response("\ufeff" + write_csv(sheets), mimetype="text/csv",
+                        headers={"Content-Disposition":
+                                 "attachment; filename=%s.csv" % filename})
+    return Response(
+        write_xlsx(sheets),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=%s.xlsx" % filename})

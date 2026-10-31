@@ -158,6 +158,7 @@ SCHEMA = {
             "verified_by_name": STR, "checked_by": FK, "checked_at": TS,
             # Incoming Material Inspection Checklist: {point: {result, remarks}}
             "inspection_no": SHORT, "checklist": TEXT,
+            "visual_description": TEXT,
             "test_parameter": STR, "test_spec": STR, "test_result": STR,
             "test_method": STR,
             # Where the box is on the floor
@@ -351,6 +352,17 @@ SCHEMA = {
             "balance_after": NUM, "recorded_by": FK, "moved_at": TS,
         },
         "foreign_keys": {"material_id": "raw_materials", "recorded_by": "users"},
+    },
+    # Finished goods taken IN or issued OUT by hand (Products In / Out).
+    "product_movements": {
+        "columns": {
+            "id": ID, "product_id": FK, "product_name": STR,
+            "product_group": SHORT, "direction": SHORT, "qty": NUM,
+            "unit": SHORT, "reason": SHORT, "person": STR, "reference": STR,
+            "notes": TEXT, "balance_after": NUM, "recorded_by": FK,
+            "moved_at": TS,
+        },
+        "foreign_keys": {"product_id": "products", "recorded_by": "users"},
     },
     # The paper month-end reports: a physical count per category per month.
     "month_end_counts": {

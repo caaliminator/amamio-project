@@ -95,6 +95,12 @@
   <section class="wz-step" data-title="Inspection checklist" id="checklistStep"
            data-hint="Incoming Material Inspection Checklist (AFP-WH-FRM-002). Mark every point Pass, Fail or N/A. Say what failed in the remarks.">
     <div class="wz-body">
+      <div class="form-row">
+        <label class="form-label" for="visual_description">Visual / organoleptic inspection <span class="req">*</span></label>
+        <input type="text" id="visual_description" name="visual_description" maxlength="200" required
+               value="{{ form.visual_description or '' }}" placeholder="e.g. Free from molds, insects, decay and rotten">
+        <div class="form-hint">What you saw, smelled and felt — this goes in the Visual / Organoleptic column of the receiving report.</div>
+      </div>
       <div class="flex-between mb-sm">
         <span class="muted small">{{ points|length }} points</span>
         <button type="button" class="btn btn-ghost btn-sm" id="allPass">{{ icon('check', 14) }} Mark the rest Pass</button>

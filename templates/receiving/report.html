@@ -7,7 +7,10 @@
 
 <div class="paper">
   {{ paper_head('Raw Materials Receiving and Inspection Report',
-                'Record the receipt and quality inspection of incoming raw materials before acceptance for production · ' ~ date_from ~ ' to ' ~ date_to) }}
+                'Purpose: Record the receipt and quality inspection of incoming raw materials before acceptance for production · ' ~ (date_from|mdy) ~ ' to ' ~ (date_to|mdy)) }}
+  <div class="paper-doc" style="text-align:right;margin:-6px 0 10px">
+    Document No.: <b>{{ doc_no or '____________' }}</b> &nbsp; Revision: <b>{{ revision or '______' }}</b> &nbsp; Effective Date: <b>{{ effective or '____________' }}</b>
+  </div>
   <table class="paper-table">
     <thead>
       <tr>
@@ -21,25 +24,26 @@
     <tbody>
       {% for r in rows %}
       <tr>
-        <td>{{ r.received_date }}</td>
+        <td class="nowrap">{{ r.received_date|mdy }}</td>
         <td>{{ r.supplier_name }}</td>
-        <td>{{ [r.po_no, r.delivery_ref]|select|join(' / ') }}</td>
-        <td>{{ r.material_name }} <span style="color:#666">({{ r.box_code }})</span></td>
-        <td>{{ r.lot_no or '' }}</td>
-        <td class="num">{{ r.declared_qty|qty }}</td>
+        <td>{{ r.po_dr }}</td>
+        <td>{{ r.material_name }}{% if r.boxes > 1 %} <span style="color:#666">({{ r.boxes }} boxes)</span>{% endif %}</td>
+        <td>{{ r.lot_no }}</td>
+        <td class="num">{{ r.qty|qty }}</td>
         <td>{{ r.unit }}</td>
-        <td>{{ r.expiry_date or '' }}</td>
-        <td>{{ r.packaging_condition or '' }}</td>
-        <td>{{ r.visual_inspection or '' }}{% if r.cleaned %} · cleaned{% endif %}</td>
-        <td class="num">{{ r.temperature_c|qty if r.temperature_c not in (none, '') else '' }}</td>
-        <td>{{ r.coa_check or '' }}</td>
-        <td>{{ r.sampling_test or '' }}</td>
-        <td><b>{{ (r.acceptance_status or 'Pending')|upper }}</b>
-          {% if r.status != 'Awaiting Inspection' %}<br><span style="font-size:.68rem">{{ r.good_qty|qty }} usable{% if r.unusable_qty %}, {{ r.unusable_qty|qty }} unusable{% endif %}{% if r.damaged_qty %}, {{ r.damaged_qty|qty }} damaged{% endif %}</span>{% endif %}</td>
-        <td>{{ [r.nonconformity, r.unusable_reason, r.damage_reason]|select|join('; ') }}</td>
-        <td>{{ r.action_taken or '' }}</td>
-        <td>{{ r.checked_by if r.checked_at else '' }}</td>
-        <td>{{ r.verified_by_name or '' }}</td>
+        <td class="nowrap">{{ r.expiry_date|mdy }}</td>
+        <td>{{ r.packaging_condition }}</td>
+        <td>{{ r.visual }}{% if r.cleaned %}{{ '; ' if r.visual }}cleaned{% endif %}</td>
+        <td class="num">{{ r.temperature }}</td>
+        <td>{{ r.coa }}</td>
+        <td>{{ r.sampling }}</td>
+        <td><b>{{ r.acceptance }}</b>
+          {% if r.good_qty or r.unusable_qty or r.damaged_qty %}<br><span style="font-size:.68rem">{{ r.good_qty|qty }} usable{% if r.unusable_qty %}, {{ r.unusable_qty|qty }} unusable{% endif %}{% if r.damaged_qty %}, {{ r.damaged_qty|qty }} damaged{% endif %}</span>{% endif %}
+          {% if r.pending %}<br><span style="font-size:.68rem">{{ r.pending }} box(es) not inspected yet</span>{% endif %}</td>
+        <td>{{ r.remarks }}</td>
+        <td>{{ r.action }}</td>
+        <td>{{ r.inspected_by }}</td>
+        <td>{{ r.verified_by }}</td>
       </tr>
       {% else %}
       <tr><td colspan="18" style="text-align:center;color:#666;padding:20px">No deliveries received in this period.</td></tr>
