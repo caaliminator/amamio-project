@@ -140,6 +140,7 @@ NAV_HIDDEN = [
     ("Receiving & Inspection", [
         ("receiving",  "Receiving Area",        "receiving", "receiving.index"),
         ("inspection", "Inspection & Cleaning", "inspect", "receiving.inspection"),
+        ("inspection", "Hold & Rejection Reports", "shield", "receiving.ncr_list"),
         ("honey",      "Honey Containers",      "honey", "honey.index"),
     ]),
     ("Production", [

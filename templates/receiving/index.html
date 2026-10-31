@@ -7,6 +7,7 @@
     <p class="page-sub">Every delivery that arrives at the production site, box by box.</p>
   </div>
   <div class="page-head-actions">
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.ncr_list') }}">{{ icon('shield', 15) }} Hold &amp; rejection{% if stats.ncr_open %} ({{ stats.ncr_open }}){% endif %}</a>
     <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.report') }}">{{ icon('reports', 15) }} Inspection report</a>
     <a class="btn btn-primary" href="{{ url_for('receiving.new') }}">{{ icon('plus', 16) }} Receive a delivery</a>
   </div>
@@ -54,7 +55,7 @@
         {% if b.delivery_ref %} · DR {{ b.delivery_ref }}{% endif %}
       </span>
     </span>
-    <span class="badge {{ b.badge }}">{{ 'Awaiting inspection' if b.status == 'Open' else b.status }}</span>
+    <span class="badge {{ b.badge }}">{{ 'Awaiting inspection' if b.status == 'Open' else ('Ready to close' if b.status == 'For Closing' else b.status) }}</span>
   </a>
   {% endfor %}
 </div>

@@ -3,14 +3,6 @@
 {% block content %}
 <a class="back-link" href="{{ url_for('receiving.inspection') }}">{{ icon('arrow-left', 15) }} Inspection &amp; Cleaning</a>
 
-{% macro chips(name, options, current, label) %}
-<div class="chip-choices" data-review-label="{{ label }}">
-  {% for o in options %}
-  <label class="chip-choice"><input type="radio" name="{{ name }}" value="{{ o }}" {{ 'checked' if current == o }} required><span>{{ o }}</span></label>
-  {% endfor %}
-</div>
-{% endmacro %}
-
 <form method="post" class="wizard" data-wizard data-wizard-start="{{ start }}"
       data-submit-label="Save inspection" data-cancel="{{ url_for('receiving.box', box_id=box.id) }}" id="inspectForm">
   <input type="hidden" name="has_losses" id="has_losses" value="0">
@@ -100,53 +92,92 @@
     </div>
   </section>
 
-  <section class="wz-step" data-title="Quality checks"
-           data-hint="As on the paper Receiving and Inspection Report.">
+  <section class="wz-step" data-title="Inspection checklist" id="checklistStep"
+           data-hint="Incoming Material Inspection Checklist (AFP-WH-FRM-002). Mark every point Pass, Fail or N/A. Say what failed in the remarks.">
     <div class="wz-body">
-      <div class="form-row">
-        <div class="form-label">Visual / organoleptic inspection <span class="req">*</span></div>
-        {{ chips('visual_inspection', results, form.visual_inspection, 'Visual / organoleptic') }}
-        <div class="form-hint">Look, smell, feel — colour, odour, texture, foreign matter.</div>
+      <div class="flex-between mb-sm">
+        <span class="muted small">{{ points|length }} points</span>
+        <button type="button" class="btn btn-ghost btn-sm" id="allPass">{{ icon('check', 14) }} Mark the rest Pass</button>
       </div>
-      <div class="form-row">
-        <div class="form-label">COA / document check <span class="req">*</span></div>
-        {{ chips('coa_check', coa, form.coa_check, 'COA / documents') }}
+      {% for key, point, requirement in points %}
+      <div class="form-row chk-point" data-point="{{ key }}">
+        <div class="form-label">{{ point }} <span class="req">*</span></div>
+        <div class="form-hint" style="margin:-2px 0 6px">{{ requirement }}</div>
+        <div class="chip-choices">
+          {% for r in check_results %}
+          <label class="chip-choice"><input type="radio" name="chk_{{ key }}" value="{{ r }}" required
+                 {{ 'checked' if form.get('chk_' ~ key) == r }}><span>{{ r }}</span></label>
+          {% endfor %}
+        </div>
+        <input type="text" name="chk_{{ key }}_remarks" maxlength="200" class="mt-sm chk-remarks"
+               value="{{ form.get('chk_' ~ key ~ '_remarks') or '' }}" placeholder="Remarks">
       </div>
-      <div class="form-row">
-        <div class="form-label">Sampling / test <span class="req">*</span></div>
-        {{ chips('sampling_test', sampling, form.sampling_test, 'Sampling / test') }}
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="wz-step" data-title="Test results (if applicable)"
+           data-hint="Fill this in when a test was done — e.g. moisture. Leave it blank if no test was needed.">
+    <div class="wz-body">
+      <div class="form-grid cols-2">
+        <div class="form-row">
+          <label class="form-label" for="test_parameter">Parameter</label>
+          <input type="text" id="test_parameter" name="test_parameter" maxlength="80" value="{{ form.test_parameter or '' }}" placeholder="e.g. Moisture">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="test_spec">Specification</label>
+          <input type="text" id="test_spec" name="test_spec" maxlength="80" value="{{ form.test_spec or '' }}" placeholder="e.g. ≤ 20%">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="test_result">Actual result</label>
+          <input type="text" id="test_result" name="test_result" maxlength="80" value="{{ form.test_result or '' }}" placeholder="e.g. 18.2%">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="test_method">Instrument / method</label>
+          <input type="text" id="test_method" name="test_method" maxlength="80" value="{{ form.test_method or '' }}" placeholder="e.g. Refractometer">
+        </div>
       </div>
     </div>
   </section>
 
-  <section class="wz-step" data-title="Decision" id="decisionStep"
-           data-hint="Accepted = meets specifications · Rejected = does not meet requirements · Hold = pending test, document or QA decision.">
+  <section class="wz-step" data-title="Inspection decision" id="decisionStep"
+           data-hint="ACCEPTED = meets requirements · HOLD / QUARANTINE = pending evaluation · REJECTED = does not meet requirements. Only material that passes every point can be accepted.">
+    <p class="small mb-sm" id="failNote" style="display:none;color:var(--danger, #c0392b)"></p>
     <div class="choice-grid cols-3 mb" data-review-label="Decision">
       <label class="choice is-pass"><input type="radio" name="acceptance" value="Accepted" required {{ 'checked' if form.acceptance == 'Accepted' }}>
         <span class="choice-card"><span class="choice-icon">{{ icon('check', 20) }}</span>
         <span><span class="choice-title">Accepted</span><span class="choice-sub">Usable part joins stock</span></span></span></label>
-      <label class="choice"><input type="radio" name="acceptance" value="Hold" {{ 'checked' if form.acceptance == 'Hold' }}>
+      <label class="choice"><input type="radio" name="acceptance" value="Hold" required {{ 'checked' if form.acceptance == 'Hold' }}>
         <span class="choice-card"><span class="choice-icon">{{ icon('pause', 20) }}</span>
-        <span><span class="choice-title">Hold</span><span class="choice-sub">Decide later</span></span></span></label>
-      <label class="choice is-fail"><input type="radio" name="acceptance" value="Rejected" {{ 'checked' if form.acceptance == 'Rejected' }}>
+        <span><span class="choice-title">Hold / quarantine</span><span class="choice-sub">Pending evaluation</span></span></span></label>
+      <label class="choice is-fail"><input type="radio" name="acceptance" value="Rejected" required {{ 'checked' if form.acceptance == 'Rejected' }}>
         <span class="choice-card"><span class="choice-icon">{{ icon('x-circle', 20) }}</span>
         <span><span class="choice-title">Rejected</span><span class="choice-sub">Nothing joins stock</span></span></span></label>
     </div>
     <div class="wz-body">
       <div class="form-row">
-        <label class="form-label" for="nonconformity">Nonconformity / remarks <span class="req" id="ncReq" style="display:none">*</span></label>
+        <label class="form-label" for="nonconformity">Reason / findings <span class="req" id="ncReq" style="display:none">*</span></label>
         <input type="text" id="nonconformity" name="nonconformity" maxlength="300" value="{{ form.nonconformity or '' }}"
-               placeholder="Required when rejected or on hold">
+               placeholder="Required when on hold or rejected">
+      </div>
+      <div class="form-row" id="ncTypesRow" style="display:none" data-review-label="Type of nonconformity">
+        <div class="form-label">Type of nonconformity <span class="req">*</span></div>
+        {% set ticked = form.getlist('nc_types') if form else [] %}
+        {% for t in nc_types %}
+        <label class="check-row"><input type="checkbox" name="nc_types" value="{{ t }}" data-review-label="{{ t }}" {{ 'checked' if t in ticked }}> {{ t }}</label>
+        {% endfor %}
+        <input type="text" name="nc_other" maxlength="120" class="mt-sm" value="{{ form.nc_other or '' }}" placeholder="Other" data-review-label="Other nonconformity">
+        <div class="form-hint">A Hold / Rejection Report opens for this box. QA and Purchasing are notified.</div>
       </div>
       <div class="form-row">
         <label class="form-label" for="action_taken">Action taken</label>
         <input type="text" id="action_taken" name="action_taken" maxlength="300" value="{{ form.action_taken or '' }}"
-               placeholder="e.g. returned to supplier, waiting for COA">
+               placeholder="e.g. tagged HOLD and moved to quarantine, waiting for COA">
       </div>
       <div class="form-row">
-        <label class="form-label" for="verified_by_name">Verified by</label>
+        <label class="form-label" for="verified_by_name">QA / authorized disposition</label>
         <input type="text" id="verified_by_name" name="verified_by_name" maxlength="80" value="{{ form.verified_by_name or '' }}"
-               placeholder="Name of the person who verified">
+               placeholder="Name of the QA / authorized person">
       </div>
     </div>
   </section>
@@ -176,10 +207,77 @@
     var needNc = decision === "Rejected" || decision === "Hold";
     document.getElementById("nonconformity").required = needNc;
     document.getElementById("ncReq").style.display = needNc ? "" : "none";
+    document.getElementById("ncTypesRow").style.display = needNc ? "" : "none";
+    // A failed point: its remark is required, and the box can't be accepted.
+    var failed = [];
+    form.querySelectorAll(".chk-point").forEach(function (row) {
+      var r = (row.querySelector("input[type=radio]:checked") || {}).value;
+      var remarks = row.querySelector(".chk-remarks");
+      remarks.required = r === "Fail";
+      remarks.placeholder = r === "Fail" ? "What failed? (required)" : "Remarks";
+      if (r === "Fail") failed.push(row);
+    });
+    var accept = form.querySelector('[name=acceptance][value=Accepted]');
+    accept.disabled = failed.length > 0;
+    if (accept.disabled && accept.checked) accept.checked = false;
+    var note = document.getElementById("failNote");
+    note.style.display = failed.length ? "" : "none";
+    note.textContent = failed.length ? failed.length + " point(s) failed — the box can't be accepted. Put it on Hold or reject it." : "";
   }
   form.addEventListener("input", sync);
   form.addEventListener("change", sync);
   sync();
+
+  // Points that failed suggest the type of nonconformity (only on the way in,
+  // so the inspector's own ticks are kept).
+  var pointTypes = {{ point_types|tojson }};
+  document.getElementById("decisionStep").addEventListener("wz:enter", function () {
+    var ticked = form.querySelectorAll("[name=nc_types]:checked").length;
+    if (ticked) return;
+    form.querySelectorAll(".chk-point").forEach(function (row) {
+      var r = (row.querySelector("input[type=radio]:checked") || {}).value;
+      var t = pointTypes[row.getAttribute("data-point")];
+      if (r === "Fail" && t) {
+        var box = form.querySelector('[name=nc_types][value="' + t + '"]');
+        if (box) box.checked = true;
+      }
+    });
+  });
+
+  document.getElementById("allPass").addEventListener("click", function () {
+    form.querySelectorAll(".chk-point").forEach(function (row) {
+      if (!row.querySelector("input[type=radio]:checked")) {
+        row.querySelector('input[type=radio][value="Pass"]').checked = true;
+      }
+    });
+    sync();
+  });
+
+  // The review shows the checklist as a count, with the failed points named.
+  document.getElementById("checklistStep").reviewHtml = function () {
+    var esc = window.IMS.esc, counts = {Pass: 0, Fail: 0, "N/A": 0}, failedNames = [];
+    form.querySelectorAll(".chk-point").forEach(function (row) {
+      var r = (row.querySelector("input[type=radio]:checked") || {}).value;
+      if (!r) return;
+      counts[r] += 1;
+      if (r === "Fail") failedNames.push(row.querySelector(".form-label").textContent.replace("*", "").trim());
+    });
+    var out = "<dt>Result</dt><dd>" + counts.Pass + " pass · " + counts.Fail + " fail · " + counts["N/A"] + " N/A</dd>";
+    if (failedNames.length) out += "<dt>Failed</dt><dd>" + esc(failedNames.join(", ")) + "</dd>";
+    return out;
+  };
+  // The nonconformity ticks are checked here (they are left out of the
+  // generic review, which would list every unticked box as "No").
+  document.getElementById("ncTypesRow").setAttribute("data-review-skip", "");
+  document.getElementById("decisionStep").addEventListener("wz:validate", function (e) {
+    var decision = (form.querySelector('[name=acceptance]:checked') || {}).value;
+    if ((decision === "Hold" || decision === "Rejected")
+        && !form.querySelector("[name=nc_types]:checked")
+        && !form.querySelector("[name=nc_other]").value.trim()) {
+      e.preventDefault();
+      e.detail.message = "Tick the type of nonconformity.";
+    }
+  });
   // Counting nothing at all is never right.
   form.querySelectorAll(".wz-step")[2].addEventListener("wz:validate", function (e) {
     if (num("usable_qty") + num("unusable_qty") + num("damaged_qty") <= 0) {

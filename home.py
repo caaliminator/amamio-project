@@ -34,7 +34,11 @@ def _counts():
                         if services.box_status(b) == services.BOX_AWAITING),
         "held": sum(1 for b in boxes if services.box_status(b) == services.BOX_HOLD),
         "open_deliveries": sum(1 for b in db.read("receiving_batches")
-                               if b.get("status") == "Open"),
+                               if b.get("status") in (services.RECEIVING_OPEN,
+                                                      services.RECEIVING_FOR_CLOSING)),
+        "for_closing": sum(1 for b in db.read("receiving_batches")
+                           if b.get("status") == services.RECEIVING_FOR_CLOSING),
+        "ncr_open": len(services.ncr_rows("open")),
         "honey_pending": honey["pending"],
         "honey_to_allocate": honey["to_allocate"],
         "packing_open": sum(1 for r in runs if r.get("status") == "In Progress"),
@@ -68,8 +72,10 @@ def tasks_for(user, c):
                   "receiving", "receiving.new", primary=True),
             _task("Log honey containers", "Weigh, label and send for moisture check",
                   "honey", "honey.new"),
-            _task("Open deliveries", "Deliveries with boxes still waiting for inspection",
+            _task("Open deliveries", "Boxes waiting for inspection, or receipts to close",
                   "receiving", "receiving.index", count=c["open_deliveries"]),
+            _task("Hold & rejection reports", "Tag, segregate and follow up nonconforming material",
+                  "shield", "receiving.ncr_list", count=c["ncr_open"]),
             _task("Supplies in / out", "Packaging, cleaning and office supplies",
                   "swap", "supplies.index"),
             _task("Scan a QR code", "See what a box or container is and where it is",
@@ -162,6 +168,12 @@ def waiting_for(user, c):
     add(can(user, "inspection") and c["held"],
         "%d box(es) on hold" % c["held"], "Waiting for a test, document or QA decision",
         "receiving.inspection")
+    add(can(user, "receiving") and c["for_closing"],
+        "%d receipt(s) ready to close" % c["for_closing"],
+        "Every box inspected — answer the Quick Control Check", "receiving.index")
+    add((can(user, "receiving") or can(user, "inspection")) and c["ncr_open"],
+        "%d hold / rejection report(s) open" % c["ncr_open"],
+        "Containment, QA disposition and closure", "receiving.ncr_list")
     add(can(user, "honey") and c["honey_pending"],
         "%d honey container(s) to check" % c["honey_pending"],
         "Moisture & appearance", "honey.index")

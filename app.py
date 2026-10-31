@@ -31,6 +31,9 @@ def create_app():
 
     os.makedirs(db.DATA_DIR, exist_ok=True)
     seed_if_empty()
+    # Boxes held or rejected before the SOP's hold / rejection reports existed
+    # get theirs now.
+    services.backfill_ncrs()
     # Shipped import templates are installed separately from the demo seed so
     # they also appear on a system that already holds real data.
     platform_service.seed_builtin_templates()

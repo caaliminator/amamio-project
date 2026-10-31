@@ -50,8 +50,14 @@ DELIVERY_BADGE = {
 }
 RECEIVING_BADGE = {
     "Open": "badge-warn",
+    "For Closing": "badge-gold",
     "Completed": "badge-ok",
     "Cancelled": "badge-danger",
+}
+NCR_BADGE = {
+    "Open": "badge-danger",
+    "Dispositioned": "badge-warn",
+    "Closed": "badge-ok",
 }
 BOX_BADGE = {
     "Awaiting Inspection": "badge-warn",
@@ -926,6 +932,83 @@ INSPECTION_RESULTS = ["Pass", "Fail", "Not applicable"]
 COA_RESULTS = ["Complete", "Incomplete", "Not required"]
 SAMPLING_RESULTS = ["Passed", "Failed", "Pending result", "Not required"]
 
+# --- SOP AFP-WH-SOP-001 "Receiving of Materials" ---------------------------
+# The delivery record is the Material Receiving Report (AFP-WH-FRM-001); each
+# box inspection fills the Incoming Material Inspection Checklist
+# (AFP-WH-FRM-002); every box put on HOLD or REJECTED gets a Nonconforming
+# Material Hold / Rejection Report (AFP-WH-FRM-003).  A receipt is closed
+# only after the SOP's Quick Control Check.
+RECEIVING_OPEN = "Open"
+RECEIVING_FOR_CLOSING = "For Closing"
+RECEIVING_CLOSED = "Completed"
+DOCS_CHECKED = ["Approved PO", "Delivery Receipt", "Certificate of Analysis"]
+CONTROL_CHECKS = [
+    ("po_dr", "PO and DR checked"),
+    ("qty_counted", "Actual quantity counted / weighed"),
+    ("quality_inspected", "Quality and packaging inspected"),
+    ("lot_dates", "Lot / batch and dates recorded, if applicable"),
+    ("status_label", "Status label applied (Accepted / Hold / Rejected)"),
+    ("records_done", "MRR and inspection records completed"),
+    ("inventory_stored", "Inventory updated and materials stored / segregated"),
+]
+CONTROL_ANSWERS = ["Yes", "No", "N/A"]
+# (key, inspection point, acceptable requirement / check)
+INSPECTION_POINTS = [
+    ("identity", "Item identity",
+     "Matches PO, approved specification, and label"),
+    ("quantity", "Quantity / weight",
+     "Actual count or weight verified against PO / DR"),
+    ("packaging", "Packaging integrity",
+     "Clean, sealed, intact; no tears, leaks, or tampering"),
+    ("cleanliness", "Cleanliness",
+     "No visible dirt, foreign matter, or contamination"),
+    ("pest", "Pest / infestation",
+     "No insects, droppings, webbing, or pest damage"),
+    ("odor", "Odor / appearance",
+     "Normal for material; no off-odor, mold, or spoilage"),
+    ("lot", "Lot / batch traceability",
+     "Lot or batch number is present and legible"),
+    ("dates", "Date marking",
+     "MFG / expiry / best-before checked, if applicable"),
+    ("coa", "COA / documents",
+     "Required COA or supporting documents available"),
+    ("transport", "Storage / transport",
+     "Transport and temperature conditions acceptable, if applicable"),
+    ("test", "Moisture / other test",
+     "Within approved specification; record result if tested"),
+]
+CHECK_RESULTS = ["Pass", "Fail", "N/A"]
+NC_TYPES = ["Quantity shortage / overage", "Wrong item / specification",
+            "Damaged packaging", "Contamination / pest",
+            "Expired / near expiry", "Missing / invalid documents",
+            "Failed test result"]
+# The type of nonconformity a failed checklist point suggests.
+NC_TYPE_FOR_POINT = {
+    "identity": NC_TYPES[1], "quantity": NC_TYPES[0], "packaging": NC_TYPES[2],
+    "cleanliness": NC_TYPES[3], "pest": NC_TYPES[3], "odor": NC_TYPES[3],
+    "dates": NC_TYPES[4], "coa": NC_TYPES[5], "test": NC_TYPES[6],
+}
+NC_CONTAINMENT = ["Tagged HOLD / REJECT", "Segregated in designated area",
+                  "Production use blocked", "Supplier notified"]
+# The SOP's exception rule: identify, segregate and block — always.
+_NC_CONTAINMENT_REQUIRED = NC_CONTAINMENT[:3]
+# (key, disposition, releases the box's usable quantity to stock?)
+NC_DISPOSITIONS = [
+    ("release", "Release — meets requirements after evaluation", True),
+    ("conditional", "Conditional acceptance", True),
+    ("rework", "Rework / sort", True),
+    ("return", "Return to supplier", False),
+    ("replace", "Replace material", False),
+    ("credit", "Credit / refund", False),
+    ("dispose", "Dispose", False),
+]
+NC_DISPOSITION_LABELS = {k: label for k, label, _ in NC_DISPOSITIONS}
+NC_RELEASES = {k for k, _, releases in NC_DISPOSITIONS if releases}
+NC_NEEDS_JUSTIFICATION = {"conditional", "rework"}
+NCR_OPEN = "Open"
+NCR_DISPOSITIONED = "Dispositioned"
+NCR_CLOSED = "Closed"
+
 # Statuses written by earlier versions of the system.
 _LEGACY_BOX_STATUS = {"Pending Check": BOX_AWAITING, "Checked": BOX_ACCEPTED,
                       "Stored": BOX_ACCEPTED, "Released": BOX_ACCEPTED,
@@ -971,23 +1054,63 @@ def _next_ref(prefix, collection, field="ref_no"):
     return "%s%04d" % (stem, highest + 1)
 
 
+def supplier_approved(supplier):
+    """SOP section 6: materials come only from suppliers on the Approved
+    Supplier List.  Own harvest / walk-in (no supplier) is an "other
+    authorized source" and needs no approval."""
+    return bool(supplier and supplier.get("approved"))
+
+
+def set_supplier_approval(supplier_id, approved, user_id):
+    """Put a supplier on (or take it off) the Approved Supplier List."""
+    supplier = db.get("suppliers", supplier_id)
+    if not supplier:
+        return None, "Supplier not found."
+    return db.update("suppliers", supplier_id, {
+        "approved": bool(approved),
+        "approved_by": user_id if approved else None,
+        "approved_at": now_iso() if approved else None,
+    }), None
+
+
 def create_receiving_batch(supplier_id, received_date, user_id,
                            delivery_ref="", remarks="", po_no="", po_id=None,
-                           supplier_name=""):
-    """Open a delivery record.  Boxes are added to it next."""
+                           supplier_name="", received_time="", delivered_by="",
+                           vehicle_plate="", receiving_area="",
+                           supplier_contact="", docs_checked=None,
+                           docs_other="", discrepancies=None):
+    """Open a delivery record — the Material Receiving Report (MRR).  Boxes
+    are added to it next."""
     supplier = db.get("suppliers", supplier_id) if supplier_id else None
+    if supplier and not (supplier_contact or "").strip():
+        supplier_contact = " · ".join(p for p in (supplier.get("contact_person"),
+                                                  supplier.get("phone")) if p)
     batch = db.insert("receiving_batches", {
-        "ref_no": _next_ref("RCV", "receiving_batches"),
+        "ref_no": _next_ref("MRR", "receiving_batches"),
         "supplier_id": int(supplier_id) if supplier_id else None,
         "supplier_name": supplier.get("name") if supplier
                          else (supplier_name or "Walk-in / own harvest"),
+        "supplier_contact": (supplier_contact or "").strip(),
         "po_id": po_id,
         "po_no": (po_no or "").strip(),
         "delivery_ref": (delivery_ref or "").strip(),
         "received_date": received_date or today_iso(),
+        "received_time": (received_time or "").strip()
+                         or datetime.now().strftime("%H:%M"),
+        "delivered_by": (delivered_by or "").strip(),
+        "vehicle_plate": (vehicle_plate or "").strip(),
+        "receiving_area": (receiving_area or "").strip() or "Receiving Area",
+        "docs_checked": [d for d in (docs_checked or []) if d in DOCS_CHECKED],
+        "docs_other": (docs_other or "").strip(),
         "received_by": user_id,
-        "status": "Open",
+        "status": RECEIVING_OPEN,
         "remarks": (remarks or "").strip(),
+        # Shortages, overages and items not on the PO, found at receipt.
+        "discrepancies": list(discrepancies or []),
+        "inventory_updated_by": None,
+        "inventory_updated_at": None,
+        "control_check": {},
+        "closed_by": None,
         "box_count": 0,
         "total_declared": 0.0,
         "total_good": 0.0,
@@ -1010,7 +1133,7 @@ def add_receiving_box(batch_id, material_id, declared_qty, user_id,
     batch = db.get("receiving_batches", batch_id)
     if not batch:
         return [], "Delivery not found."
-    if batch.get("status") != "Open":
+    if batch.get("status") not in (RECEIVING_OPEN, RECEIVING_FOR_CLOSING):
         return [], "This delivery is already closed."
     material = db.get("raw_materials", material_id)
     if not material:
@@ -1057,6 +1180,13 @@ def add_receiving_box(batch_id, material_id, declared_qty, user_id,
             "nonconformity": "",
             "action_taken": "",
             "verified_by_name": "",
+            # Incoming Material Inspection Checklist (AFP-WH-FRM-002)
+            "inspection_no": "",
+            "checklist": {},
+            "test_parameter": "",
+            "test_spec": "",
+            "test_result": "",
+            "test_method": "",
             "checked_by": None,
             "checked_at": None,
             "status": BOX_AWAITING,
@@ -1074,8 +1204,48 @@ def add_receiving_box(batch_id, material_id, declared_qty, user_id,
     return created, None
 
 
+def _line_total(line):
+    """Quantity per box x number of boxes for one line of the receive form."""
+    return (_to_float(line.get("qty_per_box"))
+            * max(1, int(_to_float(line.get("boxes"), 1))))
+
+
+def _po_discrepancies(po, clean):
+    """SOP 5.3: shortages, overages and items not on the PO, written on the
+    MRR when the delivery is recorded."""
+    import purchasing_service as pur
+    got, extra = {}, []
+    for material, line, po_line in clean:
+        qty = _line_total(line)
+        if po_line:
+            got[po_line["line_no"]] = got.get(po_line["line_no"], 0.0) + qty
+        else:
+            extra.append("%s %s" % (material.get("name"),
+                                    fmt_qty(qty, material.get("unit") or "")))
+    notes = []
+    for l in pur.lines_to_receive(po):
+        if l["remaining"] <= 0:
+            continue
+        unit = l.get("unit") or ""
+        qty = got.get(l["line_no"], 0.0)
+        diff = round(qty - l["remaining"], 3)
+        if not qty:
+            notes.append("PO line %d %s: not in this delivery (%s still to come)."
+                         % (l["line_no"], l.get("description"),
+                            fmt_qty(l["remaining"], unit)))
+        elif diff:
+            notes.append("PO line %d %s: %s expected, %s received (%s by %s)."
+                         % (l["line_no"], l.get("description"),
+                            fmt_qty(l["remaining"], unit), fmt_qty(qty, unit),
+                            "short" if diff < 0 else "over",
+                            fmt_qty(abs(diff), unit)))
+    if extra:
+        notes.append("Not on the PO: %s." % "; ".join(extra))
+    return notes
+
+
 def receive_delivery(user_id, supplier_id, received_date, lines, po_no="",
-                     delivery_ref="", remarks="", po_id=None):
+                     delivery_ref="", remarks="", po_id=None, **mrr):
     """Part 1 in one go: the delivery, its boxes, their QR codes, and a
     notification to the team that inspects them.
 
@@ -1084,6 +1254,9 @@ def receive_delivery(user_id, supplier_id, received_date, lines, po_no="",
     With ``po_id`` the delivery is received against that (approved) purchase
     order: lines carry the PO line they fill, and a PO line for an item not
     yet in stock may use material_id "new" to add it to the materials list.
+    ``mrr`` carries the other Material Receiving Report header fields
+    (received_time, delivered_by, vehicle_plate, receiving_area,
+    supplier_contact, docs_checked, docs_other).
     Returns ``(batch, boxes, None)`` or ``(None, [], message)``."""
     import purchasing_service as pur
 
@@ -1093,6 +1266,14 @@ def receive_delivery(user_id, supplier_id, received_date, lines, po_no="",
         if not po or po.get("status") != pur.PO_APPROVED:
             return None, [], "That purchase order isn't open for receiving."
         po_lines = {it["line_no"]: it for it in po.get("items") or []}
+    source_id = supplier_id or (po or {}).get("supplier_id")
+    if source_id:
+        supplier = db.get("suppliers", source_id)
+        if not supplier_approved(supplier):
+            return None, [], ("%s is not on the Approved Supplier List — an Admin "
+                              "must approve the supplier before its deliveries "
+                              "are received." % ((supplier or {}).get("name")
+                                                 or "This supplier"))
     clean = []
     for line in lines:
         if not line.get("material_id"):
@@ -1123,7 +1304,8 @@ def receive_delivery(user_id, supplier_id, received_date, lines, po_no="",
         supplier_id or (po or {}).get("supplier_id"), received_date, user_id,
         delivery_ref=delivery_ref, remarks=remarks,
         po_no=(po or {}).get("po_no") or po_no, po_id=po["id"] if po else None,
-        supplier_name=(po or {}).get("supplier_name") or "")
+        supplier_name=(po or {}).get("supplier_name") or "",
+        discrepancies=_po_discrepancies(po, clean) if po else [], **mrr)
     boxes = []
     for material, line, po_line in clean:
         created, err = add_receiving_box(
@@ -1141,9 +1323,7 @@ def receive_delivery(user_id, supplier_id, received_date, lines, po_no="",
     summary = "; ".join(
         "%s %s in %d box(es)" % (
             material.get("name"),
-            fmt_qty(_to_float(line.get("qty_per_box"))
-                    * max(1, int(_to_float(line.get("boxes"), 1))),
-                    material.get("unit") or ""),
+            fmt_qty(_line_total(line), material.get("unit") or ""),
             max(1, int(_to_float(line.get("boxes"), 1))))
         for material, line, _ in clean)
     if po:
@@ -1159,7 +1339,7 @@ def receive_delivery(user_id, supplier_id, received_date, lines, po_no="",
 def _refresh_batch_totals(batch_id):
     boxes = db.query("receiving_boxes", batch_id=int(batch_id))
     accepted = [b for b in boxes if box_status(b) == BOX_ACCEPTED]
-    open_boxes = [b for b in boxes if box_status(b) in (BOX_AWAITING, BOX_HOLD)]
+    awaiting = [b for b in boxes if box_status(b) == BOX_AWAITING]
     changes = {
         "box_count": len(boxes),
         "total_declared": round(sum(_to_float(b.get("declared_qty"))
@@ -1172,9 +1352,14 @@ def _refresh_batch_totals(batch_id):
                                    for b in boxes), 3),
     }
     batch = db.get("receiving_batches", batch_id) or {}
-    # A delivery completes itself once every box has a final decision.
-    if boxes and not open_boxes and batch.get("status") == "Open":
-        changes.update({"status": "Completed", "closed_at": now_iso()})
+    # Once every box is inspected the receipt waits to be closed with the
+    # Quick Control Check.  Boxes on HOLD don't block it — each has its own
+    # hold report and stays segregated (SOP section 3).
+    status = batch.get("status")
+    if boxes and not awaiting and status == RECEIVING_OPEN:
+        changes["status"] = RECEIVING_FOR_CLOSING
+    elif awaiting and status == RECEIVING_FOR_CLOSING:
+        changes["status"] = RECEIVING_OPEN
     return db.update("receiving_batches", batch_id, changes)
 
 
@@ -1196,6 +1381,10 @@ def _post_box_decision(box, material, user_id):
     if status == BOX_ACCEPTED and good > 0:
         adjust_stock("material", material["id"], good, "received",
                      reference_id=code, user_id=user_id)
+        # "Inventory updated by" on the MRR.
+        db.update("receiving_batches", box.get("batch_id"),
+                  {"inventory_updated_by": user_id,
+                   "inventory_updated_at": now_iso()})
     if unusable > 0:
         record_damage("inspection", code, "material", material["id"],
                       material.get("name"), unusable, unit,
@@ -1208,13 +1397,79 @@ def _post_box_decision(box, material, user_id):
                       stage="Inspection & Cleaning", user_id=user_id)
 
 
+def _clean_checklist(checklist):
+    """Every inspection point marked Pass / Fail / N/A, with a remark on each
+    failure.  Returns ``(checklist, None)`` or ``(None, message)``."""
+    clean = {}
+    for key, point, _ in INSPECTION_POINTS:
+        entry = checklist.get(key) or {}
+        result = entry.get("result") or ""
+        remarks = (entry.get("remarks") or "").strip()
+        if result not in CHECK_RESULTS:
+            return None, "Mark \"%s\" Pass, Fail or N/A." % point
+        if result == "Fail" and not remarks:
+            return None, "Say what failed on \"%s\" in its remarks." % point
+        clean[key] = {"result": result, "remarks": remarks}
+    return clean, None
+
+
+def _legacy_checks(checklist):
+    """The visual / COA / sampling columns of the Raw Materials Receiving and
+    Inspection Report, read off the checklist so that report still fills in."""
+    visual = [checklist[k]["result"]
+              for k in ("packaging", "cleanliness", "pest", "odor")]
+    if "Fail" in visual:
+        visual = "Fail"
+    elif all(r == "N/A" for r in visual):
+        visual = "Not applicable"
+    else:
+        visual = "Pass"
+    coa = {"Pass": "Complete", "Fail": "Incomplete",
+           "N/A": "Not required"}[checklist["coa"]["result"]]
+    test = {"Pass": "Passed", "Fail": "Failed",
+            "N/A": "Not required"}[checklist["test"]["result"]]
+    return visual, coa, test
+
+
+def failed_points(box):
+    """[(point, remarks)] of the checklist points a box failed."""
+    checklist = box.get("checklist") or {}
+    return [(point, checklist[key].get("remarks") or "")
+            for key, point, _ in INSPECTION_POINTS
+            if (checklist.get(key) or {}).get("result") == "Fail"]
+
+
+def nc_types_for(box):
+    """The types of nonconformity a box's failed checks point to."""
+    types = []
+    for key, _, _ in INSPECTION_POINTS:
+        kind = NC_TYPE_FOR_POINT.get(key)
+        if ((box.get("checklist") or {}).get(key) or {}).get("result") == "Fail" \
+                and kind and kind not in types:
+            types.append(kind)
+    if not types and box.get("coa_check") == "Incomplete":
+        types.append("Missing / invalid documents")
+    if not types and box.get("sampling_test") == "Failed":
+        types.append("Failed test result")
+    return types
+
+
 def inspect_receiving_box(box_id, user_id, usable_qty, unusable_qty=0,
                           damaged_qty=0, unusable_reason="", damage_reason="",
                           cleaned=False, visual_inspection="", coa_check="",
                           sampling_test="", acceptance="Accepted",
                           nonconformity="", action_taken="",
-                          verified_by_name=""):
+                          verified_by_name="", checklist=None,
+                          test_parameter="", test_spec="", test_result="",
+                          test_method="", nc_types=None, nc_other=""):
     """Part 2: record the inspection & cleaning of one box.
+
+    With ``checklist`` ({point key: {result, remarks}}) this is the Incoming
+    Material Inspection Checklist (AFP-WH-FRM-002): every point must be
+    answered, a box that fails any point can't be Accepted (SOP 5.5), and a
+    HOLD / REJECT must say the type of nonconformity.  The older visual / COA
+    / sampling fields are then filled in from the checklist.  A box put on
+    HOLD or REJECTED opens its Hold / Rejection Report.
 
     Returns ``(box, None)`` or ``(None, message)``."""
     box = db.get("receiving_boxes", box_id)
@@ -1238,6 +1493,21 @@ def inspect_receiving_box(box_id, user_id, usable_qty, unusable_qty=0,
         return None, "Choose Accepted, Rejected or Hold."
     if acceptance in ("Rejected", "Hold") and not (nonconformity or "").strip():
         return None, "Describe the nonconformity behind this decision."
+    nc_types = [t for t in (nc_types or []) if t in NC_TYPES]
+    if checklist is not None:
+        checklist, err = _clean_checklist(checklist)
+        if err:
+            return None, err
+        failed = [point for key, point, _ in INSPECTION_POINTS
+                  if checklist[key]["result"] == "Fail"]
+        if failed and acceptance == "Accepted":
+            return None, ("\"%s\" failed — only material that meets every "
+                          "requirement can be accepted. Put the box on Hold or "
+                          "reject it." % failed[0])
+        if acceptance != "Accepted" and not nc_types \
+                and not (nc_other or "").strip():
+            return None, "Tick the type of nonconformity."
+        visual_inspection, coa_check, sampling_test = _legacy_checks(checklist)
 
     material = db.get("raw_materials", box.get("material_id"))
     if not material:
@@ -1261,6 +1531,13 @@ def inspect_receiving_box(box_id, user_id, usable_qty, unusable_qty=0,
         "nonconformity": (nonconformity or "").strip(),
         "action_taken": (action_taken or "").strip(),
         "verified_by_name": (verified_by_name or "").strip(),
+        "inspection_no": box.get("inspection_no")
+                         or _next_ref("INS", "receiving_boxes", "inspection_no"),
+        "checklist": checklist or {},
+        "test_parameter": (test_parameter or "").strip(),
+        "test_spec": (test_spec or "").strip(),
+        "test_result": (test_result or "").strip(),
+        "test_method": (test_method or "").strip(),
         "status": status,
         "stage": stage,
         "checked_by": user_id,
@@ -1270,6 +1547,9 @@ def inspect_receiving_box(box_id, user_id, usable_qty, unusable_qty=0,
         _post_box_decision(box, material, user_id)
     _refresh_batch_totals(box.get("batch_id"))
     _sync_purchase_order(box)
+    ncr = None
+    if status in (BOX_HOLD, BOX_REJECTED):
+        ncr = raise_ncr(box, user_id, nc_types, nc_other)
 
     unit = material.get("unit") or ""
     message = ("Inspected %s (%s): %s usable, %s can't be used, %s damaged — %s."
@@ -1278,13 +1558,20 @@ def inspect_receiving_box(box_id, user_id, usable_qty, unusable_qty=0,
                   fmt_qty(damaged, unit), acceptance))
     if status == BOX_ACCEPTED:
         message += " Moved to the Storage Area."
-    notify_team({"receiving_head", "production_head"}, message,
-                link="/receiving/box/%d" % int(box_id))
+    link = "/receiving/box/%d" % int(box_id)
+    if ncr:
+        # SOP section 7: QA and Purchasing (the admins) are told at once.
+        message += (" %s raised — tag it, keep it segregated and out of "
+                    "production until QA decides." % ncr["report_no"])
+        link = "/receiving/ncr/%d" % ncr["id"]
+    notify_team({"receiving_head", "production_head"}, message, link=link)
     return box, None
 
 
-def decide_held_box(box_id, decision, user_id, note=""):
-    """Close a box that was put on Hold: Accepted or Rejected."""
+def decide_held_box(box_id, decision, user_id, note="", accepted_qty=None):
+    """Close a box that was put on Hold: Accepted or Rejected.  Called by the
+    disposition of its Hold / Rejection Report.  ``accepted_qty`` (rework /
+    sort) accepts less than the usable quantity; the rest is sorted out."""
     box = db.get("receiving_boxes", box_id)
     if not box:
         return None, "Box not found."
@@ -1298,20 +1585,35 @@ def decide_held_box(box_id, decision, user_id, note=""):
     action = (box.get("action_taken") or "").strip()
     if (note or "").strip():
         action = ("%s\n%s" % (action, note.strip())).strip()
-    box = db.update("receiving_boxes", box_id, {
+    changes = {
         "acceptance_status": decision,
         "status": BOX_ACCEPTED if decision == "Accepted" else BOX_REJECTED,
         "stage": "Storage Area" if decision == "Accepted" else "Receiving Area",
         "action_taken": action,
         "checked_by": user_id,
         "checked_at": now_iso(),
-    })
+    }
+    good = _to_float(box.get("good_qty"))
+    if decision == "Accepted" and accepted_qty is not None:
+        accepted = _to_float(accepted_qty)
+        if accepted <= 0 or accepted > good + 1e-9:
+            return None, ("The accepted quantity must be more than zero and no "
+                          "more than the %s held."
+                          % fmt_qty(good, material.get("unit") or ""))
+        sorted_out = round(good - accepted, 3)
+        if sorted_out > 0:
+            reason = (box.get("unusable_reason") or "").strip()
+            changes.update({
+                "good_qty": accepted,
+                "unusable_qty": round(_to_float(box.get("unusable_qty"))
+                                      + sorted_out, 3),
+                "unusable_reason": "; ".join(
+                    p for p in (reason, "sorted out on rework") if p),
+            })
+    box = db.update("receiving_boxes", box_id, changes)
     _post_box_decision(box, material, user_id)
     _refresh_batch_totals(box.get("batch_id"))
     _sync_purchase_order(box)
-    notify_team({"receiving_head", "production_head"},
-                "Box %s on hold is now %s." % (box.get("box_code"), decision),
-                link="/receiving/box/%d" % int(box_id))
     return box, None
 
 
@@ -1324,6 +1626,14 @@ def move_receiving_box(box_id, stage, user_id=None, released_to=""):
         return None, "Unknown area."
     if box_status(box) != BOX_ACCEPTED:
         return None, "Only an accepted box can be moved."
+    # SOP section 6: FEFO (or FIFO when there is no expiry date) — the box
+    # that should go first leaves the Storage Area first.
+    if stage in ("Production Area", "Consumed") and box_stage(box) == "Storage Area":
+        first = fefo_first(box)
+        if first:
+            reason = ("it expires earlier (%s)" % first.get("expiry_date")
+                      if first.get("expiry_date") else "it was received earlier")
+            return None, "Use box %s first — %s." % (first.get("box_code"), reason)
     box = db.update("receiving_boxes", box_id, {
         "stage": stage,
         "status": BOX_ACCEPTED,
@@ -1334,21 +1644,359 @@ def move_receiving_box(box_id, stage, user_id=None, released_to=""):
     return box, None
 
 
-def close_receiving_batch(batch_id, user_id=None):
+def close_receiving_batch(batch_id, user_id=None, checks=None,
+                          verified_by_name="", qa_approved_by_name=""):
+    """SOP 5.8: close the receipt after the Quick Control Check.
+
+    ``checks`` maps each CONTROL_CHECKS key to Yes / No / N/A; a "No" means
+    that step isn't done and the receipt stays open.  Boxes on HOLD may stay
+    open on their own hold report."""
     batch = db.get("receiving_batches", batch_id)
     if not batch:
         return None, "Delivery not found."
+    if batch.get("status") == RECEIVING_CLOSED:
+        return None, "This receipt is already closed."
     boxes = db.query("receiving_boxes", batch_id=int(batch_id))
     if not boxes:
         return None, "Add at least one box before closing the delivery."
-    pending = [b for b in boxes if box_status(b) in (BOX_AWAITING, BOX_HOLD)]
-    if pending:
-        return None, ("%d box(es) still need a decision before this delivery "
-                      "can be closed." % len(pending))
+    awaiting = [b for b in boxes if box_status(b) == BOX_AWAITING]
+    if awaiting:
+        return None, ("%d box(es) still need inspection before this receipt "
+                      "can be closed." % len(awaiting))
+    answers = {}
+    for key, label in CONTROL_CHECKS:
+        answer = (checks or {}).get(key)
+        if answer not in CONTROL_ANSWERS:
+            return None, "Answer \"%s\" — Yes, No or N/A." % label
+        answers[key] = answer
+    not_done = [label for key, label in CONTROL_CHECKS if answers[key] == "No"]
+    if not_done:
+        return None, ("Not ready to close — still to do: %s."
+                      % "; ".join(not_done))
+    if not (verified_by_name or "").strip():
+        return None, "Enter who verified this receipt."
     _refresh_batch_totals(batch_id)
-    batch = db.update("receiving_batches", batch_id,
-                      {"status": "Completed", "closed_at": now_iso()})
+    batch = db.update("receiving_batches", batch_id, {
+        "status": RECEIVING_CLOSED,
+        "control_check": answers,
+        "checked_by_name": verified_by_name.strip(),
+        "approved_by_name": (qa_approved_by_name or "").strip(),
+        "closed_by": user_id,
+        "closed_at": now_iso(),
+    })
     return batch, None
+
+
+def mrr_lines(batch):
+    """Section A of the Material Receiving Report: one line per item (and lot)
+    with the PO, actual and accepted quantities."""
+    po = db.get("purchase_orders", batch.get("po_id")) if batch.get("po_id") else None
+    po_qty = {it["line_no"]: _to_float(it.get("qty"))
+              for it in (po or {}).get("items") or []}
+    lines, index, po_seen = [], {}, set()
+    boxes = sorted(db.query("receiving_boxes", batch_id=int(batch["id"])),
+                   key=lambda b: b.get("seq") or 0)
+    for b in boxes:
+        key = (b.get("po_line_no"), b.get("material_id"), b.get("lot_no") or "",
+               b.get("expiry_date") or "")
+        line = index.get(key)
+        if line is None:
+            po_line = b.get("po_line_no")
+            line = index[key] = {
+                "material_name": b.get("material_name"), "unit": b.get("unit"),
+                "po_line_no": po_line,
+                # The ordered quantity is shown once per PO line.
+                "po_qty": po_qty.get(po_line) if po_line not in po_seen else None,
+                "lot_no": b.get("lot_no") or "",
+                "expiry_date": b.get("expiry_date") or "",
+                "boxes": 0, "actual_qty": 0.0, "accepted_qty": 0.0,
+                "hold_qty": 0.0, "rejected_qty": 0.0, "awaiting": 0,
+            }
+            if po_line:
+                po_seen.add(po_line)
+            lines.append(line)
+        status = box_status(b)
+        line["boxes"] += 1
+        line["actual_qty"] += _to_float(b.get("declared_qty"))
+        if status == BOX_ACCEPTED:
+            line["accepted_qty"] += _to_float(b.get("good_qty"))
+        elif status == BOX_HOLD:
+            line["hold_qty"] += _to_float(b.get("good_qty"))
+        elif status == BOX_REJECTED:
+            line["rejected_qty"] += _to_float(b.get("declared_qty"))
+        else:
+            line["awaiting"] += 1
+    for line in lines:
+        for k in ("actual_qty", "accepted_qty", "hold_qty", "rejected_qty"):
+            line[k] = round(line[k], 3)
+        line["status"] = ("Pending inspection" if line["awaiting"]
+                          else "Hold" if line["hold_qty"]
+                          else "Accepted" if line["accepted_qty"]
+                          else "Rejected")
+    return lines
+
+
+def unavailable_stock():
+    """{material_id: {"hold": qty, "awaiting": qty}} — received but NOT
+    available for production (SOP 5.8): on HOLD, or not yet inspected."""
+    out = {}
+    for b in db.read("receiving_boxes"):
+        status = box_status(b)
+        if status not in (BOX_HOLD, BOX_AWAITING):
+            continue
+        row = out.setdefault(b.get("material_id"), {"hold": 0.0, "awaiting": 0.0})
+        if status == BOX_HOLD:
+            row["hold"] = round(row["hold"] + _to_float(b.get("good_qty")), 3)
+        else:
+            row["awaiting"] = round(row["awaiting"]
+                                    + _to_float(b.get("declared_qty")), 3)
+    return out
+
+
+def fefo_first(box):
+    """The accepted box of the same item in the Storage Area that should be
+    used before this one — earliest expiry first (FEFO), else earliest
+    received (FIFO).  None when this box is next in line."""
+    def order(b):
+        return (b.get("expiry_date") or "9999-12-31", b.get("created_at") or "")
+    earlier = [b for b in db.query("receiving_boxes",
+                                   material_id=box.get("material_id"))
+               if b["id"] != box["id"] and box_status(b) == BOX_ACCEPTED
+               and box_stage(b) == "Storage Area" and order(b) < order(box)]
+    return min(earlier, key=order) if earlier else None
+
+
+# --- Nonconforming Material Hold / Rejection Report (AFP-WH-FRM-003) -------
+# Opened automatically for every box put on HOLD or REJECTED.  The receiving
+# area records the containment (tag, segregate, block, notify supplier); QA
+# or an authorized approver records the disposition, which is what finally
+# releases a held box to stock or rejects it; then the report is closed.
+def raise_ncr(box, user_id, nc_types=None, nc_other=""):
+    """Open the hold / rejection report for a box (one per box)."""
+    existing = db.query("nonconformance_reports", box_id=box["id"])
+    if existing:
+        return existing[0]
+    batch = db.get("receiving_batches", box.get("batch_id")) or {}
+    types = [t for t in (nc_types or []) if t in NC_TYPES] or nc_types_for(box)
+    other = (nc_other or "").strip()
+    if not types and not other:
+        other = "See findings"
+    user = db.get("users", user_id) if user_id else None
+    role = security.normalize_role((user or {}).get("role"))
+    held = box_status(box) == BOX_HOLD
+    findings = "; ".join(p for p in (
+        (box.get("nonconformity") or "").strip(),
+        "; ".join("%s: %s" % fp for fp in failed_points(box))) if p)
+    return db.insert("nonconformance_reports", {
+        "report_no": _next_ref("NCR", "nonconformance_reports", "report_no"),
+        "box_id": box["id"],
+        "box_code": box.get("box_code"),
+        "batch_id": box.get("batch_id"),
+        "mrr_no": batch.get("ref_no"),
+        "po_no": batch.get("po_no"),
+        "supplier_id": batch.get("supplier_id"),
+        "supplier_name": batch.get("supplier_name"),
+        "material_id": box.get("material_id"),
+        "material_name": box.get("material_name"),
+        "lot_no": box.get("lot_no") or "",
+        "unit": box.get("unit"),
+        # On HOLD only the usable part waits (the rest is already written
+        # off); a rejected box is rejected whole.
+        "qty_affected": _to_float(box.get("good_qty") if held
+                                  else box.get("declared_qty")),
+        "raised_as": "Hold" if held else "Rejected",
+        "reported_by": user_id,
+        "department": security.ROLE_LABELS.get(role, ""),
+        "nc_types": types,
+        "nc_other": other,
+        "findings": findings,
+        "containment": [],
+        "hold_location": "",
+        "qty_segregated": None,
+        "tag_no": "",
+        "contained_by": None,
+        "contained_at": None,
+        "disposition": "",
+        "disposition_details": "",
+        "justification": "",
+        "accepted_qty": None,
+        "supplier_response": "",
+        "disposed_by": None,
+        "disposed_at": None,
+        "qa_approved_by_name": "",
+        "closure_verified_by_name": "",
+        "closed_by": None,
+        "closed_at": None,
+        "status": NCR_OPEN,
+        "created_at": now_iso(),
+    })
+
+
+def backfill_ncrs():
+    """Every box on HOLD or REJECTED must have its hold / rejection report
+    (SOP sections 7 and 8) — open one for boxes from before the reports
+    existed.  Safe to run on every start."""
+    have = {r.get("box_id") for r in db.read("nonconformance_reports")}
+    made = 0
+    for box in db.read("receiving_boxes"):
+        if box["id"] not in have and box_status(box) in (BOX_HOLD, BOX_REJECTED):
+            raise_ncr(box, box.get("checked_by"))
+            made += 1
+    return made
+
+
+def ncr_for_box(box_id):
+    """The box's hold / rejection report, opening one for a box held or
+    rejected before these reports existed."""
+    found = db.query("nonconformance_reports", box_id=int(box_id))
+    if found:
+        return found[0]
+    box = db.get("receiving_boxes", box_id)
+    if not box or box_status(box) not in (BOX_HOLD, BOX_REJECTED):
+        return None
+    return raise_ncr(box, box.get("checked_by"))
+
+
+def record_ncr_containment(ncr_id, user_id, actions, hold_location="",
+                           qty_segregated=None, tag_no=""):
+    """Section C — immediate containment, recorded by the receiving area."""
+    ncr = db.get("nonconformance_reports", ncr_id)
+    if not ncr:
+        return None, "Report not found."
+    if ncr.get("status") == NCR_CLOSED:
+        return None, "This report is already closed."
+    actions = [a for a in (actions or []) if a in NC_CONTAINMENT]
+    missing = [a for a in _NC_CONTAINMENT_REQUIRED if a not in actions]
+    if missing:
+        return None, ("The SOP requires the material to be tagged, segregated "
+                      "and blocked from production — still to do: %s."
+                      % ", ".join(missing))
+    if not (hold_location or "").strip():
+        return None, "Say where the material is held (hold / quarantine location)."
+    qty = (_to_float(qty_segregated) if qty_segregated not in (None, "")
+           else _to_float(ncr.get("qty_affected")))
+    if qty < 0:
+        return None, "The quantity segregated cannot be negative."
+    ncr = db.update("nonconformance_reports", ncr_id, {
+        "containment": actions,
+        "hold_location": hold_location.strip(),
+        "qty_segregated": qty,
+        "tag_no": (tag_no or "").strip() or ncr.get("box_code") or "",
+        "contained_by": user_id,
+        "contained_at": now_iso(),
+    })
+    return ncr, None
+
+
+def decide_ncr(ncr_id, user_id, disposition, details="", justification="",
+               supplier_response="", accepted_qty=None, qa_approved_by_name=""):
+    """Section D — the QA / authorized disposition.  For a box on HOLD this is
+    the final decision: release, conditional acceptance or rework put its
+    usable quantity into stock; anything else rejects it."""
+    ncr = db.get("nonconformance_reports", ncr_id)
+    if not ncr:
+        return None, "Report not found."
+    if ncr.get("status") != NCR_OPEN:
+        return None, "A disposition is already recorded for %s." % ncr.get("report_no")
+    if not ncr.get("contained_at"):
+        return None, ("Record the containment first — the material must be "
+                      "tagged, segregated and blocked before it is dispositioned.")
+    if disposition not in NC_DISPOSITION_LABELS:
+        return None, "Choose a disposition."
+    if disposition in NC_NEEDS_JUSTIFICATION and not (justification or "").strip():
+        return None, ("%s needs a documented technical justification."
+                      % NC_DISPOSITION_LABELS[disposition])
+    if not (qa_approved_by_name or "").strip():
+        return None, "Enter the name of the QA / authorized approver."
+    box = db.get("receiving_boxes", ncr.get("box_id")) or {}
+    status = box_status(box)
+    releases = disposition in NC_RELEASES
+    if status == BOX_REJECTED and releases:
+        return None, ("A rejected box can't be released — choose return, "
+                      "replace, credit / refund or dispose.")
+    if status == BOX_HOLD:
+        note = "%s: %s" % (ncr.get("report_no"), NC_DISPOSITION_LABELS[disposition])
+        if (details or "").strip():
+            note += " — " + details.strip()
+        box, err = decide_held_box(
+            box["id"], "Accepted" if releases else "Rejected", user_id,
+            note=note,
+            accepted_qty=accepted_qty if releases and accepted_qty not in (None, "")
+            else None)
+        if err:
+            return None, err
+    elif status != BOX_REJECTED:
+        return None, "Box %s is no longer on hold." % ncr.get("box_code")
+    ncr = db.update("nonconformance_reports", ncr_id, {
+        "disposition": disposition,
+        "disposition_details": (details or "").strip(),
+        "justification": (justification or "").strip(),
+        "supplier_response": (supplier_response or "").strip()
+                             or ncr.get("supplier_response") or "",
+        "accepted_qty": _to_float(box.get("good_qty")) if releases else 0.0,
+        "qa_approved_by_name": qa_approved_by_name.strip(),
+        "disposed_by": user_id,
+        "disposed_at": now_iso(),
+        "status": NCR_DISPOSITIONED,
+    })
+    outcome = ("%s joins stock" % fmt_qty(ncr["accepted_qty"], ncr.get("unit") or "")
+               if releases else "nothing joins stock")
+    notify_team({"receiving_head", "production_head"},
+                "%s (%s, %s): %s — %s." % (
+                    ncr.get("report_no"), ncr.get("material_name"),
+                    ncr.get("box_code"), NC_DISPOSITION_LABELS[disposition],
+                    outcome),
+                link="/receiving/ncr/%d" % int(ncr_id))
+    return ncr, None
+
+
+def close_ncr(ncr_id, user_id, verified_by_name, supplier_response=""):
+    """Section E — closure, once the disposition is carried out."""
+    ncr = db.get("nonconformance_reports", ncr_id)
+    if not ncr:
+        return None, "Report not found."
+    if ncr.get("status") == NCR_CLOSED:
+        return None, "This report is already closed."
+    if ncr.get("status") != NCR_DISPOSITIONED:
+        return None, "Record the disposition before closing the report."
+    if not (verified_by_name or "").strip():
+        return None, "Enter who verified the closure."
+    ncr = db.update("nonconformance_reports", ncr_id, {
+        "supplier_response": (supplier_response or "").strip()
+                             or ncr.get("supplier_response") or "",
+        "closure_verified_by_name": verified_by_name.strip(),
+        "closed_by": user_id,
+        "closed_at": now_iso(),
+        "status": NCR_CLOSED,
+    })
+    return ncr, None
+
+
+def ncr_row(r):
+    """A hold / rejection report shaped for the templates."""
+    row = dict(r)
+    row.update({
+        "badge": NCR_BADGE.get(r.get("status"), "badge-muted"),
+        "reported_by_name": user_name(r.get("reported_by")),
+        "contained_by_name": user_name(r.get("contained_by")) if r.get("contained_by") else "",
+        "disposed_by_name": user_name(r.get("disposed_by")) if r.get("disposed_by") else "",
+        "closed_by_name": user_name(r.get("closed_by")) if r.get("closed_by") else "",
+        "disposition_label": NC_DISPOSITION_LABELS.get(r.get("disposition"), ""),
+        "created": fmt_dt(r.get("created_at")),
+        "contained": fmt_dt(r.get("contained_at")),
+        "disposed": fmt_dt(r.get("disposed_at")),
+        "closed": fmt_dt(r.get("closed_at")),
+    })
+    return row
+
+
+def ncr_rows(status=None):
+    """Hold / rejection reports, newest first; ``status`` "open" = not closed."""
+    rows = db.read("nonconformance_reports")
+    if status == "open":
+        rows = [r for r in rows if r.get("status") != NCR_CLOSED]
+    rows.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+    return [ncr_row(r) for r in rows]
 
 
 def box_qr_text(box, batch=None):
@@ -1398,10 +2046,12 @@ def receiving_box_rows(batch_id=None, status=None, limit=None):
         boxes = [b for b in boxes if box_status(b) in wanted]
     boxes.sort(key=lambda b: (b.get("batch_id") or 0, b.get("seq") or 0))
     batches = {b["id"]: b for b in db.read("receiving_batches")}
+    ncrs = {r.get("box_id"): r for r in db.read("nonconformance_reports")}
     rows = []
     for b in boxes:
         batch = batches.get(b.get("batch_id"), {})
         status_now = box_status(b)
+        ncr = ncrs.get(b["id"]) or {}
         rows.append({
             "id": b["id"], "box_code": b.get("box_code"), "seq": b.get("seq"),
             "material_id": b.get("material_id"),
@@ -1425,6 +2075,14 @@ def receiving_box_rows(batch_id=None, status=None, limit=None):
             "nonconformity": b.get("nonconformity"),
             "action_taken": b.get("action_taken"),
             "verified_by_name": b.get("verified_by_name"),
+            "inspection_no": b.get("inspection_no") or "",
+            "checklist": b.get("checklist") or {},
+            "test_parameter": b.get("test_parameter") or "",
+            "test_spec": b.get("test_spec") or "",
+            "test_result": b.get("test_result") or "",
+            "test_method": b.get("test_method") or "",
+            "ncr_id": ncr.get("id"), "ncr_no": ncr.get("report_no"),
+            "ncr_status": ncr.get("status"),
             "status": status_now, "stage": box_stage(b),
             "badge": BOX_BADGE.get(status_now, "badge-muted"),
             "checked_by": user_name(b.get("checked_by")),
@@ -1432,6 +2090,7 @@ def receiving_box_rows(batch_id=None, status=None, limit=None):
             "received_at": fmt_dt(b.get("created_at")),
             "batch_ref": batch.get("ref_no"),
             "batch_id": b.get("batch_id"),
+            "received_by_name": user_name(batch.get("received_by")),
             "po_no": batch.get("po_no"),
             "delivery_ref": batch.get("delivery_ref"),
             "supplier_name": batch.get("supplier_name"),

@@ -23,22 +23,57 @@
         <select id="supplier_id" name="supplier_id" data-review-label="Supplier">
           <option value="">Own harvest / walk-in (no supplier)</option>
           {% for s in suppliers %}
-            <option value="{{ s.id }}" {{ 'selected' if form.supplier_id == s.id|string }}>{{ s.name }}</option>
+            <option value="{{ s.id }}" {{ 'selected' if form.supplier_id == s.id|string and s.approved }}
+                    {{ 'disabled' if not s.approved }}>{{ s.name }}{{ '' if s.approved else ' (not approved)' }}</option>
           {% endfor %}
         </select>
+        <div class="form-hint">Only suppliers on the Approved Supplier List can deliver.</div>
         {% endif %}
       </div>
+      <div class="form-grid cols-2">
+        <div class="form-row">
+          <label class="form-label" for="received_date">Date received <span class="req">*</span></label>
+          <input type="date" id="received_date" name="received_date" required
+                 value="{{ form.received_date or today }}" max="{{ today }}">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="received_time">Time received <span class="req">*</span></label>
+          <input type="time" id="received_time" name="received_time" required
+                 value="{{ form.received_time or now_time }}">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="delivered_by">Delivered by</label>
+          <input type="text" id="delivered_by" name="delivered_by" maxlength="80"
+                 value="{{ form.delivered_by or '' }}" placeholder="Driver / delivery person">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="vehicle_plate">Vehicle / plate no.</label>
+          <input type="text" id="vehicle_plate" name="vehicle_plate" maxlength="20"
+                 value="{{ form.vehicle_plate or '' }}" placeholder="e.g. ABC 1234">
+        </div>
+      </div>
       <div class="form-row">
-        <label class="form-label" for="received_date">Date received <span class="req">*</span></label>
-        <input type="date" id="received_date" name="received_date" required
-               value="{{ form.received_date or today }}" max="{{ today }}">
+        <label class="form-label" for="receiving_area">Receiving area</label>
+        <input type="text" id="receiving_area" name="receiving_area" maxlength="80"
+               value="{{ form.receiving_area or 'Receiving Area' }}">
+        <div class="form-hint">Keep accepted, pending-inspection and rejected materials physically apart here (SOP 5.1).</div>
       </div>
     </div>
   </section>
 
   <section class="wz-step" data-title="Delivery documents"
-           data-hint="Copy the reference numbers from the paperwork, if there is any. You can skip this step.">
+           data-hint="Get the approved PO, the delivery receipt and any COA or other required documents. Tick what you checked and copy the reference numbers.">
     <div class="wz-body">
+      <div class="form-row">
+        <div class="form-label">Documents checked</div>
+        {% set ticked = form.getlist('docs_checked') if form else [] %}
+        {% for d in docs %}
+        <label class="check-row"><input type="checkbox" name="docs_checked" value="{{ d }}" data-review-label="{{ d }}"
+          {{ 'checked' if d in ticked or (d == 'Approved PO' and po and not form) }}> {{ d }}{% if d == 'Certificate of Analysis' %} <span class="muted small">(if required)</span>{% endif %}</label>
+        {% endfor %}
+        <input type="text" name="docs_other" maxlength="80" value="{{ form.docs_other or '' }}"
+               placeholder="Other document, if any" class="mt-sm" data-review-label="Other document">
+      </div>
       <div class="form-grid cols-2">
         <div class="form-row">
           <label class="form-label" for="po_no">PO no.</label>
@@ -54,8 +89,9 @@
         </div>
       </div>
       <div class="form-row">
-        <label class="form-label" for="remarks">Remarks</label>
-        <textarea id="remarks" name="remarks" rows="2" placeholder="Anything worth noting about this delivery">{{ form.remarks or '' }}</textarea>
+        <label class="form-label" for="remarks">Receiving remarks / discrepancies</label>
+        <textarea id="remarks" name="remarks" rows="2" placeholder="Wrong items, damaged cartons, missing documents…">{{ form.remarks or '' }}</textarea>
+        {% if po %}<div class="form-hint">Shortages and overages against the PO are noted on the receiving report by themselves.</div>{% endif %}
       </div>
     </div>
   </section>

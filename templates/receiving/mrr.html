@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% from "_paper.html" import paper_head %}
+{% block title %}MRR {{ batch.ref_no }}{% endblock %}
+{% block content %}
+<style>
+  .sop-box { display: inline-grid; place-items: center; width: 14px; height: 14px; border: 1.5px solid #111; margin-right: 5px; font-size: .72rem; line-height: 1; vertical-align: -2px; }
+  .sop-checks { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: .82rem; margin-bottom: 6px; }
+  .sop-lines div { border-bottom: 1px solid #999; min-height: 22px; padding: 3px 0; font-size: .82rem; }
+  .sop-note { font-size: .7rem; color: #444; text-align: center; margin-top: 14px; font-style: italic; }
+</style>
+<div class="toolbar no-print">
+  <a class="back-link" style="margin:0" href="{{ url_for('receiving.batch', batch_id=batch.id) }}">{{ icon('arrow-left', 15) }} {{ batch.ref_no }}</a>
+  <button class="btn btn-primary" type="button" onclick="window.print()">{{ icon('printer', 15) }} Print</button>
+</div>
+
+<div class="paper">
+  {{ paper_head('Material Receiving Report (MRR)', '', doc_no='AFP-WH-FRM-001', revision='00') }}
+  <div class="paper-fields">
+    <div><b>MRR No.:</b> {{ batch.ref_no }}</div>
+    <div><b>Date &amp; Time Received:</b> {{ batch.received_date }} {{ batch.received_time or '' }}</div>
+    <div><b>Supplier:</b> {{ batch.supplier_name }}</div>
+    <div><b>Supplier Contact:</b> {{ batch.supplier_contact or '' }}</div>
+    <div><b>Purchase Order (PO) No.:</b> {{ batch.po_no or '' }}</div>
+    <div><b>Delivery Receipt (DR) No.:</b> {{ batch.delivery_ref or '' }}</div>
+    <div><b>Delivered By:</b> {{ batch.delivered_by or '' }}</div>
+    <div><b>Vehicle/Plate No.:</b> {{ batch.vehicle_plate or '' }}</div>
+    <div><b>Receiving Area:</b> {{ batch.receiving_area or 'Receiving Area' }}</div>
+    <div><b>Received By:</b> {{ received_by }}</div>
+  </div>
+
+  <div class="paper-section">A. Materials Received</div>
+  <table class="paper-table">
+    <thead><tr>
+      <th>No.</th><th>Material / Item Description</th><th>Unit</th><th class="num">PO Qty</th>
+      <th class="num">Actual Qty</th><th class="num">Accepted Qty</th><th>Lot / Batch No.</th>
+      <th>Expiry / Best Before</th><th>Status</th>
+    </tr></thead>
+    <tbody>
+      {% for l in lines %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ l.material_name }} <span style="color:#666">({{ l.boxes }} box{{ 'es' if l.boxes != 1 }})</span></td>
+        <td>{{ l.unit }}</td>
+        <td class="num">{{ l.po_qty|qty if l.po_qty is not none else '' }}</td>
+        <td class="num">{{ l.actual_qty|qty }}</td>
+        <td class="num">{{ l.accepted_qty|qty if l.status != 'Pending inspection' else '' }}</td>
+        <td>{{ l.lot_no }}</td>
+        <td>{{ l.expiry_date }}</td>
+        <td>{{ l.status|upper }}{% if l.hold_qty %}<br><span style="font-size:.68rem">{{ l.hold_qty|qty }} on hold</span>{% endif %}{% if l.rejected_qty %}<br><span style="font-size:.68rem">{{ l.rejected_qty|qty }} rejected</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+      {% for _ in range([0, 4 - lines|length]|max) %}
+      <tr><td style="height:22px"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="paper-section">B. Documents Checked</div>
+  <div class="sop-checks">
+    {% for d in docs %}<span><span class="sop-box">{{ '✓' if d in (batch.docs_checked or []) }}</span>{{ d }}{% if d == 'Certificate of Analysis' %} (if required){% endif %}</span>{% endfor %}
+    <span><span class="sop-box">{{ '✓' if batch.docs_other }}</span>Other: {{ batch.docs_other or '__________' }}</span>
+  </div>
+
+  <div class="paper-section">C. Receiving Remarks / Discrepancies</div>
+  <div class="sop-lines">
+    {% if batch.remarks %}<div>{{ batch.remarks }}</div>{% endif %}
+    {% for d in batch.discrepancies or [] %}<div>{{ d }}</div>{% endfor %}
+    {% if not batch.remarks and not batch.discrepancies %}<div></div><div></div>{% endif %}
+  </div>
+
+  <div class="paper-fields" style="margin-top:18px">
+    <div><b>Inventory updated by:</b> {{ inventory_by }}</div>
+    <div><b>Date/Time:</b> {{ (batch.inventory_updated_at or '')[:16]|replace('T', ' ') }}</div>
+    <div><b>Received by (signature):</b> {{ received_by }}</div>
+    <div><b>Verified by:</b> {{ batch.checked_by_name or '' }}</div>
+    <div><b>QA / Authorized approval:</b> {{ batch.approved_by_name or '' }}</div>
+    <div><b>Date:</b> {{ (batch.closed_at or '')[:10] }}</div>
+  </div>
+  <div class="sop-note">AMAMIO FARM PRODUCTS · Controlled Form – Uncontrolled when printed</div>
+</div>
+{% endblock %}

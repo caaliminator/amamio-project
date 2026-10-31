@@ -7,6 +7,7 @@
     <p class="page-sub">Boxes that arrived at the receiving area and are waiting to be cleaned and checked.</p>
   </div>
   <div class="page-head-actions">
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.ncr_list') }}">{{ icon('shield', 15) }} Hold &amp; rejection reports</a>
     <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.report') }}">{{ icon('reports', 15) }} Inspection report</a>
     <a class="btn btn-primary" href="{{ url_for('qr.scan') }}">{{ icon('qr', 16) }} Scan a box</a>
   </div>
@@ -38,11 +39,11 @@
 <div class="section-label">On hold ({{ held|length }})</div>
 <div class="queue">
   {% for box in held %}
-  <a class="queue-item" href="{{ url_for('receiving.box', box_id=box.id) }}">
+  <a class="queue-item" href="{{ url_for('receiving.box_ncr', box_id=box.id) }}">
     <span class="code" style="min-width:58px">{{ box.box_code }}</span>
     <span class="queue-main">
-      <span class="queue-title">{{ box.material_name }} — {{ box.good_qty|qty(box.unit) }} usable</span>
-      <span class="queue-sub">{{ box.nonconformity }}</span>
+      <span class="queue-title">{{ box.material_name }} — {{ box.good_qty|qty(box.unit) }} on hold</span>
+      <span class="queue-sub">{% if box.ncr_no %}{{ box.ncr_no }} · {% endif %}{{ box.nonconformity }}</span>
     </span>
     <span class="badge badge-warn">Decide</span>
   </a>

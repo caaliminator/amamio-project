@@ -424,6 +424,9 @@ def create_purchase_order(request_id, user, header, supplier, delivery, lines,
         directory = None
     if not directory:
         return None, "Choose the supplier from the Supplier Directory."
+    if not services.supplier_approved(directory):
+        return None, ("%s is not on the Approved Supplier List — approve it in "
+                      "the Supplier Directory first." % directory.get("name"))
     supplier_name = directory.get("name") or ""
     card = supplier_card(directory)
 
@@ -554,6 +557,10 @@ def approve_purchase_order(po_id, user):
         return None, "PO %s is not waiting for an approval." % po["po_no"]
     if not can_approve(user, po):
         return None, "PO %s is waiting for %s." % (po["po_no"], waiting_on(po))
+    if po.get("supplier_id") and not services.supplier_approved(
+            db.get("suppliers", po["supplier_id"])):
+        return None, ("%s is not on the Approved Supplier List — approve it in "
+                      "the Supplier Directory first." % po.get("supplier_name"))
     name = user.get("name") or ""
     link = "/purchasing/%d" % po_id
     if stage == "initial":
@@ -775,7 +782,8 @@ def supplier_card(supplier):
             "address": supplier.get("address") or "",
             "contact": contact or supplier.get("buy_from") or "",
             "tin": supplier.get("tin") or "",
-            "contact_person": supplier.get("contact_person") or ""}
+            "contact_person": supplier.get("contact_person") or "",
+            "approved": services.supplier_approved(supplier)}
 
 
 def purchasing_counts():

@@ -34,31 +34,31 @@
       <a class="btn btn-primary" href="{{ url_for('receiving.inspect', box_id=box.id) }}">Inspect this box</a>
     {% endif %}
   </div>
-{% elif box.status == 'On Hold' %}
+{% elif box.status in ('On Hold', 'Rejected') and box.ncr_status != 'Closed' %}
   <div class="next-action">
     <div class="next-action-text">
-      <b>On hold — waiting for a test, document or QA decision</b>
-      <span>{{ box.nonconformity }}</span>
+      {% if box.status == 'On Hold' %}
+      <b>HOLD / QUARANTINE — not available for production</b>
+      <span>Keep it tagged and segregated. QA decides on the hold report{% if box.nonconformity %}: {{ box.nonconformity }}{% endif %}</span>
+      {% else %}
+      <b>REJECTED — keep it tagged and segregated</b>
+      <span>Record the containment and the disposition (return, replace, credit or dispose) on the rejection report.</span>
+      {% endif %}
     </div>
+    <a class="btn btn-primary" href="{{ url_for('receiving.box_ncr', box_id=box.id) }}">{{ icon('shield', 16) }} {{ box.ncr_no or 'Open the hold / rejection report' }}</a>
   </div>
-  {% if can_inspect %}
-  <form method="post" action="{{ url_for('receiving.decide_hold', box_id=box.id) }}" class="card mb">
-    <div class="card-title">Final decision</div>
-    <div class="choice-grid cols-2 mb">
-      <label class="choice is-pass"><input type="radio" name="decision" value="Accepted" required>
-        <span class="choice-card"><span class="choice-icon">{{ icon('check', 20) }}</span>
-        <span><span class="choice-title">Accept</span><span class="choice-sub">{{ box.good_qty|qty(box.unit) }} joins stock</span></span></span></label>
-      <label class="choice is-fail"><input type="radio" name="decision" value="Rejected">
-        <span class="choice-card"><span class="choice-icon">{{ icon('x-circle', 20) }}</span>
-        <span><span class="choice-title">Reject</span><span class="choice-sub">Nothing joins stock</span></span></span></label>
-    </div>
-    <div class="form-row">
-      <label class="form-label" for="note">What was decided, and why?</label>
-      <input type="text" id="note" name="note" placeholder="e.g. COA received — moisture within spec">
-    </div>
-    <button class="btn btn-primary" type="submit">Save decision</button>
-  </form>
-  {% endif %}
+{% endif %}
+
+{% if fefo_first %}
+<div class="card mb" style="border-left:3px solid var(--warn, #d4a017)">
+  <div class="card-title">Use {{ fefo_first.box_code }} first</div>
+  <p class="small muted" style="margin:0">
+    {% if fefo_first.expiry_date %}It expires earlier ({{ fefo_first.expiry_date }}) — First Expired, First Out.
+    {% else %}It was received earlier — First In, First Out.{% endif %}
+    This box can't go to production until {{ fefo_first.box_code }} has.
+    <a href="{{ url_for('receiving.box', box_id=fefo_first.id) }}">Open {{ fefo_first.box_code }}</a>
+  </p>
+</div>
 {% endif %}
 
 {% if box.status != 'Awaiting Inspection' %}
@@ -74,7 +74,8 @@
   <div class="card-title">Move this box <span class="muted">— it is in the {{ box.stage }}</span></div>
   <div class="chip-choices mb">
     {% for s in stages if s != box.stage %}
-      <label class="chip-choice"><input type="radio" name="stage" value="{{ s }}" required><span>{{ s }}</span></label>
+      {% set held_back = fefo_first and s in ('Production Area', 'Consumed') %}
+      <label class="chip-choice" {{ 'style=opacity:.45' if held_back }}><input type="radio" name="stage" value="{{ s }}" required {{ 'disabled' if held_back }}><span>{{ s }}</span></label>
     {% endfor %}
   </div>
   <button class="btn btn-primary btn-sm" type="submit">Move</button>
@@ -90,10 +91,21 @@
     <dt>Packaging condition</dt><dd>{{ box.packaging_condition or '—' }}</dd>
     <dt>Temperature</dt><dd>{{ box.temperature_c|qty('°C') if box.temperature_c not in (none, '') else '—' }}</dd>
     {% if box.status != 'Awaiting Inspection' %}
+    {% if box.inspection_no %}<dt>Inspection no.</dt><dd>{{ box.inspection_no }}</dd>{% endif %}
     <dt>Cleaned</dt><dd>{{ 'Yes' if box.cleaned else 'No' }}</dd>
+    {% if box.checklist %}
+    <dt>Inspection checklist</dt><dd>{{ box.checklist.values()|selectattr('result', 'equalto', 'Pass')|list|length }} pass ·
+      {{ failed|length }} fail · {{ box.checklist.values()|selectattr('result', 'equalto', 'N/A')|list|length }} N/A</dd>
+    {% for point, remarks in failed %}<dt>Failed: {{ point }}</dt><dd>{{ remarks }}</dd>{% endfor %}
+    {% else %}
     <dt>Visual / organoleptic</dt><dd>{{ box.visual_inspection or '—' }}</dd>
     <dt>COA / documents</dt><dd>{{ box.coa_check or '—' }}</dd>
     <dt>Sampling / test</dt><dd>{{ box.sampling_test or '—' }}</dd>
+    {% endif %}
+    {% if box.test_parameter or box.test_result %}
+    <dt>Test result</dt><dd>{{ box.test_parameter }}: {{ box.test_result }}{% if box.test_spec %} (spec {{ box.test_spec }}){% endif %}{% if box.test_method %} · {{ box.test_method }}{% endif %}</dd>
+    {% endif %}
+    {% if box.ncr_no %}<dt>Hold / rejection report</dt><dd><a href="{{ url_for('receiving.ncr', ncr_id=box.ncr_id) }}">{{ box.ncr_no }}</a> · {{ box.ncr_status }}</dd>{% endif %}
     {% if box.unusable_reason %}<dt>Why it can't be used</dt><dd>{{ box.unusable_reason }}</dd>{% endif %}
     {% if box.damage_reason %}<dt>Damage</dt><dd>{{ box.damage_reason }}</dd>{% endif %}
     {% if box.nonconformity %}<dt>Nonconformity</dt><dd>{{ box.nonconformity }}</dd>{% endif %}
@@ -103,6 +115,14 @@
     {% endif %}
     <dt>QR code carries</dt><dd class="small" style="font-weight:500">{{ qr_text }}</dd>
   </dl>
+  {% if box.status != 'Awaiting Inspection' %}
+  <div class="flex gap-sm wrap mt">
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.checklist', box_id=box.id) }}">{{ icon('clipboard', 14) }} Inspection checklist</a>
+    {% if can('receiving') %}
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.status_labels', batch_id=box.batch_id, only=box.id) }}">{{ icon('printer', 14) }} Status label</a>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 </div>
 {% endblock %}

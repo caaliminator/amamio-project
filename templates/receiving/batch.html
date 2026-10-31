@@ -9,14 +9,49 @@
     <div class="record-code">{{ batch.ref_no }}</div>
     <h1 class="record-title">{{ batch.supplier_name }}</h1>
     <div class="muted small">
-      Received {{ batch.received_date }} by {{ received_by }}
+      Received {{ batch.received_date }}{% if batch.received_time %} {{ batch.received_time }}{% endif %} by {{ received_by }}
       {% if po and can('purchasing') %} · <a href="{{ url_for('purchasing.detail', po_id=po.id) }}">PO {{ po.po_no }}</a>
       {% elif batch.po_no %} · PO {{ batch.po_no }}{% endif %}
       {% if batch.delivery_ref %} · DR {{ batch.delivery_ref }}{% endif %}
+      {% if batch.delivered_by %}<br>Delivered by {{ batch.delivered_by }}{% if batch.vehicle_plate %} · {{ batch.vehicle_plate }}{% endif %}{% endif %}
     </div>
   </div>
-  <span class="badge {{ badge }}">{{ 'Awaiting inspection' if batch.status == 'Open' else batch.status }}</span>
+  <div class="flex gap-sm wrap" style="align-items:center">
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.mrr', batch_id=batch.id) }}">{{ icon('printer', 14) }} Receiving report (MRR)</a>
+    <span class="badge {{ badge }}">{{ 'Awaiting inspection' if batch.status == 'Open' else batch.status }}</span>
+  </div>
 </div>
+
+{% if batch.status == 'For Closing' %}
+<div class="next-action">
+  <div class="next-action-text">
+    <b>Every box is inspected — close the receipt</b>
+    <span>Print the status labels, store accepted boxes, keep held / rejected ones segregated, then answer the Quick Control Check.</span>
+  </div>
+  <div class="flex gap-sm wrap">
+    <a class="btn btn-ghost" href="{{ url_for('receiving.status_labels', batch_id=batch.id) }}">{{ icon('printer', 16) }} Status labels</a>
+    <a class="btn btn-primary" href="{{ url_for('receiving.close', batch_id=batch.id) }}">Close receipt</a>
+  </div>
+</div>
+{% endif %}
+
+{% if open_ncrs %}
+<div class="card mb">
+  <div class="card-title">Hold / rejection reports still open ({{ open_ncrs|length }})</div>
+  <div class="queue">
+    {% for b in open_ncrs %}
+    <a class="queue-item" href="{{ url_for('receiving.ncr', ncr_id=b.ncr_id) }}">
+      <span class="code" style="min-width:96px">{{ b.ncr_no }}</span>
+      <span class="queue-main">
+        <span class="queue-title">{{ b.material_name }} — {{ b.box_code }}</span>
+        <span class="queue-sub">{{ b.status }}{% if b.nonconformity %} · {{ b.nonconformity }}{% endif %}</span>
+      </span>
+      <span class="badge {{ 'badge-danger' if b.ncr_status == 'Open' else 'badge-warn' }}">{{ b.ncr_status }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
 
 {% if awaiting %}
 <div class="next-action">
@@ -43,11 +78,14 @@
 <div class="flex-between mb-sm">
   <div class="section-label" style="margin:8px 0">Boxes in this delivery</div>
   <div class="flex gap-sm">
-    {% if batch.status == 'Open' %}
+    {% if batch.status in ('Open', 'For Closing') %}
     <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.add_boxes', batch_id=batch.id) }}">{{ icon('plus', 14) }} Add a box</a>
     {% endif %}
     {% if not awaiting and boxes %}
-    <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.labels', batch_id=batch.id) }}">{{ icon('printer', 14) }} Labels</a>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.labels', batch_id=batch.id) }}">{{ icon('printer', 14) }} QR labels</a>
+    {% endif %}
+    {% if boxes|rejectattr('status', 'equalto', 'Awaiting Inspection')|list %}
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.status_labels', batch_id=batch.id) }}">{{ icon('printer', 14) }} Status labels</a>
     {% endif %}
   </div>
 </div>
@@ -81,8 +119,19 @@
 </div></div>
 {% endif %}
 
-{% if batch.remarks %}
-<div class="card mt"><div class="meta-label muted small">Remarks</div><div>{{ batch.remarks }}</div></div>
+{% if batch.remarks or batch.discrepancies %}
+<div class="card mt">
+  <div class="meta-label muted small">Receiving remarks / discrepancies</div>
+  {% if batch.remarks %}<div>{{ batch.remarks }}</div>{% endif %}
+  {% for d in batch.discrepancies or [] %}<div class="small">• {{ d }}</div>{% endfor %}
+</div>
+{% endif %}
+
+{% if batch.status == 'Completed' and batch.closed_at %}
+<div class="card mt">
+  <div class="meta-label muted small">Receipt closed</div>
+  <div class="small">{{ batch.closed_at[:16]|replace('T', ' ') }}{% if batch.checked_by_name %} · verified by {{ batch.checked_by_name }}{% endif %}{% if batch.approved_by_name %} · QA approval {{ batch.approved_by_name }}{% endif %}</div>
+</div>
 {% endif %}
 </div>
 {% endblock %}

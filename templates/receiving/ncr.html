@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}{{ ncr.report_no }}{% endblock %}
+{% block content %}
+<div class="focus">
+<a class="back-link" href="{{ url_for('receiving.ncr_list') }}">{{ icon('arrow-left', 15) }} Hold &amp; Rejection Reports</a>
+
+<div class="record-head">
+  <div>
+    <div class="record-code">{{ ncr.report_no }}</div>
+    <h1 class="record-title">{{ ncr.material_name }}</h1>
+    <div class="muted small">
+      {{ ncr.qty_affected|qty(ncr.unit) }} {{ 'on HOLD' if ncr.raised_as == 'Hold' else 'REJECTED' }} ·
+      <a href="{{ url_for('receiving.box', box_id=ncr.box_id) }}">{{ ncr.box_code }}</a> ·
+      {{ ncr.supplier_name }} · {{ ncr.mrr_no }}{% if ncr.po_no %} · PO {{ ncr.po_no }}{% endif %}
+    </div>
+  </div>
+  <div class="flex gap-sm wrap" style="align-items:center">
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.ncr_print', ncr_id=ncr.id) }}">{{ icon('printer', 14) }} Print report</a>
+    <span class="badge {{ ncr.badge }}">{{ ncr.status }}</span>
+  </div>
+</div>
+
+<div class="track mb">
+  <span class="track-step is-done">Raised</span>
+  <span class="track-step is-{{ 'done' if ncr.contained_at else 'now' }}">Contained</span>
+  <span class="track-step is-{{ 'done' if ncr.disposition else ('now' if ncr.contained_at else '') }}">Dispositioned</span>
+  <span class="track-step is-{{ 'done' if ncr.status == 'Closed' else ('now' if ncr.disposition else '') }}">Closed</span>
+</div>
+
+<div class="card mb">
+  <div class="card-title">A–B. Nonconformity &amp; findings</div>
+  <dl class="review-list">
+    <dt>Type</dt><dd>{{ (ncr.nc_types + ([ 'Other: ' ~ ncr.nc_other ] if ncr.nc_other else []))|join(', ') }}</dd>
+    <dt>Findings</dt><dd>{{ ncr.findings or '—' }}</dd>
+    <dt>Lot / batch</dt><dd>{{ ncr.lot_no or '—' }}</dd>
+    <dt>Reported by</dt><dd>{{ ncr.reported_by_name }}{% if ncr.department %} · {{ ncr.department }}{% endif %} · {{ ncr.created }}</dd>
+  </dl>
+</div>
+
+{# C. Containment — by the receiving area #}
+{% if ncr.contained_at %}
+<div class="card mb">
+  <div class="card-title">C. Immediate containment</div>
+  <dl class="review-list">
+    <dt>Done</dt><dd>{{ ncr.containment|join(' · ') }}</dd>
+    <dt>Hold / quarantine location</dt><dd>{{ ncr.hold_location }}</dd>
+    <dt>Quantity segregated</dt><dd>{{ ncr.qty_segregated|qty(ncr.unit) }}</dd>
+    <dt>Tag no.</dt><dd>{{ ncr.tag_no or '—' }}</dd>
+    <dt>Recorded by</dt><dd>{{ ncr.contained_by_name }} · {{ ncr.contained }}</dd>
+  </dl>
+</div>
+{% elif ncr.status != 'Closed' %}
+<form method="post" action="{{ url_for('receiving.ncr_contain', ncr_id=ncr.id) }}" class="card mb">
+  <div class="card-title">C. Immediate containment</div>
+  <p class="small muted">Stop normal receiving for this material: tag it, move it to the HOLD / quarantine area and block it from production.</p>
+  {% for c in containment %}
+  <label class="check-row"><input type="checkbox" name="containment" value="{{ c }}"> {{ c }}{% if loop.index <= 3 %} <span class="req">*</span>{% endif %}</label>
+  {% endfor %}
+  <div class="form-grid cols-2 mt-sm">
+    <div class="form-row">
+      <label class="form-label" for="hold_location">Hold / quarantine location <span class="req">*</span></label>
+      <input type="text" id="hold_location" name="hold_location" maxlength="80" required placeholder="e.g. Quarantine rack Q-1">
+    </div>
+    <div class="form-row">
+      <label class="form-label" for="tag_no">Tag no.</label>
+      <input type="text" id="tag_no" name="tag_no" maxlength="40" value="{{ ncr.box_code }}">
+    </div>
+    <div class="form-row">
+      <label class="form-label" for="qty_segregated">Quantity physically segregated</label>
+      <div class="big-field">
+        <input type="number" id="qty_segregated" name="qty_segregated" step="0.001" min="0" inputmode="decimal" value="{{ '%g'|format(ncr.qty_affected|float) }}">
+        <span class="unit">{{ ncr.unit }}</span>
+      </div>
+    </div>
+  </div>
+  <button class="btn btn-primary" type="submit">Save containment</button>
+</form>
+{% endif %}
+
+{# D. Disposition — QA / authorized approver #}
+{% if ncr.disposition %}
+<div class="card mb">
+  <div class="card-title">D. Disposition</div>
+  <dl class="review-list">
+    <dt>Decision</dt><dd><b>{{ ncr.disposition_label }}</b>{% if ncr.accepted_qty %} — {{ ncr.accepted_qty|qty(ncr.unit) }} released to stock{% endif %}</dd>
+    {% if ncr.disposition_details %}<dt>Details / reference</dt><dd>{{ ncr.disposition_details }}</dd>{% endif %}
+    {% if ncr.justification %}<dt>Technical justification</dt><dd>{{ ncr.justification }}</dd>{% endif %}
+    {% if ncr.supplier_response %}<dt>Supplier corrective action</dt><dd>{{ ncr.supplier_response }}</dd>{% endif %}
+    <dt>QA / authorized approval</dt><dd>{{ ncr.qa_approved_by_name }} · recorded by {{ ncr.disposed_by_name }} · {{ ncr.disposed }}</dd>
+  </dl>
+</div>
+{% elif ncr.contained_at %}
+  {% if can_decide %}
+  <form method="post" action="{{ url_for('receiving.ncr_dispose', ncr_id=ncr.id) }}" class="card mb" id="disposeForm">
+    <div class="card-title">D. Disposition <span class="muted">— QA / authorized approver</span></div>
+    {% for key, label, releases in dispositions if not releases or box_status != 'Rejected' %}
+    <label class="check-row"><input type="radio" name="disposition" value="{{ key }}" required data-releases="{{ 1 if releases else 0 }}" data-justify="{{ 1 if key in needs_justification else 0 }}"> {{ label }}
+      {% if releases %}<span class="muted small">— usable part joins stock</span>{% endif %}
+      {% if key == 'rework' %}<span class="muted small">(QA approval required)</span>{% endif %}</label>
+    {% endfor %}
+    <div class="form-row mt-sm" id="acceptedRow" style="display:none">
+      <label class="form-label" for="accepted_qty">Quantity accepted</label>
+      <div class="big-field">
+        <input type="number" id="accepted_qty" name="accepted_qty" step="0.001" min="0" inputmode="decimal" value="{{ '%g'|format((good_qty or 0)|float) }}">
+        <span class="unit">{{ ncr.unit }}</span>
+      </div>
+      <div class="form-hint">After sorting, enter what passed. The rest is written off as can't be used.</div>
+    </div>
+    <div class="form-row" id="justifyRow" style="display:none">
+      <label class="form-label" for="justification">Technical justification <span class="req">*</span></label>
+      <textarea id="justification" name="justification" rows="2" placeholder="Why this is acceptable, and the conditions"></textarea>
+    </div>
+    <div class="form-row">
+      <label class="form-label" for="disposition_details">Disposition details / reference</label>
+      <input type="text" id="disposition_details" name="disposition_details" maxlength="200" placeholder="e.g. RTS slip no., credit memo no., COA received">
+    </div>
+    <div class="form-row">
+      <label class="form-label" for="supplier_response">Supplier corrective action / response</label>
+      <input type="text" id="supplier_response" name="supplier_response" maxlength="300">
+    </div>
+    <div class="form-row">
+      <label class="form-label" for="qa_approved_by_name">QA / authorized approval <span class="req">*</span></label>
+      <input type="text" id="qa_approved_by_name" name="qa_approved_by_name" maxlength="80" required value="{{ me_name }}">
+    </div>
+    <button class="btn btn-primary" type="submit">Save disposition</button>
+  </form>
+  <script>
+  (function () {
+    var form = document.getElementById("disposeForm");
+    function sync() {
+      var picked = form.querySelector("[name=disposition]:checked");
+      var rework = picked && picked.value === "rework";
+      var justify = picked && picked.getAttribute("data-justify") === "1";
+      document.getElementById("acceptedRow").style.display = rework ? "" : "none";
+      document.getElementById("justifyRow").style.display = justify ? "" : "none";
+      document.getElementById("justification").required = !!justify;
+    }
+    form.addEventListener("change", sync);
+    sync();
+  })();
+  </script>
+  {% else %}
+  <div class="card mb"><div class="card-title">D. Disposition</div>
+    <p class="small muted" style="margin:0">Waiting for QA / an authorized approver to decide: release, return, replace, credit / refund, rework / sort, conditional acceptance or dispose.</p></div>
+  {% endif %}
+{% endif %}
+
+{# E. Closure #}
+{% if ncr.status == 'Closed' %}
+<div class="card mb">
+  <div class="card-title">E. Closure</div>
+  <dl class="review-list">
+    <dt>Closure verified by</dt><dd>{{ ncr.closure_verified_by_name }}</dd>
+    <dt>Date closed</dt><dd>{{ ncr.closed }} · {{ ncr.closed_by_name }}</dd>
+  </dl>
+</div>
+{% elif ncr.disposition %}
+<form method="post" action="{{ url_for('receiving.ncr_close', ncr_id=ncr.id) }}" class="card mb">
+  <div class="card-title">E. Closure</div>
+  <p class="small muted">Close the report once the disposition is carried out (returned, replaced, disposed…).</p>
+  {% if not ncr.supplier_response %}
+  <div class="form-row">
+    <label class="form-label" for="supplier_response_close">Supplier corrective action / response</label>
+    <input type="text" id="supplier_response_close" name="supplier_response" maxlength="300">
+  </div>
+  {% endif %}
+  <div class="form-row">
+    <label class="form-label" for="closure_verified_by_name">Closure verified by <span class="req">*</span></label>
+    <input type="text" id="closure_verified_by_name" name="closure_verified_by_name" maxlength="80" required value="{{ me_name }}">
+  </div>
+  <button class="btn btn-primary" type="submit">Close report</button>
+</form>
+{% endif %}
+
+<p class="small muted">Materials on HOLD or REJECTED must stay identified and physically segregated. They must not be issued to production unless formally released by authorized QA personnel.</p>
+</div>
+{% endblock %}

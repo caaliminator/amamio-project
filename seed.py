@@ -158,6 +158,9 @@ def _seed_suppliers():
                      "email": "", "address": "", "materials_supplied": items,
                      "buy_from": "" if is_phone else contact,
                      "lead_time_days": None, "notes": "", "created_at": now})
+    # The demo directory starts on the Approved Supplier List (SOP section 6).
+    for row in rows:
+        row.update({"approved": True, "approved_by": None, "approved_at": now})
     for row in db.insert_many("suppliers", rows):
         suppliers[row["name"]] = row
     return suppliers

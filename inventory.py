@@ -11,10 +11,14 @@ inventory_bp = Blueprint("inventory", __name__)
 @inventory_bp.route("/")
 @module_required("inventory")
 def index():
+    # HOLD and not-yet-inspected quantities are shown apart from stock: they
+    # are not available for production (SOP AFP-WH-SOP-001, 5.8).
+    unavailable = services.unavailable_stock()
     materials = []
     for m in db.read("raw_materials"):
         row = dict(m)
         row["low"] = services.is_low(m)
+        row.update(unavailable.get(m["id"], {"hold": 0.0, "awaiting": 0.0}))
         materials.append(row)
     return render_template("inventory/index.html", materials=materials,
                            products=db.read("products"))

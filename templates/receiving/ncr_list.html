@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Hold &amp; Rejection Reports{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Hold &amp; Rejection Reports</h1>
+    <p class="page-sub">Nonconforming material (AFP-WH-FRM-003) — every box put on HOLD or REJECTED, from containment to QA disposition and closure.</p>
+  </div>
+</div>
+
+<div class="toolbar">
+  <div class="seg">
+    <a href="{{ url_for('receiving.ncr_list', show='open') }}" class="{{ 'is-active' if show == 'open' }}">Open</a>
+    <a href="{{ url_for('receiving.ncr_list', show='all') }}" class="{{ 'is-active' if show != 'open' }}">All reports</a>
+  </div>
+</div>
+
+{% if rows %}
+<div class="queue">
+  {% for r in rows %}
+  <a class="queue-item" href="{{ url_for('receiving.ncr', ncr_id=r.id) }}">
+    <span class="code" style="min-width:110px">{{ r.report_no }}</span>
+    <span class="queue-main">
+      <span class="queue-title">{{ r.material_name }} — {{ r.qty_affected|qty(r.unit) }} {{ 'on hold' if r.raised_as == 'Hold' else 'rejected' }}</span>
+      <span class="queue-sub">{{ r.supplier_name }} · {{ r.mrr_no }} · {{ r.box_code }} · {{ r.created }}
+        {% if r.disposition_label %} · {{ r.disposition_label }}{% elif not r.contained_at %} · containment not recorded{% endif %}</span>
+    </span>
+    <span class="badge {{ r.badge }}">{{ r.status }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card"><div class="empty">
+  <div class="empty-icon">{{ icon('shield', 30) }}</div>
+  <div class="empty-title">{{ 'No open reports' if show == 'open' else 'No reports yet' }}</div>
+  <p class="muted">A report opens by itself when an inspected box is put on Hold or Rejected.</p>
+</div></div>
+{% endif %}
+{% endblock %}

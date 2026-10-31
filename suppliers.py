@@ -2,14 +2,16 @@
 Contact#) filed under Raw / Production / Packing / Office.
 
 One supplier per page, added or edited in a short wizard, and a printable
-copy of the whole directory grouped by category.
+copy of the whole directory grouped by category.  An Admin puts a supplier
+on the Approved Supplier List (SOP AFP-WH-SOP-001 section 6); only approved
+suppliers can be ordered from and received from.
 """
 from flask import (Blueprint, abort, flash, g, redirect, render_template,
                    request, url_for)
 
 import db
 import services
-from security import module_required
+from security import current_user, module_required, role_required
 
 suppliers_bp = Blueprint("suppliers", __name__)
 
@@ -165,7 +167,23 @@ def detail(supplier_id):
     return render_template("suppliers/detail.html", s=_view(s),
                            materials=materials, deliveries=deliveries[:5],
                            delivery_count=len(deliveries),
-                           hints=CATEGORY_HINTS)
+                           hints=CATEGORY_HINTS,
+                           approved_by=services.user_name(s.get("approved_by"))
+                           if s.get("approved_by") else "")
+
+
+@suppliers_bp.route("/<int:supplier_id>/approval", methods=["POST"])
+@role_required("admin")
+def approval(supplier_id):
+    """Add the supplier to, or remove it from, the Approved Supplier List."""
+    approve = request.form.get("approved") == "1"
+    s, err = services.set_supplier_approval(supplier_id, approve,
+                                            current_user()["id"])
+    if err:
+        abort(404)
+    flash("%s is %s the Approved Supplier List." % (
+        s["name"], "now on" if approve else "no longer on"), "success")
+    return redirect(url_for("suppliers.detail", supplier_id=supplier_id))
 
 
 @suppliers_bp.route("/<int:supplier_id>/edit", methods=["GET", "POST"])

@@ -46,6 +46,7 @@
       <span class="queue-sub">{% if cat == 'All' %}<span class="sup-tag">{{ s.category }}</span>{% endif %}{{ s.materials_supplied or 'No items listed yet' }}{% if s.tin %} · TIN {{ s.tin }}{% endif %}</span>
     </span>
     {% if s.contact_line %}<span class="sup-contact">{{ s.contact_line }}</span>{% endif %}
+    {% if not s.approved %}<span class="badge badge-danger">Not approved</span>{% endif %}
   </a>
   {% endfor %}
 </div>

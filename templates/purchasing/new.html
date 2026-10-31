@@ -18,12 +18,13 @@
         <select id="supplier_id" name="supplier_id" required>
           <option value="">— Choose from the Supplier Directory —</option>
           {% for s in suppliers %}
-          <option value="{{ s.id }}" {{ 'selected' if chosen|string == s.id|string }}
+          <option value="{{ s.id }}" {{ 'selected' if chosen|string == s.id|string and s.approved }}
+                  {{ 'disabled' if not s.approved }}
                   data-name="{{ s.name }}" data-address="{{ s.address }}" data-contact="{{ s.contact }}"
-                  data-tin="{{ s.tin }}" data-person="{{ s.contact_person }}">{{ s.name }}</option>
+                  data-tin="{{ s.tin }}" data-person="{{ s.contact_person }}">{{ s.name }}{{ '' if s.approved else ' (not approved)' }}</option>
           {% endfor %}
         </select>
-        <p class="muted small">Not listed? Add it to the <a href="{{ url_for('suppliers.index') }}">Supplier Directory</a> first, so its ledger can track the payments.</p>
+        <p class="muted small">Only suppliers on the Approved Supplier List can be ordered from. Not listed? Add it to the <a href="{{ url_for('suppliers.index') }}">Supplier Directory</a> and approve it first, so its ledger can track the payments.</p>
       </div>
       <div class="form-grid cols-2">
         <div class="form-row">

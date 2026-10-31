@@ -49,6 +49,24 @@ def stock(name, kind="material"):
     return services.current_stock(kind, item["id"]), item
 
 
+def checklist(**fails):
+    """Inspection checklist form fields: every point Pass, except those
+    given as point=remark, which Fail with that remark."""
+    data = {}
+    for key, _, _ in services.INSPECTION_POINTS:
+        data["chk_" + key] = "Fail" if key in fails else "Pass"
+        data["chk_%s_remarks" % key] = fails.get(key, "")
+    return data
+
+
+def inspect(c, box_id, **fields):
+    """Post an inspection with a full checklist (fields override)."""
+    data = checklist()
+    data.update(fields)
+    return c.post("/receiving/box/%d/inspect" % box_id, data=data,
+                  follow_redirects=True)
+
+
 ACCOUNTS = [("superadmin", "super123"), ("admin", "admin123"),
             ("receiving", "recv123"), ("production", "prod123"),
             ("packing", "pack123"), ("packer1", "member123"),
@@ -159,6 +177,9 @@ with application.test_client() as c:
     unread_before = len([n for n in db.read("notifications") if not n["is_read"]])
     r = c.post("/receiving/new", data={
         "supplier_id": "", "received_date": services.today_iso(),
+        "received_time": "08:30", "delivered_by": "Juan D.",
+        "vehicle_plate": "ABC 1234",
+        "docs_checked": ["Delivery Receipt"], "docs_other": "Packing list",
         "po_no": "PO-T1", "delivery_ref": "DR-T1",
         "material_id": [ginger["id"], lemon["id"]],
         "qty_per_box": ["10", "100"], "boxes": ["2", "1"],
@@ -184,18 +205,40 @@ with application.test_client() as c:
     check(data.get("kind") == "box", "scanning the full label text finds the box")
     check(c.get("/receiving/%d/labels" % batch["id"]).status_code == 200,
           "labels page renders")
+    check(batch["ref_no"].startswith("MRR-") and batch["received_time"] == "08:30"
+          and batch["delivered_by"] == "Juan D."
+          and batch["vehicle_plate"] == "ABC 1234"
+          and batch["docs_checked"] == ["Delivery Receipt"]
+          and batch["docs_other"] == "Packing list",
+          "the delivery keeps the MRR header (time, delivered by, plate, documents)")
+    page = c.get("/receiving/%d/mrr" % batch["id"]).data.decode("utf-8")
+    check("AFP-WH-FRM-001" in page and "ABC 1234" in page and "Juan D." in page,
+          "the Material Receiving Report prints")
+    check(b"Inspection checklist" not in c.get("/receiving/box/%d" % boxes[0]["id"]).data,
+          "a box not yet inspected has no checklist to print")
+    inv = c.get("/inventory/").data.decode("utf-8")
+    check("Awaiting inspection" in inv and "On hold" in inv,
+          "stock on hand shows quantities awaiting inspection / on hold apart")
 
 # 5) Module 1, part 2 — inspection & cleaning: usable / can't use / damaged
 with application.test_client() as c:
     login(c, "production", "prod123")
     damage_before = len(db.read("damage_records"))
-    r = c.post("/receiving/box/%d/inspect" % boxes[0]["id"], data={
-        "cleaned": "1", "usable_qty": "8.5", "unusable_qty": "1",
-        "damaged_qty": "0.5", "unusable_reason": "Undersized",
-        "damage_reason": "Bruised", "visual_inspection": "Pass",
-        "coa_check": "Not required", "sampling_test": "Not required",
-        "acceptance": "Accepted", "verified_by_name": "QA"},
-        follow_redirects=True)
+    # The checklist must be complete.
+    c.post("/receiving/box/%d/inspect" % boxes[0]["id"], data={
+        "cleaned": "1", "usable_qty": "10", "acceptance": "Accepted"})
+    check(db.get("receiving_boxes", boxes[0]["id"])["status"]
+          == "Awaiting Inspection", "an inspection without the checklist is refused")
+    # A failed point can't be accepted.
+    inspect(c, boxes[0]["id"], cleaned="1", usable_qty="10",
+            acceptance="Accepted", **checklist(pest="Weevils seen"))
+    check(db.get("receiving_boxes", boxes[0]["id"])["status"]
+          == "Awaiting Inspection", "a box that fails a checklist point can't be accepted")
+    inspect(c, boxes[0]["id"], cleaned="1", usable_qty="8.5", unusable_qty="1",
+            damaged_qty="0.5", unusable_reason="Undersized",
+            damage_reason="Bruised", acceptance="Accepted",
+            verified_by_name="QA", test_parameter="Moisture",
+            test_spec="<= 12%", test_result="10.5%", test_method="Moisture meter")
     after = services.current_stock("material", ginger["id"])
     check(abs(after - ginger_before - 8.5) < 0.001,
           "only the usable quantity joined stock")
@@ -204,28 +247,193 @@ with application.test_client() as c:
     box = db.get("receiving_boxes", boxes[0]["id"])
     check(box["status"] == "Accepted" and box["stage"] == "Storage Area",
           "accepted box moved to the Storage Area")
+    check(box["inspection_no"].startswith("INS-") and len(box["checklist"]) == 11
+          and box["test_result"] == "10.5%" and box["visual_inspection"] == "Pass",
+          "the inspection keeps its number, the 11 checklist points and the test result")
+    page = c.get("/receiving/box/%d/checklist" % box["id"]).data.decode("utf-8")
+    check("AFP-WH-FRM-002" in page and "Moisture meter" in page,
+          "the Incoming Material Inspection Checklist prints")
+    check(db.get("receiving_batches", batch["id"])["inventory_updated_by"],
+          "the MRR records who updated the inventory")
     # A missing reason is refused.
-    c.post("/receiving/box/%d/inspect" % boxes[1]["id"], data={
-        "cleaned": "1", "usable_qty": "9", "damaged_qty": "1",
-        "visual_inspection": "Pass", "coa_check": "Complete",
-        "sampling_test": "Passed", "acceptance": "Accepted"})
+    inspect(c, boxes[1]["id"], cleaned="1", usable_qty="9", damaged_qty="1",
+            acceptance="Accepted")
     check(db.get("receiving_boxes", boxes[1]["id"])["status"]
           == "Awaiting Inspection", "damage without a reason is refused")
-    # Hold: nothing moves until the decision.
-    c.post("/receiving/box/%d/inspect" % boxes[1]["id"], data={
-        "cleaned": "1", "usable_qty": "10", "visual_inspection": "Pass",
-        "coa_check": "Incomplete", "sampling_test": "Pending result",
-        "acceptance": "Hold", "nonconformity": "Waiting for COA"})
+    # Hold without saying what kind of nonconformity is refused.
+    inspect(c, boxes[1]["id"], cleaned="1", usable_qty="10", acceptance="Hold",
+            nonconformity="Waiting for COA",
+            **checklist(coa="COA not included"))
+    check(db.get("receiving_boxes", boxes[1]["id"])["status"]
+          == "Awaiting Inspection", "hold without the type of nonconformity is refused")
+    # Hold: nothing moves until the QA disposition on the hold report.
+    unread_before = len([n for n in db.read("notifications") if not n["is_read"]])
+    data = checklist(coa="COA not included")
+    data.update({"cleaned": "1", "usable_qty": "10", "acceptance": "Hold",
+                 "nonconformity": "Waiting for COA",
+                 "nc_types": ["Missing / invalid documents"]})
+    c.post("/receiving/box/%d/inspect" % boxes[1]["id"], data=data)
     held = services.current_stock("material", ginger["id"])
     check(db.get("receiving_boxes", boxes[1]["id"])["status"] == "On Hold"
           and abs(held - after) < 0.001, "a box on hold adds no stock")
-    c.post("/receiving/box/%d/hold" % boxes[1]["id"],
-           data={"decision": "Accepted", "note": "COA received"})
-    check(abs(services.current_stock("material", ginger["id"]) - held - 10)
-          < 0.001, "accepting the held box adds its usable quantity")
+    ncr = db.query("nonconformance_reports", box_id=boxes[1]["id"])
+    check(len(ncr) == 1 and ncr[0]["report_no"].startswith("NCR-")
+          and ncr[0]["nc_types"] == ["Missing / invalid documents"]
+          and abs(ncr[0]["qty_affected"] - 10) < 1e-6
+          and "COA not included" in ncr[0]["findings"],
+          "a box on hold opens its hold / rejection report")
+    ncr = ncr[0]
+    check(len([n for n in db.read("notifications") if not n["is_read"]]) > unread_before,
+          "QA and Purchasing are notified of the hold")
+    check(services.unavailable_stock()[ginger["id"]]["hold"] == 10,
+          "the held quantity is counted apart from stock")
+    # Disposition needs the containment first.
+    c.post("/receiving/ncr/%d/dispose" % ncr["id"],
+           data={"disposition": "release", "qa_approved_by_name": "QA"})
+    check(db.get("nonconformance_reports", ncr["id"])["status"] == "Open",
+          "no disposition before the material is contained")
+    c.post("/receiving/ncr/%d/contain" % ncr["id"],
+           data={"containment": ["Tagged HOLD / REJECT"], "hold_location": "Q-1"})
+    check(not db.get("nonconformance_reports", ncr["id"])["contained_at"],
+          "containment must tag, segregate and block the material")
+    c.post("/receiving/ncr/%d/contain" % ncr["id"], data={
+        "containment": ["Tagged HOLD / REJECT", "Segregated in designated area",
+                        "Production use blocked", "Supplier notified"],
+        "hold_location": "Quarantine rack Q-1"})
+    check(db.get("nonconformance_reports", ncr["id"])["hold_location"]
+          == "Quarantine rack Q-1", "containment recorded")
+    c.post("/receiving/ncr/%d/dispose" % ncr["id"],
+           data={"disposition": "conditional", "qa_approved_by_name": "QA"})
+    check(db.get("nonconformance_reports", ncr["id"])["status"] == "Open",
+          "conditional acceptance without a justification is refused")
+    c.post("/receiving/ncr/%d/dispose" % ncr["id"], data={
+        "disposition": "rework", "accepted_qty": "9",
+        "justification": "Sorted out the soft roots",
+        "disposition_details": "COA received by e-mail",
+        "qa_approved_by_name": "QA Officer"})
+    check(abs(services.current_stock("material", ginger["id"]) - held - 9)
+          < 0.001, "rework / sort releases only what passed")
+    box = db.get("receiving_boxes", boxes[1]["id"])
+    check(box["status"] == "Accepted" and abs(box["unusable_qty"] - 1) < 1e-6,
+          "the rest of the held box is written off as sorted out")
+    c.post("/receiving/ncr/%d/close" % ncr["id"],
+           data={"closure_verified_by_name": "Warehouse"})
+    check(db.get("nonconformance_reports", ncr["id"])["status"] == "Closed",
+          "the hold report is closed")
+    page = c.get("/receiving/ncr/%d/print" % ncr["id"]).data.decode("utf-8")
+    check("AFP-WH-FRM-003" in page and "Quarantine rack Q-1" in page,
+          "the Hold / Rejection Report prints")
+    # Rejected: its report can't release the box.
+    inspect(c, boxes[2]["id"], cleaned="1", usable_qty="0", damaged_qty="100",
+            damage_reason="Crushed", acceptance="Rejected",
+            nonconformity="Crushed in transit", nc_types="Damaged packaging",
+            **checklist(packaging="Carton crushed"))
+    ncr2 = db.query("nonconformance_reports", box_id=boxes[2]["id"])[0]
+    c.post("/receiving/ncr/%d/contain" % ncr2["id"], data={
+        "containment": services.NC_CONTAINMENT[:3], "hold_location": "Reject bay"})
+    c.post("/receiving/ncr/%d/dispose" % ncr2["id"],
+           data={"disposition": "release", "qa_approved_by_name": "QA"})
+    check(db.get("nonconformance_reports", ncr2["id"])["status"] == "Open",
+          "a rejected box can't be released")
+    c.post("/receiving/ncr/%d/dispose" % ncr2["id"],
+           data={"disposition": "return", "qa_approved_by_name": "QA"})
+    check(db.get("nonconformance_reports", ncr2["id"])["disposition"] == "return"
+          and db.get("receiving_boxes", boxes[2]["id"])["status"] == "Rejected",
+          "a rejected box is returned to the supplier")
     r = c.get("/receiving/report?from=2000-01-01")
     check(r.status_code == 200 and b"RECEIVING AND INSPECTION" in r.data.upper(),
           "receiving & inspection report renders")
+
+# 5b) closing the receipt — the SOP's Quick Control Check
+with application.test_client() as c:
+    login(c, "receiving", "recv123")
+    check(db.get("receiving_batches", batch["id"])["status"] == "For Closing",
+          "a delivery with every box inspected waits to be closed")
+    page = c.get("/receiving/%d/status-labels" % batch["id"]).data.decode("utf-8")
+    check("ACCEPTED" in page and "REJECTED" in page,
+          "status labels print ACCEPTED / REJECTED")
+    checks = {"check_" + k: "Yes" for k, _ in services.CONTROL_CHECKS}
+    c.post("/receiving/%d/close" % batch["id"],
+           data=dict(checks, check_status_label="No", verified_by_name="Ana"))
+    check(db.get("receiving_batches", batch["id"])["status"] == "For Closing",
+          "a No on the control check keeps the receipt open")
+    c.post("/receiving/%d/close" % batch["id"], data=dict(checks))
+    check(db.get("receiving_batches", batch["id"])["status"] == "For Closing",
+          "closing needs who verified the receipt")
+    c.post("/receiving/%d/close" % batch["id"],
+           data=dict(checks, check_lot_dates="N/A", verified_by_name="Ana"))
+    closed = db.get("receiving_batches", batch["id"])
+    check(closed["status"] == "Completed" and closed["checked_by_name"] == "Ana"
+          and closed["control_check"]["lot_dates"] == "N/A",
+          "the receipt closes after the Quick Control Check")
+    for path in ("/receiving/ncr", "/receiving/ncr?show=all",
+                 "/receiving/%d" % batch["id"], "/receiving/box/%d" % boxes[1]["id"],
+                 "/dashboard"):
+        check(c.get(path).status_code == 200, "%s renders" % path)
+
+# 5c) the Approved Supplier List (SOP section 6)
+unapproved = db.insert("suppliers", {"name": "Not Yet Approved Farm",
+                                     "category": "Raw", "approved": False})
+_, ginger = stock("Ginger")
+with application.test_client() as c:
+    login(c, "receiving", "recv123")
+    before = len(db.read("receiving_batches"))
+    c.post("/receiving/new", data={
+        "supplier_id": str(unapproved["id"]), "received_date": services.today_iso(),
+        "material_id": [ginger["id"]], "qty_per_box": ["5"], "boxes": ["1"]})
+    check(len(db.read("receiving_batches")) == before,
+          "a delivery from a supplier not on the approved list is refused")
+    check(c.post("/suppliers/%d/approval" % unapproved["id"],
+                 data={"approved": "1"}).status_code == 403,
+          "only an Admin approves a supplier")
+with application.test_client() as c:
+    login(c, "admin", "admin123")
+    c.post("/suppliers/%d/approval" % unapproved["id"], data={"approved": "1"})
+    check(services.supplier_approved(db.get("suppliers", unapproved["id"])),
+          "an Admin puts the supplier on the approved list")
+    check(b"Approved supplier" in c.get("/suppliers/%d" % unapproved["id"]).data,
+          "the supplier page shows it is approved")
+with application.test_client() as c:
+    login(c, "receiving", "recv123")
+    c.post("/receiving/new", data={
+        "supplier_id": str(unapproved["id"]), "received_date": services.today_iso(),
+        "material_id": [ginger["id"]], "qty_per_box": ["5"], "boxes": ["1"]})
+    check(len(db.read("receiving_batches")) == before + 1,
+          "once approved, its deliveries are received")
+
+# 5d) every box on hold or rejected has its report — even older ones
+legacy = db.query("receiving_boxes", batch_id=batch["id"])[2]
+db.write("nonconformance_reports", [r for r in db.read("nonconformance_reports")
+                                    if r.get("box_id") != legacy["id"]])
+check(services.backfill_ncrs() >= 1
+      and len(db.query("nonconformance_reports", box_id=legacy["id"])) == 1,
+      "a held / rejected box without a report gets one")
+check(services.backfill_ncrs() == 0, "the backfill never makes a second report")
+
+# 5e) FEFO / FIFO: the box that expires first leaves storage first
+qa = db.query("users", username="production")[0]["id"]
+fefo_batch, fefo_boxes, _ = services.receive_delivery(
+    qa, None, services.today_iso(), [
+        {"material_id": ginger["id"], "qty_per_box": 5, "boxes": 1,
+         "expiry_date": "2099-12-20"},
+        {"material_id": ginger["id"], "qty_per_box": 5, "boxes": 1,
+         "expiry_date": "2099-12-05"}])
+for b in fefo_boxes:
+    services.inspect_receiving_box(b["id"], qa, 5, acceptance="Accepted")
+later, sooner = fefo_boxes
+with application.test_client() as c:
+    login(c, "production", "prod123")
+    c.post("/receiving/box/%d/move" % later["id"], data={"stage": "Production Area"})
+    check(db.get("receiving_boxes", later["id"])["stage"] == "Storage Area",
+          "a box can't go to production while one expiring earlier is in storage")
+    check(b"Use %s first" % sooner["box_code"].encode()
+          in c.get("/receiving/box/%d" % later["id"]).data,
+          "the box page says which box to use first")
+    c.post("/receiving/box/%d/move" % sooner["id"], data={"stage": "Production Area"})
+    c.post("/receiving/box/%d/move" % later["id"], data={"stage": "Production Area"})
+    check(db.get("receiving_boxes", sooner["id"])["stage"] == "Production Area"
+          and db.get("receiving_boxes", later["id"])["stage"] == "Production Area",
+          "after the earlier box, the later one can go")
 
 # 6) Module 2 — honey: PASS to selling, FAILED to other products
 with application.test_client() as c:
@@ -715,11 +923,14 @@ with application.test_client() as c:
           and all(b.get("po_id") == po["id"] for b in boxes)
           and batch["supplier_name"] == po["supplier_name"],
           "the delivery and its boxes are tied to the PO lines")
+    check(any("PO line %d" % second["line_no"] in d and "short by" in d
+              for d in batch.get("discrepancies") or []),
+          "a short delivery against the PO is noted on the MRR")
 with application.test_client() as c:
     login(c, "production", "prod123")
     before = services.current_stock("material", first["material_id"])
     for b in boxes:
-        c.post("/receiving/box/%d/inspect" % b["id"], data={
+        inspect(c, b["id"], **{
             "usable_qty": str(b["declared_qty"]), "unusable_qty": "0",
             "damaged_qty": "0", "acceptance": "Accepted", "cleaned": "1"})
     check(services.current_stock("material", first["material_id"])
@@ -789,7 +1000,7 @@ with application.test_client() as c:
 with application.test_client() as c:
     login(c, "production", "prod123")
     for b in db.query("receiving_boxes", batch_id=batch["id"]):
-        c.post("/receiving/box/%d/inspect" % b["id"], data={
+        inspect(c, b["id"], **{
             "usable_qty": str(b["declared_qty"]), "unusable_qty": "0",
             "damaged_qty": "0", "acceptance": "Accepted", "cleaned": "1"})
     check(db.get("purchase_orders", demo_po["id"])["status"] == "Delivered"
@@ -842,7 +1053,8 @@ for table in ("receiving_boxes", "packing_items", "honey_allocations",
               "assets", "asset_movements", "stock_movements",
               "month_end_count_lines", "batch_dispensing", "batch_steps",
               "retention_samples", "sanitation_areas", "pest_control_areas",
-              "purchase_orders", "purchase_order_items"):
+              "purchase_orders", "purchase_order_items",
+              "nonconformance_reports"):
     check("CREATE TABLE `%s`" % table in schema,
           "MySQL schema has %s" % table)
 check("INSERT INTO `users`" in data_sql, "MySQL data dump includes rows")

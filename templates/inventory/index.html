@@ -4,7 +4,7 @@
 <div class="flex gap mb" style="justify-content: space-between; flex-wrap: wrap;">
   <div>
     <h1 class="page-title">Inventory</h1>
-    <p class="muted">Current stock on hand. Read-only.</p>
+    <p class="muted">Current stock on hand. Read-only. Quantities on hold or awaiting inspection are not part of the stock and can't go to production.</p>
   </div>
   <a class="btn btn-ghost btn-sm" href="{{ url_for('inventory.transactions') }}">View transaction ledger</a>
 </div>
@@ -20,6 +20,8 @@
           <th>Category</th>
           <th>Unit</th>
           <th class="text-right">Stock</th>
+          <th class="text-right" title="On HOLD / quarantine — not available for production">On hold</th>
+          <th class="text-right" title="Received, not inspected yet — not available for production">Awaiting inspection</th>
           <th class="text-right">Reorder level</th>
           <th>Status</th>
         </tr>
@@ -31,6 +33,8 @@
           <td><span class="badge badge-muted">{{ m.category }}</span></td>
           <td>{{ m.unit }}</td>
           <td class="text-right">{{ m.stock_qty }}</td>
+          <td class="text-right">{{ m.hold|qty if m.hold else '—' }}</td>
+          <td class="text-right">{{ m.awaiting|qty if m.awaiting else '—' }}</td>
           <td class="text-right">{{ m.reorder_level }}</td>
           <td>
             {% if m.low %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Close {{ batch.ref_no }}{% endblock %}
+{% block content %}
+<div class="focus">
+<a class="back-link" href="{{ url_for('receiving.batch', batch_id=batch.id) }}">{{ icon('arrow-left', 15) }} {{ batch.ref_no }}</a>
+
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Close the receipt</h1>
+    <p class="page-sub">{{ batch.ref_no }} · {{ batch.supplier_name }} · Quick Control Check (SOP AFP-WH-SOP-001)</p>
+  </div>
+</div>
+
+{% if batch.status == 'Completed' %}
+<div class="card"><div class="empty">
+  <div class="empty-title">This receipt is already closed</div>
+  <a class="btn btn-primary mt" href="{{ url_for('receiving.batch', batch_id=batch.id) }}">Back to the delivery</a>
+</div></div>
+{% elif awaiting %}
+<div class="card"><div class="empty">
+  <div class="empty-title">{{ awaiting|length }} box(es) still need inspection</div>
+  <p class="muted">A receipt can be closed once every box has been inspected.</p>
+  <a class="btn btn-primary mt" href="{{ url_for('receiving.batch', batch_id=batch.id) }}">Back to the delivery</a>
+</div></div>
+{% else %}
+{% if held %}
+<div class="card mb" style="border-left:3px solid var(--warn, #d4a017)">
+  <div class="card-title">{{ held|length }} box(es) on HOLD</div>
+  <p class="small muted" style="margin:0">They stay tagged, segregated and unavailable for production until QA decides on their hold report. Closing the receipt doesn't release them.</p>
+</div>
+{% endif %}
+
+<form method="post" class="card">
+  <div class="card-title">Before closing the receipt</div>
+  {% for key, label in checks %}
+  <div class="form-row">
+    <div class="form-label">{{ label }} <span class="req">*</span></div>
+    <div class="chip-choices">
+      {% for a in answers %}
+      <label class="chip-choice"><input type="radio" name="check_{{ key }}" value="{{ a }}" required
+             {{ 'checked' if form.get('check_' ~ key) == a }}><span>{{ a }}</span></label>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+  <div class="form-grid cols-2 mt">
+    <div class="form-row">
+      <label class="form-label" for="verified_by_name">Verified by <span class="req">*</span></label>
+      <input type="text" id="verified_by_name" name="verified_by_name" maxlength="80" required
+             value="{{ form.verified_by_name or '' }}">
+    </div>
+    <div class="form-row">
+      <label class="form-label" for="qa_approved_by_name">QA / authorized approval</label>
+      <input type="text" id="qa_approved_by_name" name="qa_approved_by_name" maxlength="80"
+             value="{{ form.qa_approved_by_name or '' }}">
+    </div>
+  </div>
+  <p class="small muted">Any "No" keeps the receipt open — finish that step first. <b>No material may be issued to production until it has been inspected, accepted, identified, and recorded.</b></p>
+  <button class="btn btn-primary" type="submit">Close receipt</button>
+</form>
+{% endif %}
+</div>
+{% endblock %}

@@ -60,8 +60,12 @@ SCHEMA = {
             "id": ID, "name": STR, "tin": SHORT, "category": SHORT,
             "contact_person": STR, "phone": SHORT, "email": STR,
             "address": TEXT, "materials_supplied": TEXT, "buy_from": STR,
-            "lead_time_days": "INT NULL", "notes": TEXT, "created_at": TS,
+            "lead_time_days": "INT NULL", "notes": TEXT,
+            # On the Approved Supplier List (SOP AFP-WH-SOP-001 section 6)
+            "approved": BOOL, "approved_by": FK, "approved_at": TS,
+            "created_at": TS,
         },
+        "foreign_keys": {"approved_by": "users"},
     },
     "customers": {
         "columns": {
@@ -108,20 +112,33 @@ SCHEMA = {
     # Part 1: the Receiving Team Head opens a delivery and labels every box /
     # crate with a QR code.  Part 2: each box is inspected and cleaned, and
     # its content split into usable / can't be used / damaged.  The columns
-    # follow the paper "Raw Materials Receiving and Inspection Report".
+    # follow SOP AFP-WH-SOP-001: a delivery is the Material Receiving Report
+    # (AFP-WH-FRM-001), a box inspection the Incoming Material Inspection
+    # Checklist (AFP-WH-FRM-002).
     "receiving_batches": {
         "columns": {
+            # ref_no is the MRR No.
             "id": ID, "ref_no": SHORT, "supplier_id": FK, "supplier_name": STR,
+            "supplier_contact": STR,
             "po_id": FK, "po_no": SHORT, "delivery_ref": STR,
-            "received_date": DATE, "received_by": FK, "status": SHORT,
-            "remarks": TEXT,
+            "received_date": DATE, "received_time": SHORT,
+            "delivered_by": STR, "vehicle_plate": SHORT,
+            "receiving_area": STR, "docs_checked": TEXT, "docs_other": STR,
+            "received_by": FK, "status": SHORT,
+            "remarks": TEXT, "discrepancies": TEXT,
             "box_count": "INT NULL", "total_declared": NUM, "total_good": NUM,
             "total_unusable": NUM, "total_damaged": NUM,
+            "inventory_updated_by": FK, "inventory_updated_at": TS,
+            # Quick Control Check, answered when the receipt is closed
+            "control_check": TEXT,
+            # checked_by_name = "Verified by"; approved_by_name = QA approval
             "checked_by_name": STR, "approved_by_name": STR,
-            "created_at": TS, "closed_at": TS,
+            "closed_by": FK, "created_at": TS, "closed_at": TS,
         },
         "foreign_keys": {"supplier_id": "suppliers", "received_by": "users",
-                         "po_id": "purchase_orders"},
+                         "po_id": "purchase_orders",
+                         "inventory_updated_by": "users", "closed_by": "users"},
+        "json_fields": ["docs_checked", "discrepancies", "control_check"],
     },
     "receiving_boxes": {
         "columns": {
@@ -139,6 +156,10 @@ SCHEMA = {
             "sampling_test": SHORT, "acceptance_status": SHORT,
             "nonconformity": TEXT, "action_taken": TEXT,
             "verified_by_name": STR, "checked_by": FK, "checked_at": TS,
+            # Incoming Material Inspection Checklist: {point: {result, remarks}}
+            "inspection_no": SHORT, "checklist": TEXT,
+            "test_parameter": STR, "test_spec": STR, "test_result": STR,
+            "test_method": STR,
             # Where the box is on the floor
             "status": SHORT, "stage": SHORT, "location": STR,
             "released_to": SHORT, "released_at": TS,
@@ -147,6 +168,35 @@ SCHEMA = {
         "foreign_keys": {"batch_id": "receiving_batches",
                          "material_id": "raw_materials", "checked_by": "users",
                          "received_by": "users", "po_id": "purchase_orders"},
+        "json_fields": ["checklist"],
+    },
+    # Nonconforming Material Hold / Rejection Report (AFP-WH-FRM-003): one per
+    # box put on HOLD or REJECTED — containment, disposition, closure.
+    "nonconformance_reports": {
+        "columns": {
+            "id": ID, "report_no": SHORT, "box_id": FK, "box_code": SHORT,
+            "batch_id": FK, "mrr_no": SHORT, "po_no": SHORT,
+            "supplier_id": FK, "supplier_name": STR,
+            "material_id": FK, "material_name": STR, "lot_no": SHORT,
+            "unit": SHORT, "qty_affected": NUM, "raised_as": SHORT,
+            "reported_by": FK, "department": STR,
+            "nc_types": TEXT, "nc_other": STR, "findings": TEXT,
+            "containment": TEXT, "hold_location": STR, "qty_segregated": NUM,
+            "tag_no": SHORT, "contained_by": FK, "contained_at": TS,
+            "disposition": SHORT, "disposition_details": TEXT,
+            "justification": TEXT, "accepted_qty": NUM,
+            "supplier_response": TEXT, "disposed_by": FK, "disposed_at": TS,
+            "qa_approved_by_name": STR, "closure_verified_by_name": STR,
+            "closed_by": FK, "closed_at": TS, "status": SHORT,
+            "created_at": TS,
+        },
+        "foreign_keys": {"box_id": "receiving_boxes",
+                         "batch_id": "receiving_batches",
+                         "supplier_id": "suppliers",
+                         "material_id": "raw_materials",
+                         "reported_by": "users", "contained_by": "users",
+                         "disposed_by": "users", "closed_by": "users"},
+        "json_fields": ["nc_types", "containment"],
     },
 
     # --- Honey production: containers + moisture/appearance QC --------------
