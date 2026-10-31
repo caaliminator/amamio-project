@@ -1,17 +1,1 @@
-[
-  {
-    "supplier_id": 3,
-    "supplier_name": "Agusan Cacao Growers",
-    "po_id": 1,
-    "amount": 14510.0,
-    "paid_on": "2026-10-26",
-    "kind": "Full payment",
-    "method": "Cash",
-    "reference": "",
-    "notes": "",
-    "recorded_by": 1,
-    "recorded_by_name": "Amamio Super Admin",
-    "created_at": "2026-10-26T15:35:45.283467+00:00",
-    "id": 1
-  }
-]
+[]

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% from "employees/_fields.html" import employee_fields %}
+{% block title %}Employees{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Employees</h1>
+    <p class="page-sub">Staff without a system account. Team heads pick these names as the requesting employee on a purchase request.</p>
+  </div>
+</div>
+
+<div class="card mb">
+  <div class="card-title">Add an employee</div>
+  <form method="post" class="form">
+    {{ employee_fields(form, departments, suffixes) }}
+    <button class="btn btn-primary" type="submit">Add to the list</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-title">Employee list · {{ rows|length }}</div>
+  {% if rows %}
+  <div class="filter-bar">
+    <input type="search" id="empFilter" placeholder="Search a name, position or department…" style="max-width:340px" aria-label="Search employees">
+    <span class="muted small">{% for d in departments if counts[d] %}{{ d }} {{ counts[d] }}{{ ' · ' if not loop.last }}{% endfor %}</span>
+  </div>
+  <div class="table-wrap">
+    <table class="table" id="empTable">
+      <thead>
+        <tr><th>Name</th><th>Position</th><th>Department</th><th>Employee no.</th><th>Mobile</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for e in rows %}
+        <tr>
+          <td>{{ e.name }}</td>
+          <td class="muted">{{ e.position or '—' }}</td>
+          <td><span class="badge badge-muted">{{ e.department or '—' }}</span></td>
+          <td class="code">{{ e.employee_no or '' }}</td>
+          <td class="muted small">{{ e.phone or '' }}</td>
+          <td class="nowrap">
+            <a class="btn btn-sm btn-ghost" href="{{ url_for('employees.edit', id=e.id) }}">Edit</a>
+            <form method="post" action="{{ url_for('employees.delete', id=e.id) }}" style="display:inline"
+                  data-confirm="Remove {{ e.name }} from the employee list?">
+              <button class="btn btn-sm btn-ghost" type="submit">Remove</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted small" id="empNone" hidden>No employee matches.</p>
+  {% else %}
+  <p class="muted">No employees yet — add the first one above.</p>
+  {% endif %}
+</div>
+
+<script>
+(function () {
+  var box = document.getElementById("empFilter");
+  if (!box) return;
+  var rows = document.querySelectorAll("#empTable tbody tr");
+  box.addEventListener("input", function () {
+    var words = box.value.toLowerCase().split(/\s+/).filter(Boolean), shown = 0;
+    rows.forEach(function (tr) {
+      var text = tr.textContent.toLowerCase();
+      var hit = words.every(function (w) { return text.indexOf(w) > -1; });
+      tr.hidden = !hit;
+      if (hit) shown++;
+    });
+    document.getElementById("empNone").hidden = shown > 0;
+  });
+})();
+</script>
+{% endblock %}

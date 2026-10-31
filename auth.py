@@ -1,10 +1,11 @@
 """Authentication, dashboard and user-management blueprint (auth_bp)."""
-from flask import (Blueprint, flash, jsonify, redirect, render_template,
-                   request, session, url_for)
+from flask import (Blueprint, abort, flash, g, jsonify, redirect,
+                   render_template, request, send_file, session, url_for)
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import db
 import home
+import profiles
 import services
 from security import (ROLE_DESCRIPTIONS, ROLE_KEYS, ROLE_LABELS, current_user,
                       is_admin, is_super_admin, login_required, normalize_role,
@@ -96,7 +97,11 @@ def dashboard():
 @role_required("admin")
 def users():
     if request.method == "POST":
-        name = (request.form.get("name") or "").strip()
+        first = (request.form.get("first_name") or "").strip()
+        middle = (request.form.get("middle_name") or "").strip()
+        last = (request.form.get("last_name") or "").strip()
+        name = (profiles.full_name(first, middle, last)
+                or (request.form.get("name") or "").strip())
         username = (request.form.get("username") or "").strip()
         password = request.form.get("password") or ""
         role = request.form.get("role") or ""
@@ -117,6 +122,8 @@ def users():
                 "name": name, "username": username,
                 "password_hash": generate_password_hash(password),
                 "role": role, "email": email, "phone": phone,
+                "first_name": first, "middle_name": middle, "last_name": last,
+                "position": ROLE_LABELS.get(role, role),
                 "team": ROLE_LABELS.get(role, role), "active": True,
                 "last_login": None, "created_at": services.now_iso(),
             })
@@ -129,6 +136,9 @@ def users():
         role = normalize_role(u.get("role"))
         rows.append({
             "id": u["id"], "name": u.get("name"), "username": u.get("username"),
+            "position": u.get("position") or "",
+            "photo_url": profiles.image_url(u, "photo"),
+            "has_signature": bool(profiles.image_path(u, "signature")),
             "email": u.get("email"), "phone": u.get("phone"),
             "role": role, "role_label": ROLE_LABELS.get(role, role),
             "active": u.get("active", True),
@@ -228,3 +238,66 @@ def reset_password(id):
                   {"password_hash": generate_password_hash(password)})
         flash("Password reset for '%s'." % target.get("username"), "success")
     return redirect(url_for("auth.users"))
+
+
+# --- Staff profiles (Super Admin) -------------------------------------------
+@auth_bp.route("/users/<int:id>/profile", methods=["GET", "POST"])
+@role_required("super_admin")
+def user_profile(id):
+    """Personal details, photo and e-signature of one user — printed on the
+    system's forms wherever this person signs."""
+    target = db.get("users", id)
+    if not target:
+        abort(404)
+    g.nav_endpoint = "auth.users"
+    form = request.form
+    if request.method == "POST":
+        action = form.get("action") or "save"
+        if action in ("remove_photo", "remove_signature"):
+            kind = action.split("_", 1)[1]
+            profiles.remove_image(target, kind)
+            flash("%s removed." % ("Photo" if kind == "photo" else "E-signature"),
+                  "success")
+            return redirect(url_for("auth.user_profile", id=id))
+        # Fields are checked first and stored last, so a rejected picture
+        # leaves the profile as it was.
+        changes, err = profiles.clean_profile(form)
+        if not err:
+            for kind in profiles.KINDS:
+                upload = request.files.get(kind)
+                if upload and upload.filename:
+                    _, err = profiles.save_image(db.get("users", id), kind, upload)
+                    if err:
+                        err = "%s: %s" % ("Photo" if kind == "photo"
+                                          else "E-signature", err)
+                        break
+        if not err:
+            db.update("users", id, changes)
+            flash("Profile of %s saved." % changes["name"], "success")
+            return redirect(url_for("auth.user_profile", id=id))
+        flash(err, "error")
+        target = db.get("users", id)
+    values = dict(target)
+    values.update(profiles.name_parts(target))
+    if not values.get("position"):
+        values["position"] = ROLE_LABELS.get(normalize_role(target.get("role")), "")
+    if request.method == "POST":
+        values.update({k: form.get(k) or "" for k in profiles.TEXT_FIELDS})
+    return render_template(
+        "user_profile.html", u=target, v=values,
+        role_label=ROLE_LABELS.get(normalize_role(target.get("role")), ""),
+        photo_url=profiles.image_url(target, "photo"),
+        signature_url=profiles.image_url(target, "signature"),
+        genders=profiles.GENDERS, suffixes=profiles.SUFFIXES,
+        today=services.today_iso())
+
+
+@auth_bp.route("/users/<int:id>/image/<kind>")
+@login_required
+def user_image(id, kind):
+    """A user's photo or e-signature — signed-in users only (the forms
+    print them), never from the public static folder."""
+    path = profiles.image_path(db.get("users", id), kind)
+    if not path:
+        abort(404)
+    return send_file(path, max_age=3600)

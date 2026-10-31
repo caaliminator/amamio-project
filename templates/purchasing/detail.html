@@ -45,6 +45,20 @@
 </div>
 {% endif %}
 
+{% if stage %}
+{# Waiting for the Admin's check or the Super Admin's approval: show the PO
+   exactly as it prints, so it reads like the paper being signed. #}
+{% include "purchasing/_document.html" %}
+{% if can_approve %}
+<div class="next-action">
+  <div class="next-action-text"><b>{{ 'Checked everything?' if stage == 'initial' else 'Ready to approve?' }}</b>
+    <span>{{ 'Your name goes on the PO as Checked by.' if stage == 'initial' else 'Your name goes on the PO as Approved by, and it is issued to ' ~ po.supplier_name ~ '.' }}</span></div>
+  <form method="post" action="{{ url_for('purchasing.approve', po_id=po.id) }}">
+    <button class="btn btn-primary" type="submit">{{ 'Check and approve' if stage == 'initial' else 'Give final approval' }}</button>
+  </form>
+</div>
+{% endif %}
+{% else %}
 <div class="card mb">
   <div class="card-title">Items</div>
   <div class="table-wrap">
@@ -75,7 +89,7 @@
         {% if po.discount %}<tr><td colspan="4">Discount</td><td class="num">−{{ po.discount|peso }}</td><td colspan="2"></td></tr>{% endif %}
         {% if po.freight %}<tr><td colspan="4">Delivery / freight</td><td class="num">{{ po.freight|peso }}</td><td colspan="2"></td></tr>{% endif %}
         {% if po.labor %}<tr><td colspan="4">Labor cost</td><td class="num">{{ po.labor|peso }}</td><td colspan="2"></td></tr>{% endif %}
-        {% if po.tax %}<tr><td colspan="4">VAT / other tax</td><td class="num">{{ po.tax|peso }}</td><td colspan="2"></td></tr>{% endif %}
+        {% if po.tax %}<tr><td colspan="4">VAT{{ (' (%g%%)'|format(po.vat_rate|float)) if po.vat_rate else ' / other tax' }}</td><td class="num">{{ po.tax|peso }}</td><td colspan="2"></td></tr>{% endif %}
         <tr><td colspan="4"><b>Grand total</b></td><td class="num"><b>{{ po.grand_total|peso }}</b></td><td colspan="2"></td></tr>
       </tfoot>
     </table>
@@ -160,6 +174,7 @@
   </dl>
   {% if po.terms %}<div class="form-label mt">Terms / special instructions</div><p class="muted small">{{ po.terms }}</p>{% endif %}
 </div>
+{% endif %}
 
 <div class="flex gap-sm wrap">
   <a class="btn btn-ghost btn-sm" href="{{ url_for('purchasing.print_po', po_id=po.id) }}">{{ icon('printer', 14) }} Print Purchase Order</a>

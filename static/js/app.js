@@ -79,8 +79,11 @@
   });
   document.addEventListener("submit", function (e) {
     var form = e.target;
-    if (form.matches("[data-confirm]") &&
-        !confirm(form.getAttribute("data-confirm"))) {
+    // The button pressed may carry its own question (e.g. "Remove photo").
+    var btn = e.submitter && e.submitter.hasAttribute("data-confirm") ? e.submitter : null;
+    var question = btn ? btn.getAttribute("data-confirm")
+                       : form.matches("[data-confirm]") && form.getAttribute("data-confirm");
+    if (question && !confirm(question)) {
       e.preventDefault();
     }
   }, true);
@@ -649,6 +652,162 @@
     });
     document.addEventListener("mousemove", move);
     document.addEventListener("scroll", function () { if (tip) tip.style.display = "none"; }, true);
+  })();
+
+  /* ---- Searchable dropdown: type to filter a list ----
+       <div class="combo" data-combo="optionsId" [data-combo-new="'%s' …"]>
+         <input type="text" class="combo-input" name="…">
+         [<input type="hidden" class="combo-value" name="…" data-other="other">]
+       </div>
+     Options: <script type="application/json" id="optionsId"> holding
+     [{"v": value, "l": label, "g": group, "s": side note, "d": {…}}].
+     Every typed word must appear in the label (or in the group too, with
+     data-combo-search-group on the .combo).  The hidden value is the
+     option's value when the text matches a label exactly, else data-other
+     (typed text allowed) or "".  Choosing an option — or typing one exactly —
+     fires "combo:pick" on the .combo with the option as detail.
+     The list opens only once something is typed (or on ↓ to browse it all),
+     never just because the box got the focus. */
+  (function () {
+    var cache = {};
+    function options(combo) {
+      var id = combo.getAttribute("data-combo");
+      if (!cache[id]) {
+        var el = document.getElementById(id);
+        try { cache[id] = el ? JSON.parse(el.textContent) : []; } catch (e) { cache[id] = []; }
+      }
+      return cache[id];
+    }
+    function norm(s) { return String(s || "").toLowerCase().replace(/\s+/g, " ").trim(); }
+    function inputOf(combo) { return combo.querySelector(".combo-input"); }
+    function listOf(combo) {
+      var list = combo.querySelector(".combo-list");
+      if (!list) {
+        list = document.createElement("div");
+        list.className = "combo-list";
+        list.setAttribute("role", "listbox");
+        list.hidden = true;
+        combo.appendChild(list);
+      }
+      return list;
+    }
+    // Bold the typed words inside the label (escaped piece by piece).
+    function highlight(label, words) {
+      var low = label.toLowerCase(), marks = [], out = "", pos = 0;
+      words.forEach(function (w) {
+        var i = w ? low.indexOf(w) : -1;
+        if (i > -1) marks.push([i, i + w.length]);
+      });
+      marks.sort(function (a, b) { return a[0] - b[0]; });
+      marks.forEach(function (m) {
+        var from = Math.max(m[0], pos);
+        if (m[1] <= from) return;
+        out += esc(label.slice(pos, from)) + "<mark>" + esc(label.slice(from, m[1])) + "</mark>";
+        pos = m[1];
+      });
+      return out + esc(label.slice(pos));
+    }
+    function open(combo) {
+      var input = inputOf(combo), typed = input.value.trim();
+      var q = norm(typed), words = q ? q.split(" ") : [];
+      var all = options(combo), html = "", group = null, shown = 0, exact = false;
+      var byGroup = combo.hasAttribute("data-combo-search-group");
+      all.forEach(function (o, i) {
+        var l = norm(o.l), hay = byGroup && o.g ? l + " " + norm(o.g) : l;
+        if (shown >= 80 || !words.every(function (w) { return hay.indexOf(w) > -1; })) return;
+        if (l === q) exact = true;
+        if (o.g && o.g !== group) {
+          group = o.g;
+          html += '<div class="combo-group">' + esc(group) + "</div>";
+        }
+        html += '<div class="combo-opt" role="option" data-i="' + i + '"><span>' +
+          highlight(o.l, words) + "</span>" + (o.s ? "<small>" + esc(o.s) + "</small>" : "") + "</div>";
+        shown++;
+      });
+      var note = combo.getAttribute("data-combo-new");
+      if (q && !exact && note) html += '<div class="combo-note">' + esc(note.replace("%s", typed)) + "</div>";
+      else if (!shown) html += '<div class="combo-note">No matches</div>';
+      var list = listOf(combo);
+      list.innerHTML = html;
+      list.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+      combo.__active = -1;
+    }
+    function close(combo) {
+      listOf(combo).hidden = true;
+      inputOf(combo).setAttribute("aria-expanded", "false");
+    }
+    function sync(combo) {
+      var q = norm(inputOf(combo).value), match = null;
+      options(combo).some(function (o) {
+        if (q && norm(o.l) === q) { match = o; return true; }
+        return false;
+      });
+      var hidden = combo.querySelector(".combo-value");
+      if (hidden) hidden.value = match ? match.v : (q ? hidden.getAttribute("data-other") || "" : "");
+      return match;
+    }
+    function announce(combo, o) {
+      if (combo.__picked === o.v) return;
+      combo.__picked = o.v;
+      combo.dispatchEvent(new CustomEvent("combo:pick", { bubbles: true, detail: o }));
+    }
+    function pick(combo, o) {
+      inputOf(combo).value = o.l;
+      sync(combo);
+      close(combo);
+      announce(combo, o);
+      inputOf(combo).dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    function move(combo, step) {
+      var opts = listOf(combo).querySelectorAll(".combo-opt");
+      if (!opts.length) return;
+      combo.__active = (combo.__active + step + opts.length) % opts.length;
+      opts.forEach(function (el, i) { el.classList.toggle("is-active", i === combo.__active); });
+      opts[combo.__active].scrollIntoView({ block: "nearest" });
+    }
+    function comboOf(el) { return el && el.closest && el.closest(".combo"); }
+
+    document.addEventListener("input", function (e) {
+      if (!e.target.classList.contains("combo-input")) return;
+      var combo = comboOf(e.target);
+      sync(combo);
+      if (e.target.value.trim()) open(combo);
+      else close(combo);
+    });
+    document.addEventListener("focusout", function (e) {
+      if (!e.target.classList.contains("combo-input")) return;
+      var combo = comboOf(e.target);
+      close(combo);
+      var match = sync(combo);
+      if (match) announce(combo, match);
+      else combo.__picked = null;
+    });
+    document.addEventListener("mousedown", function (e) {
+      var opt = e.target.closest && e.target.closest(".combo-opt");
+      if (!opt) return;
+      e.preventDefault();            // keep the focus in the box
+      var combo = comboOf(opt);
+      pick(combo, options(combo)[+opt.getAttribute("data-i")]);
+    });
+    // Capture phase, so Enter picks an option before a wizard moves on.
+    document.addEventListener("keydown", function (e) {
+      if (!e.target.classList || !e.target.classList.contains("combo-input")) return;
+      var combo = comboOf(e.target), list = listOf(combo);
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        if (list.hidden) open(combo);
+        move(combo, e.key === "ArrowDown" ? 1 : -1);
+      } else if (e.key === "Enter" && !list.hidden && combo.__active > -1) {
+        e.preventDefault();
+        e.stopPropagation();
+        var opt = list.querySelectorAll(".combo-opt")[combo.__active];
+        pick(combo, options(combo)[+opt.getAttribute("data-i")]);
+      } else if (e.key === "Escape" && !list.hidden) {
+        e.stopPropagation();
+        close(combo);
+      }
+    }, true);
   })();
 
   /* Expose a tiny namespace for inline page scripts. */

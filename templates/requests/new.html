@@ -4,39 +4,29 @@
 <a class="back-link" href="{{ url_for('requests.index') }}">{{ icon('arrow-left', 15) }} Purchase Requests</a>
 
 {% macro item_card(line) %}
-{% set picked = (line.material_id if line else '')|string %}
-{% set other = picked == 'other' %}
 <div class="line-card" data-line>
   <div class="line-card-head">
     <span class="line-card-num">Item</span>
     <button type="button" class="line-remove" data-remove-line aria-label="Remove this item">&times;</button>
   </div>
   <div class="form-grid cols-2">
+    {# Type to search the materials list; a name that isn't on it is
+       requested as a new item ("other"). #}
     <div class="form-row">
       <label class="form-label">Item requested <span class="req">*</span></label>
-      <select name="material_id" required class="js-item">
-        <option value="">— Choose an item —</option>
-        {% for group, rows in catalog %}
-        <optgroup label="{{ group }}">
-          {% for r in rows %}
-          <option value="{{ r.id }}" data-name="{{ r.name }}" data-unit="{{ r.unit }}"
-                  data-cost="{{ '%.2f'|format(r.cost) if r.cost else '' }}" data-supplier="{{ r.supplier }}"
-                  {{ 'selected' if picked == r.id|string }}>{{ r.name }}</option>
-          {% endfor %}
-        </optgroup>
-        {% endfor %}
-        <option value="other" {{ 'selected' if other }}>Other item — not on the list</option>
-      </select>
+      <div class="combo js-item" data-combo="itemOptions"
+           data-combo-new="“%s” isn't on the list — it will be requested as a new item">
+        <input type="text" name="description" class="combo-input" required maxlength="120"
+               autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false"
+               value="{{ line.description if line else '' }}" placeholder="Type to search, e.g. jar, honey, tape">
+        <input type="hidden" name="material_id" class="combo-value" data-other="other"
+               value="{{ line.material_id if line else '' }}">
+      </div>
     </div>
     <div class="form-row">
       <label class="form-label">Purpose / use</label>
       <input type="text" name="purpose_use" maxlength="120" value="{{ line.purpose_use if line else '' }}" placeholder="e.g. Dehydrator">
     </div>
-  </div>
-  {# Filled in from the dropdown; typed only for an item not on the list. #}
-  <div class="form-row js-other"{{ '' if other else ' hidden' }}>
-    <label class="form-label">Name of the item <span class="req">*</span></label>
-    <input type="text" name="description" maxlength="120" required value="{{ line.description if line else '' }}" placeholder="e.g. Timer switch">
   </div>
   <div class="form-grid cols-3">
     <div class="form-row">
@@ -51,16 +41,18 @@
     </div>
     <div class="form-row">
       <label class="form-label">Est. unit cost (₱)</label>
-      <input type="number" name="est_unit_cost" min="0" step="0.01" inputmode="decimal" value="{{ line.est_unit_cost if line else '' }}" placeholder="0.00" class="js-cost">
+      <input type="number" name="est_unit_cost" min="0" step="0.01" inputmode="decimal" value="{{ line.est_unit_cost if line else '0.00' }}" placeholder="0.00" class="js-cost">
     </div>
   </div>
   <div class="form-grid cols-2">
     <div class="form-row">
       <label class="form-label">Preferred supplier</label>
-      <select name="preferred_supplier" class="js-supplier">
-        <option value="">— No preference —</option>
-        {% for s in suppliers %}<option {{ 'selected' if line and line.preferred_supplier == s }}>{{ s }}</option>{% endfor %}
-      </select>
+      <div class="combo" data-combo="supplierOptions"
+           data-combo-new="“%s” isn't in the Supplier Directory — it will be noted as typed">
+        <input type="text" name="preferred_supplier" class="combo-input js-supplier" maxlength="120"
+               autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false"
+               value="{{ line.preferred_supplier if line else '' }}" placeholder="Type to search · blank = no preference">
+      </div>
     </div>
     <div class="form-row">
       <label class="form-label">Budget / category</label>
@@ -109,17 +101,28 @@
     <div class="tally is-even" id="grandTotal"></div>
   </section>
 
-  <section class="wz-step" data-title="When is it needed, and who is asking?">
+  <section class="wz-step" data-title="When is it needed, and who is asking?"
+           data-hint="The employee who needs the items is the requestor; you sign the form as the department head who approved it.">
     <div class="wz-body">
       <div class="form-grid cols-2">
         <div class="form-row">
-          <label class="form-label" for="needed_by">Expected date</label>
-          <input type="date" id="needed_by" name="needed_by" min="{{ today }}" value="{{ form.needed_by or '' }}">
+          <label class="form-label" for="requested_by_name">Requesting employee (full name) <span class="req">*</span></label>
+          <div class="combo" data-combo="employeeOptions" data-combo-search-group
+               data-combo-new="“%s” isn't on the employee list — it will be used as typed (the Super Admin adds staff under Employees)">
+            <input type="text" id="requested_by_name" name="requested_by_name" class="combo-input" maxlength="120" required
+                   autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false"
+                   value="{{ form.requested_by_name or '' }}" placeholder="e.g. Juan S. Dela Cruz">
+          </div>
+          <div class="form-hint">Type to search the employee list, by name, position or department.</div>
         </div>
         <div class="form-row">
-          <label class="form-label" for="requested_by_name">Requestor name <span class="req">*</span></label>
-          <input type="text" id="requested_by_name" name="requested_by_name" maxlength="80" required
-                 value="{{ form.requested_by_name or me.name }}">
+          <label class="form-label" for="dept_head">Approved by (department head)</label>
+          <input type="text" id="dept_head" value="{{ with_position(me.id) }}" readonly tabindex="-1" class="locked-field">
+          <div class="form-hint">{{ 'Your name and e-signature print' if signature_url(me.id) else 'Your name prints' }} here on the Purchase Request Form.</div>
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="needed_by">Expected date</label>
+          <input type="date" id="needed_by" name="needed_by" min="{{ today }}" value="{{ form.needed_by or '' }}">
         </div>
       </div>
       <div class="form-row">
@@ -137,13 +140,16 @@
     </div>
   </section>
 
-  <section class="wz-step" data-title="Check and submit for approval" data-review
-           data-hint="The Admin checks it first, then the Super Admin gives the final approval.">
-    <div class="wz-body"></div>
+  <section class="wz-step" id="reviewStep" data-title="Check and submit for approval" data-review
+           data-hint="This is the purchase request as it will print. Submitting signs it as approved by you (department head). The Admin checks it next, then the Super Admin gives the final approval.">
+    <div class="wz-body is-bare"></div>
   </section>
 </form>
 
 <template id="lineTpl">{{ item_card(none) }}</template>
+<script type="application/json" id="itemOptions">{{ item_options|tojson }}</script>
+<script type="application/json" id="supplierOptions">{{ supplier_options|tojson }}</script>
+<script type="application/json" id="employeeOptions">{{ employee_options|tojson }}</script>
 
 <script>
 (function () {
@@ -168,7 +174,7 @@
   }
   document.getElementById("addLine").addEventListener("click", function () {
     var node = tpl.content.firstElementChild.cloneNode(true);
-    cards.appendChild(node); update(); node.querySelector("select").focus();
+    cards.appendChild(node); update(); node.querySelector(".combo-input").focus();
   });
   cards.addEventListener("click", function (e) {
     var b = e.target.closest("[data-remove-line]");
@@ -176,47 +182,35 @@
   });
   cards.addEventListener("input", update);
 
-  // Picking an item fills in its name, unit, last cost and usual supplier;
-  // "Other" asks for the name instead.
-  function pickItem(sel, fill) {
-    var card = sel.closest("[data-line]");
-    var o = sel.options[sel.selectedIndex];
-    var other = sel.value === "other";
-    var name = card.querySelector("[name=description]");
-    card.querySelector(".js-other").hidden = !other;
-    if (other) { if (fill) { name.value = ""; name.focus(); } return; }
-    name.value = o.getAttribute("data-name") || "";
-    if (!fill || !sel.value) return;
-    card.querySelector("[name=unit]").value = o.getAttribute("data-unit") || "pc";
-    if (o.getAttribute("data-cost")) card.querySelector(".js-cost").value = o.getAttribute("data-cost");
+  // Picking an item from the list fills in its unit and usual supplier (the
+  // estimated cost starts at 0 — the requester types it); a typed name that
+  // isn't on the list is requested as is.
+  cards.addEventListener("combo:pick", function (e) {
+    if (!e.target.classList.contains("js-item")) return;
+    var card = e.target.closest("[data-line]"), d = e.detail.d || {};
+    card.querySelector("[name=unit]").value = d.unit || "pc";
     var sup = card.querySelector(".js-supplier");
-    var want = o.getAttribute("data-supplier");
-    if (want && !sup.value && Array.prototype.some.call(sup.options, function (x) { return x.value === want; })) {
-      sup.value = want;
-    }
-  }
-  cards.addEventListener("change", function (e) {
-    if (e.target.classList.contains("js-item")) { pickItem(e.target, true); update(); }
+    if (d.supplier && !sup.value) sup.value = d.supplier;
+    update();
   });
-  cards.querySelectorAll(".js-item").forEach(function (sel) { pickItem(sel, false); });
   update();
 
-  step.reviewHtml = function () {
-    var esc = window.IMS.esc, out = [], sum = 0;
-    cards.querySelectorAll("[data-line]").forEach(function (c) {
-      var d = c.querySelector("[name=description]").value.trim();
-      if (!d) return;
-      var q = parseFloat(c.querySelector(".js-qty").value) || 0;
-      var u = c.querySelector("[name=unit]").value;
-      var cost = parseFloat(c.querySelector(".js-cost").value) || 0;
-      var sup = c.querySelector("[name=preferred_supplier]").value.trim();
-      sum += q * cost;
-      out.push("<dt>" + esc(d) + "</dt><dd>" + q + " " + esc(u) + (cost ? " × " + peso(cost) + " = " + peso(q * cost) : "") +
-        (sup ? " · " + esc(sup) : "") + "</dd>");
-    });
-    out.push("<dt>Total estimated purchase cost</dt><dd>" + peso(sum) + "</dd>");
-    return out.join("");
-  };
+  // Last step: the PR exactly as it will print, built by the server from the
+  // fields so far (same template as the saved copy).
+  var reviewStep = document.getElementById("reviewStep");
+  var previewUrl = {{ url_for('requests.preview')|tojson }};
+  var seq = 0;
+  reviewStep.addEventListener("wz:enter", function () {
+    var box = reviewStep.querySelector(".review"), mine = ++seq;
+    box.innerHTML = '<p class="muted">Preparing the preview…</p>';
+    fetch(previewUrl, { method: "POST", body: new FormData(document.getElementById("prForm")),
+                        headers: { "X-Requested-With": "fetch" } })
+      .then(function (r) { return r.text(); })
+      .then(function (html) { if (mine === seq) box.innerHTML = html; })
+      .catch(function () {
+        if (mine === seq) box.innerHTML = '<div class="doc-error">The preview could not be loaded. Check your connection and open this step again.</div>';
+      });
+  });
 })();
 </script>
 {% endblock %}

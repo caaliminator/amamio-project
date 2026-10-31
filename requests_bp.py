@@ -10,6 +10,7 @@ from flask import (Blueprint, abort, flash, jsonify, redirect, render_template,
                    request, url_for)
 
 import db
+import profiles
 import purchasing_service as pur
 import services
 from security import (current_user, is_admin, module_required,
@@ -22,7 +23,7 @@ OPEN_STATUSES = (pur.PR_PENDING, pur.FOR_FINAL, "Approved", "Revised", "Ordered"
 
 def _row(r, users):
     return {
-        "id": r["id"], "pr_no": pur.pr_number(r),
+        "id": r.get("id"), "pr_no": pur.pr_number(r),
         "department": r.get("department") or ("Production" if r.get("type") == "production" else ""),
         "purpose": r.get("purpose") or r.get("reason") or "",
         "summary": pur.summary_line(r),
@@ -63,6 +64,28 @@ def _lines_from_form(form):
             for i in range(len(cols["description"]))]
 
 
+def _pr_from_form(user, form, save=True):
+    """Build (and, with ``save``, store) a PR from the form's fields."""
+    return pur.create_purchase_request(
+        user, form.get("department") or "", form.get("purpose") or "",
+        form.get("needed_by") or "", _lines_from_form(form),
+        notes=form.get("notes") or "", urgency=form.get("urgency") or "Normal",
+        requested_by_name=form.get("requested_by_name") or "", save=save)
+
+
+@requests_bp.route("/new/preview", methods=["POST"])
+@module_required("requests")
+def preview():
+    """The form's last step: the PR exactly as it will print, built from the
+    fields typed so far (nothing is saved)."""
+    req, err = _pr_from_form(current_user(), request.form, save=False)
+    if err:
+        return render_template("requests/_preview_error.html", error=err), 422
+    return render_template("requests/_document.html", req=req,
+                           row=_row(req, services.users_by_id()),
+                           items=_items_view(req), decided_on="", preview=True)
+
+
 @requests_bp.route("/new", methods=["GET", "POST"])
 @module_required("requests")
 def new():
@@ -72,19 +95,26 @@ def new():
     lines = []
     if request.method == "POST":
         lines = _lines_from_form(form)
-        req, err = pur.create_purchase_request(
-            user, form.get("department") or "", form.get("purpose") or "",
-            form.get("needed_by") or "", lines, notes=form.get("notes") or "",
-            urgency=form.get("urgency") or "Normal",
-            requested_by_name=form.get("requested_by_name") or "")
+        req, err = _pr_from_form(user, form)
         if not err:
             flash("Purchase request %s submitted for approval — the Admin has "
                   "been notified to check it." % req["pr_no"], "success")
             return redirect(url_for("requests.detail", id=req["id"]))
         flash(err, "error")
     catalog = pur.item_choices()
+    # Options for the type-to-search boxes (app.js "combo").
+    item_options = [{"v": r["id"], "l": r["name"], "g": group, "s": r["unit"],
+                     "d": {"unit": r["unit"], "supplier": r["supplier"]}}
+                    for group, rows in catalog for r in rows]
+    supplier_options = [{"v": n, "l": n} for n in pur.supplier_names()]
+    # Requesting employee: the staff list (people without an account), the
+    # head's own department first.
+    employee_options = profiles.employee_options(pur.DEPARTMENTS,
+                                                 first=pur.department_for(user))
     return render_template(
         "requests/new.html", form=form, lines=lines, me=user,
+        item_options=item_options, supplier_options=supplier_options,
+        employee_options=employee_options,
         departments=pur.DEPARTMENTS, my_department=pur.department_for(user),
         catalog=catalog, units=pur.units_for(catalog),
         categories=pur.BUDGET_CATEGORIES, suppliers=pur.supplier_names(),

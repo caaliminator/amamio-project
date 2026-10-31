@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Profile — {{ u.name }}{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('auth.users') }}">{{ icon('arrow-left', 15) }} Users &amp; Profiles</a>
+
+<div class="page-head">
+  <div class="profile-head">
+    {% if photo_url %}<img class="avatar avatar-lg avatar-photo" src="{{ photo_url }}" alt="">
+    {% else %}<span class="avatar avatar-lg">{{ (v.first_name or u.name or '?')[0]|upper }}{{ (v.last_name or '')[:1]|upper }}</span>{% endif %}
+    <div>
+      <h1 class="page-title">{{ u.name }}</h1>
+      <p class="page-sub">{{ v.position or role_label }} · <span class="code">{{ u.username }}</span> · {{ role_label }}</p>
+    </div>
+  </div>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="form profile-layout">
+  <div>
+    <div class="card mb">
+      <div class="card-title">Name</div>
+      <div class="form-grid cols-2">
+        <div class="form-row">
+          <label class="form-label" for="first_name">First name <span class="req">*</span></label>
+          <input type="text" id="first_name" name="first_name" required maxlength="60" value="{{ v.first_name }}">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="middle_name">Middle name</label>
+          <input type="text" id="middle_name" name="middle_name" maxlength="60" value="{{ v.middle_name }}">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="last_name">Last name <span class="req">*</span></label>
+          <input type="text" id="last_name" name="last_name" required maxlength="60" value="{{ v.last_name }}">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="suffix">Suffix</label>
+          <select id="suffix" name="suffix">
+            {% for s in suffixes %}<option value="{{ s }}" {{ 'selected' if v.suffix == s }}>{{ s or '—' }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-hint">The full name is what prints on the forms this person signs.</div>
+    </div>
+
+    <div class="card mb">
+      <div class="card-title">Work</div>
+      <div class="form-row">
+        <label class="form-label" for="position">Position</label>
+        <input type="text" id="position" name="position" maxlength="80" value="{{ v.position }}" placeholder="e.g. Warehouse / Inventory Officer">
+      </div>
+      <div class="form-grid cols-2">
+        <div class="form-row">
+          <label class="form-label" for="employee_no">Employee no.</label>
+          <input type="text" id="employee_no" name="employee_no" maxlength="30" value="{{ v.employee_no or '' }}">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="date_hired">Date hired</label>
+          <input type="date" id="date_hired" name="date_hired" max="{{ today }}" value="{{ v.date_hired or '' }}">
+        </div>
+      </div>
+      <div class="form-hint">System role: <b>{{ role_label }}</b> — change it on the Users &amp; Profiles list.</div>
+    </div>
+
+    <div class="card mb">
+      <div class="card-title">Personal details</div>
+      <div class="form-row">
+        <div class="form-label">Gender</div>
+        <div class="chip-choices">
+          {% for gname in genders %}
+          <label class="chip-choice"><input type="radio" name="gender" value="{{ gname }}" {{ 'checked' if v.gender == gname }}><span>{{ gname }}</span></label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-grid cols-3">
+        <div class="form-row">
+          <label class="form-label" for="birthdate">Birthdate</label>
+          <input type="date" id="birthdate" name="birthdate" max="{{ today }}" value="{{ v.birthdate or '' }}">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="phone">Mobile no.</label>
+          <input type="text" id="phone" name="phone" maxlength="30" value="{{ v.phone or '' }}" placeholder="09xx xxx xxxx">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="email">Email</label>
+          <input type="email" id="email" name="email" maxlength="120" value="{{ v.email or '' }}">
+        </div>
+      </div>
+      <div class="form-grid cols-2">
+        <div class="form-row">
+          <label class="form-label" for="address">Address</label>
+          <input type="text" id="address" name="address" maxlength="200" value="{{ v.address or '' }}">
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="emergency_contact">Emergency contact</label>
+          <input type="text" id="emergency_contact" name="emergency_contact" maxlength="120" value="{{ v.emergency_contact or '' }}" placeholder="Name · relationship · number">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card mb">
+      <div class="card-title">Photo</div>
+      <div class="pic-box">
+        <img class="pic-photo" id="photoPreview" src="{{ photo_url }}" alt="" {{ '' if photo_url else 'hidden' }}>
+        <span class="pic-empty" id="photoEmpty" {{ 'hidden' if photo_url }}>No photo yet</span>
+      </div>
+      <input type="file" name="photo" accept="image/png,image/jpeg,image/webp" data-preview="photoPreview" data-empty="photoEmpty">
+      <div class="form-hint">PNG or JPG, under 5 MB. A clear, front-facing picture.</div>
+      {% if photo_url %}
+      <button class="btn btn-sm btn-ghost mt-sm" type="submit" name="action" value="remove_photo" formnovalidate
+              data-confirm="Remove the photo of {{ u.name }}?">Remove photo</button>
+      {% endif %}
+    </div>
+
+    <div class="card mb">
+      <div class="card-title">E-signature</div>
+      <div class="pic-box pic-paper">
+        <img class="pic-sig" id="sigPreview" src="{{ signature_url }}" alt="" {{ '' if signature_url else 'hidden' }}>
+        <span class="pic-empty" id="sigEmpty" {{ 'hidden' if signature_url }}>No e-signature yet</span>
+      </div>
+      <input type="file" name="signature" accept="image/png,image/jpeg,image/webp" data-preview="sigPreview" data-empty="sigEmpty">
+      <div class="form-hint">Sign in dark ink on plain white paper and take a clear photo or scan — or use a PNG with a transparent background. The paper is removed and the picture trimmed to the signature automatically when saved.</div>
+      {% if signature_url %}
+      <button class="btn btn-sm btn-ghost mt-sm" type="submit" name="action" value="remove_signature" formnovalidate
+              data-confirm="Remove the e-signature of {{ u.name }}? Forms will print without it.">Remove e-signature</button>
+      {% endif %}
+    </div>
+
+    <div class="card mb">
+      <div class="card-title">How it prints on the forms</div>
+      <div class="doc doc-mini">
+        <div class="doc-sign" style="--cols:1">
+          <div>
+            <div class="doc-sig">{% if signature_url %}<img class="sig-img" src="{{ signature_url }}" alt="">{% endif %}</div>
+            <div class="doc-sign-name">{{ u.name }}</div>
+            <div class="doc-sign-pos">{{ v.position or role_label }}</div>
+            <div class="doc-sign-role">Approved by</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="profile-actions">
+    <button class="btn btn-primary" type="submit" name="action" value="save">Save profile</button>
+    <a class="btn btn-ghost" href="{{ url_for('auth.users') }}">Cancel</a>
+  </div>
+</form>
+
+<script>
+// Show a picked photo / signature straight away (it is processed on save).
+document.querySelectorAll("input[type=file][data-preview]").forEach(function (input) {
+  input.addEventListener("change", function () {
+    var img = document.getElementById(input.getAttribute("data-preview"));
+    var empty = document.getElementById(input.getAttribute("data-empty"));
+    if (!input.files || !input.files[0]) return;
+    img.src = URL.createObjectURL(input.files[0]);
+    img.hidden = false;
+    empty.hidden = true;
+  });
+});
+</script>
+{% endblock %}

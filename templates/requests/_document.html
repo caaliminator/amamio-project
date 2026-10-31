@@ -1,0 +1,82 @@
+{# The Purchase Request as a document — the printable copy, and the preview
+   on the form's last step (``preview``: built from the fields, not saved;
+   each part links back to the step that fills it). #}
+{% from "_paper.html" import doc, doc_signs %}
+{% set pv = preview is defined and preview %}
+{% macro edit(step) %}{% if pv %}<a href="#" class="doc-edit no-print" data-wz-goto="{{ step }}">Edit</a>{% endif %}{% endmacro %}
+{% set mark = 'Preview' if pv else ('Rejected' if req.status == 'Rejected'
+               else ('Not yet approved' if req.status in ('Pending', 'For Final Approval') else '')) %}
+
+{% call doc('Purchase Request', no=row.pr_no, status=('Preview · not submitted yet' if pv else req.status), mark=mark) %}
+  <div class="doc-meta">
+    <div><span>Date requested</span><b>{{ row.date_requested|longdate or '—' }}</b></div>
+    <div><span>Required date</span><b>{{ row.needed_by|longdate or '—' }}</b></div>
+    <div><span>Department</span><b>{{ row.department or '—' }}</b></div>
+    <div><span>Urgency</span><b>{{ row.urgency }}</b></div>
+    {{ edit(0) }}
+  </div>
+
+  <div class="doc-parties">
+    <section>
+      <h3>Requested by {{ edit(2) }}</h3>
+      <div class="doc-party-name">{{ row.requested_by }}</div>
+      <p>{{ row.department }} department</p>
+    </section>
+    <section>
+      <h3>Purpose / justification {{ edit(0) }}</h3>
+      <div class="doc-party-name">{{ row.purpose }}</div>
+    </section>
+  </div>
+
+  <div class="doc-section-head"><h3>Items requested</h3>{{ edit(1) }}</div>
+  <table class="doc-table">
+    <thead>
+      <tr><th class="n">#</th><th>Item description</th><th class="num">Qty</th><th>Unit</th>
+        <th class="num">Est. unit cost</th><th class="num">Est. total</th><th>Preferred supplier</th></tr>
+    </thead>
+    <tbody>
+      {% for it in items %}
+      <tr>
+        <td class="n">{{ loop.index }}</td>
+        <td>
+          <div class="doc-item">{{ it.name }}</div>
+          {% set sub = [it.purpose_use, it.budget_category, it.remark,
+                        'Not approved' if it.status == 'Rejected' else '',
+                        ('Approved ' ~ it.approved_qty|qty(it.unit)) if it.approved_qty is not none and it.approved_qty != it.requested_qty and it.status != 'Rejected' else '']|select|list %}
+          {% if sub %}<div class="doc-item-sub">{{ sub|join(' · ') }}</div>{% endif %}
+        </td>
+        <td class="num">{{ it.requested_qty|qty }}</td>
+        <td>{{ it.unit }}</td>
+        <td class="num">{{ it.est_unit_cost|peso if it.est_unit_cost else '—' }}</td>
+        <td class="num">{{ it.est_total|peso if it.est_total else '—' }}</td>
+        <td>{{ it.preferred_supplier or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="doc-bottom">
+    <div class="doc-terms">
+      <h3>Requester's notes / special instructions {{ edit(2) }}</h3>
+      <p>{{ req.notes or (req.remarks if req.type != 'general') or '—' }}</p>
+    </div>
+    <table class="doc-totals">
+      <tr><th>Items</th><td>{{ items|length }}</td></tr>
+      <tr class="grand"><td colspan="2"><div class="doc-grand"><span>Est. purchase cost</span><b>{{ row.total|peso }}</b></div></td></tr>
+    </table>
+  </div>
+
+  {% if req.check_remarks %}<div class="doc-callout"><b>Admin's remarks (check):</b> {{ req.check_remarks }}</div>{% endif %}
+  {% if req.remarks and req.type == 'general' %}<div class="doc-callout"><b>Approver's remarks:</b> {{ req.remarks }}</div>{% endif %}
+
+  {# The department head is the one submitting, so they are signed from the
+     preview on.  The rest stay empty until that step is done: Checked by at
+     the Admin's check, Approved by at the Super Admin's final approval,
+     Purchasing when the PO is prepared. #}
+  {{ doc_signs([
+       ('Requested by', row.requested_by, none, row.date_requested),
+       ('Approved by (dept. head)', req.dept_head_name, req.dept_head_id, req.dept_approved_at),
+       ('Checked by', req.checked_by_name, none, (req.checked_at or decided_on) if req.checked_by_name else '', 'Admin'),
+       ('Approved by', req.approved_by_name, none, decided_on if req.approved_by_name else '', 'Super Admin'),
+       ('Purchasing / procurement', req.purchasing_by_name, none, req.purchasing_date, 'When the PO is prepared')]) }}
+{% endcall %}

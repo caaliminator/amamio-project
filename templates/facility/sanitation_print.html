@@ -1,48 +1,33 @@
 {% extends "base.html" %}
-{% from "_paper.html" import range_filter %}
+{% from "_paper.html" import doc, range_filter %}
 {% block title %}General Cleaning & Sanitation Record{% endblock %}
 {% block content %}
 <style>
-  .paper-table tr.group td.plain { background: #fff; color: #111; text-transform: none; font-weight: 700; }
-  .paper-table tr.group td.phase { text-decoration: underline; white-space: nowrap; }
-  .paper-table tr.group td:first-child { white-space: nowrap; }
-  .paper-table td.ok { color: #555; }
-  .paper-table td.flag { font-weight: 700; }
-  .san-head { text-align: center; margin-bottom: 14px; }
-  .san-head img { width: 74px; height: 74px; object-fit: cover; border-radius: 4px; }
-  .san-head .paper-org { font-size: 1rem; }
+  .doc-table tr.phase td { padding-top: 10px; font-weight: 700; color: #1d1c1a; border-bottom: 1px solid #e8e3d8; }
+  .doc-table tr.phase td.phase-name { color: #a8862a; font-size: .64rem; letter-spacing: .12em; text-transform: uppercase; }
+  .doc-table td.ok { color: #807a6e; }
+  .doc-table td.flag { font-weight: 700; }
 </style>
 <a class="back-link no-print" href="{{ url_for('facility.sanitation') }}">{{ icon('arrow-left', 15) }} Cleaning &amp; Sanitation</a>
 {{ range_filter(url_for('facility.sanitation_print'), date_from, date_to) }}
 
-<div class="paper">
-  <div class="paper-head" style="justify-content:center;border-bottom:none;margin-bottom:0">
-    <img src="{{ url_for('static', filename='img/amamio-logo.jpg') }}" alt="Amamio Farm Products">
-    <div style="text-align:center">
-      <div class="paper-org">AMAMIO FARM PRODUCT</div>
-      <div class="paper-addr">District 4, Brgy. Kinabjangan, Nasipit, Agusan del Norte</div>
-    </div>
-  </div>
-  <div class="paper-title">General Cleaning &amp; Sanitation Record</div>
-  <div class="paper-sub">{{ date_from }} to {{ date_to }}</div>
-
-  <table class="paper-table">
+{% call doc('General Cleaning & Sanitation Record', subtitle=(date_from|longdate) ~ ' – ' ~ (date_to|longdate), wide=true, landscape=true) %}
+  <table class="doc-table is-compact" style="margin-top:20px">
     <thead>
       <tr>
-        <th>DATE</th><th>LOCATION</th><th>CURRENT STATUS</th><th>ACTION TO UNDERTAKEN</th>
-        <th>DATE UNDERTAKEN</th><th>CONDUCTED BY:</th><th>INSPECTED BY:</th><th>REMARKS</th>
+        <th>Date</th><th>Location</th><th>Current status</th><th>Action to undertake</th>
+        <th>Date undertaken</th><th>Conducted by</th><th>Inspected by</th><th>Remarks</th>
       </tr>
     </thead>
     <tbody>
       {% for g in groups %}
+        <tr class="group"><td colspan="8">{{ g.date|longdate }}</td></tr>
         {% for phase in phases %}
           {% set rec = (g.records|selectattr('phase', 'equalto', phase)|list|first) %}
-          <tr class="group">
-            <td class="plain">{{ g.date if loop.first else '' }}</td>
-            <td class="phase">{{ phase_paper[phase] }}</td>
-            <td class="plain"></td><td class="plain"></td><td class="plain"></td>
-            <td class="plain"></td><td class="plain"></td>
-            <td class="plain" style="font-weight:400">{{ rec.remarks if rec else '' }}</td>
+          <tr class="phase">
+            <td></td>
+            <td class="phase-name" colspan="6">{{ phase_paper[phase] }}</td>
+            <td style="font-weight:400">{{ rec.remarks if rec else '' }}</td>
           </tr>
           {% for loc in locations %}
             {% set a = (rec.areas|selectattr('location', 'equalto', loc)|list|first) if rec else none %}
@@ -51,7 +36,7 @@
               <td>{{ location_paper.get(loc, loc) }}</td>
               <td class="{{ 'ok' if a and a.current_status == 'Clean' else 'flag' }}">{{ a.current_status if a else '' }}</td>
               <td>{{ a.action if a else '' }}</td>
-              <td>{{ (a.date_undertaken or '') if a else '' }}</td>
+              <td class="nowrap">{{ (a.date_undertaken|longdate) if a else '' }}</td>
               {% if loop.first %}
               <td rowspan="{{ locations|length }}" style="vertical-align:middle">{{ rec.conducted_by if rec else '' }}</td>
               <td rowspan="{{ locations|length }}" style="vertical-align:middle">{{ rec.inspected_by if rec else '' }}</td>
@@ -61,10 +46,9 @@
           {% endfor %}
         {% endfor %}
       {% else %}
-      <tr><td colspan="8" style="text-align:center;color:#666;padding:20px">No cleaning recorded in this period.</td></tr>
+      <tr><td colspan="8" class="empty">No cleaning recorded in this period.</td></tr>
       {% endfor %}
     </tbody>
   </table>
-  <div class="paper-note">file name: General Cleaning &amp; Sanitation Record</div>
-</div>
+{% endcall %}
 {% endblock %}

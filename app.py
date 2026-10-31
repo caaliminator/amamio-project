@@ -12,6 +12,7 @@ import db
 import icons
 import page_notes
 import platform_service
+import profiles
 import security
 import services
 from seed import seed_if_empty
@@ -64,6 +65,7 @@ def create_app():
     from supplies import supplies_bp
     from product_moves import product_moves_bp
     from facility import facility_bp
+    from employees import employees_bp
     from purchasing import purchasing_bp
     from ledger import ledger_bp
 
@@ -94,15 +96,21 @@ def create_app():
     app.register_blueprint(supplies_bp, url_prefix="/supplies")
     app.register_blueprint(product_moves_bp, url_prefix="/products-in-out")
     app.register_blueprint(facility_bp, url_prefix="/facility")
+    app.register_blueprint(employees_bp, url_prefix="/employees")
 
     app.jinja_env.globals["icon"] = icons.icon
+    # Printed forms: the e-signature and position of whoever signed.
+    app.jinja_env.globals["signature_url"] = profiles.signature_url
+    app.jinja_env.globals["position_of"] = profiles.position_of
+    # Text fields: "Name (Position)"; the routes store the bare name.
+    app.jinja_env.globals["with_position"] = profiles.with_position
     app.jinja_env.filters["qty"] = services.fmt_qty
     app.jinja_env.filters["peso"] = services.fmt_peso
     app.jinja_env.filters["longdate"] = services.fmt_date
     app.jinja_env.filters["mdy"] = services.fmt_mdy
 
     # --- Global template context ------------------------------------------
-    def _nav_active():
+    def _nav_active(user):
         """The one sidebar entry to highlight for this request.
 
         A view may name it via ``g.nav_endpoint``; otherwise an exact endpoint
@@ -110,7 +118,8 @@ def create_app():
         chosen = getattr(g, "nav_endpoint", None)
         if chosen:
             return chosen
-        endpoints = [it[3] for _, items in security.NAV for it in items]
+        endpoints = [it[3] for _, items in security.nav_for(user)
+                     for it in items]
         if request.endpoint in endpoints:
             return request.endpoint
         for endpoint in endpoints:
@@ -128,11 +137,12 @@ def create_app():
             # "About this page" note (page_notes.py), unless the user hid them.
             "show_notes": bool(user) and not user.get("hide_notes"),
             "page_note": page_notes.for_endpoint(request.endpoint) if user else None,
-            "nav_active": _nav_active() if user else None,
+            "nav_active": _nav_active(user) if user else None,
             "current_user": user,
             "nav_unread": services.unread_count(user["id"]) if user else 0,
             "can": (lambda module: security.can(user, module)),
-            "nav_sections": security.NAV,
+            "nav_sections": security.nav_for(user),
+            "nav_subtitle": security.nav_subtitle(user),
             "role_labels": security.ROLE_LABELS,
             "is_admin": security.is_admin(user),
             "is_super_admin": security.is_super_admin(user),

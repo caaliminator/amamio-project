@@ -5438,5 +5438,25 @@
     "user_id": null,
     "timestamp": "2026-07-27T08:58:00+00:00",
     "id": 544
+  },
+  {
+    "item_type": "material",
+    "item_id": 74,
+    "change_qty": 5.0,
+    "txn_type": "received",
+    "reference_id": "RB-15",
+    "user_id": 3,
+    "timestamp": "2026-10-31T11:17:27.599480+00:00",
+    "id": 545
+  },
+  {
+    "item_type": "material",
+    "item_id": 2,
+    "change_qty": 150.0,
+    "txn_type": "received",
+    "reference_id": "RB-14",
+    "user_id": 3,
+    "timestamp": "2026-10-31T11:35:08.605688+00:00",
+    "id": 546
   }
 ]

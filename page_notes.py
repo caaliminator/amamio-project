@@ -643,9 +643,9 @@ NOTES = {
     },
     "requests.new": {
         "title": "New purchase request",
-        "what": "The Purchase Request Form, one part at a time: department and purpose; the items, picked from a dropdown, with estimated costs and the preferred supplier from the directory; then the expected date, the requestor's name and notes.",
+        "what": "The Purchase Request Form, one part at a time: department and purpose; the items — type to search the materials list, or type a new item — with estimated costs and the preferred supplier (type to search the directory); then the requesting employee, the expected date and notes.",
         "who": "Team Heads · " + ADMINS,
-        "flow": "The PR No. is given automatically (year-month-number). Submitted for approval: the Admin checks it first, then the Super Admin gives the final approval.",
+        "flow": "The PR No. is given automatically (year-month-number). The team head who submits it signs it as Approved By (Dept. Head). Then the Admin checks it, and the Super Admin gives the final approval.",
         "form": "Purchase Request Form",
     },
     "requests.new_production": {
@@ -688,7 +688,7 @@ NOTES = {
     },
     "purchasing.new": {
         "title": "Prepare a purchase order",
-        "what": "The Purchase Order form, one part at a time: the supplier, picked from the directory; dates, payment terms (incl. advance or partial payment) and delivery; the items, picked from a dropdown, and prices; then totals with optional labor cost. Prepared by is you.",
+        "what": "The Purchase Order form, one part at a time: the supplier, picked from the directory; dates, payment terms (incl. advance or partial payment) and delivery; the items as approved on the PR (the description can't be changed) with their prices; then discount, freight, optional labor cost and VAT as a percentage. Prepared by is you.",
         "who": ADMINS,
         "flow": "Only approved PR items can be ordered. The PO No. follows the PR No.",
         "form": "Purchase Order",
@@ -737,10 +737,28 @@ NOTES = {
         "flow": "Use it to plan batches and purchase requests.",
     },
     "auth.users": {
-        "title": "Users",
+        "title": "Users & Profiles",
         "what": "Everyone who can sign in, their role, and whether they are active.",
-        "who": ADMINS,
-        "flow": "The role decides which pages a person sees.",
+        "who": ADMINS + " · profiles: Super Admin",
+        "flow": "The role decides which pages a person sees. The Super Admin opens Edit profile to keep each person's details, photo and e-signature.",
+    },
+    "employees.index": {
+        "title": "Employees",
+        "what": "The staff who don't sign in to the system — name, position, department and employee no.",
+        "who": "Super Admin",
+        "flow": "Team heads pick these names as the requesting employee on a purchase request (type to search). People with a system account are kept in Users & Profiles instead.",
+    },
+    "employees.edit": {
+        "title": "Edit employee",
+        "what": "Correct one employee's name, position, department or contact number.",
+        "who": "Super Admin",
+        "flow": "Purchase requests already raised keep the name as it was written.",
+    },
+    "auth.user_profile": {
+        "title": "Staff profile",
+        "what": "One person's name, position, personal details, photo and e-signature.",
+        "who": "Super Admin",
+        "flow": "The full name, position and e-signature print on the forms this person signs — Purchase Request, Purchase Order, Material Receiving Report, Inspection Checklist and Hold / Rejection Report.",
     },
     "migration.index": {
         "title": "MySQL Export",

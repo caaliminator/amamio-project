@@ -77,6 +77,8 @@ PERMISSIONS = {
     "reports":       ADMIN_ROLES,
     "users":         ADMIN_ROLES,
     "migration":     {"super_admin"},
+    "profiles":      {"super_admin"},                # staff profiles & e-signatures
+    "employees":     {"super_admin"},                # staff without an account
 
     # Module 1 — receiving area, then inspection & cleaning.
     "receiving":     ADMIN_ROLES | {"receiving_head"},
@@ -107,7 +109,7 @@ PERMISSIONS = {
 }
 
 # Modules only the Super Admin may reach, whatever PERMISSIONS says.
-SUPER_ADMIN_ONLY = {"migration"}
+SUPER_ADMIN_ONLY = {"migration", "profiles", "employees"}
 
 # Modules where PERMISSIONS is exact — the Admin role does NOT get in by
 # default.  Packing is recorded by the packers and the Super Admin only.
@@ -134,6 +136,10 @@ NAV = [
     ]),
     ("Stock", [
         ("product_moves", "Products In / Out", "swap", "product_moves.index"),
+    ]),
+    ("Super Admin", [
+        ("profiles",  "Users & Profiles", "users", "auth.users"),
+        ("employees", "Employees",        "customers", "employees.index"),
     ]),
 ]
 
@@ -180,6 +186,50 @@ NAV_HIDDEN = [
         ("migration",     "MySQL Export",  "database", "migration.index"),
     ]),
 ]
+
+# Menus written for one team, in its own words (SOP AFP-WH-SOP-001 for
+# receiving).  A role listed here sees this menu instead of NAV, with its own
+# sidebar subtitle; every entry is still checked with can().
+ROLE_NAV = {
+    "receiving_head": [
+        ("Receiving", [
+            ("dashboard", "Receiving Home",     "dashboard", "auth.dashboard"),
+            ("receiving", "Receiving Log",      "clipboard", "receiving.index"),
+            ("receiving", "Receive a Delivery", "in", "receiving.new"),
+            ("honey",     "Honey Containers",   "honey", "honey.index"),
+            ("supplies",  "Supplies In / Out",  "swap", "supplies.index"),
+            ("qr",        "Scan a QR Label",    "qr", "qr.scan"),
+        ]),
+        ("Inspection & Hold", [
+            ("inspection", "Boxes for Inspection",     "inspect", "receiving.inspection"),
+            ("inspection", "Hold & Rejection Reports", "shield", "receiving.ncr_list"),
+        ]),
+        ("Receiving Reports", [
+            ("receiving", "Receiving & Inspection Report", "reports", "receiving.report"),
+            ("receiving", "Damage Report",                 "alert", "receiving.damage"),
+        ]),
+        ("Suppliers & Requests", [
+            ("suppliers", "Supplier Directory", "suppliers", "suppliers.index"),
+            ("requests",  "Purchase Requests",  "requests", "requests.index"),
+        ]),
+        ("General", [
+            ("notifications", "Notifications", "notifications", "notifications.index"),
+        ]),
+    ],
+}
+ROLE_NAV_SUBTITLE = {"receiving_head": "Receiving"}
+
+
+def nav_for(user):
+    """The sidebar sections for this user: their team's menu, or NAV."""
+    role = normalize_role(user.get("role")) if user else None
+    return ROLE_NAV.get(role, NAV)
+
+
+def nav_subtitle(user):
+    """The line under the brand in the sidebar."""
+    role = normalize_role(user.get("role")) if user else None
+    return ROLE_NAV_SUBTITLE.get(role, "Sales & Inventory")
 
 def normalize_role(role):
     """Map a legacy role key onto the current role set."""

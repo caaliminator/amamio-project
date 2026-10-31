@@ -26,6 +26,7 @@ from flask import (Blueprint, abort, flash, g, redirect, render_template,
                    request, url_for)
 
 import db
+import profiles
 import purchasing_service as pur
 import services
 from security import can, current_user, module_required
@@ -277,7 +278,7 @@ def close(batch_id):
             checks={key: form.get("check_" + key)
                     for key, _ in services.CONTROL_CHECKS},
             verified_by_name=form.get("verified_by_name") or "",
-            qa_approved_by_name=form.get("qa_approved_by_name") or "")
+            qa_approved_by_name=profiles.strip_position(form.get("qa_approved_by_name")))
         if not err:
             flash("Receipt %s closed." % record.get("ref_no"), "success")
             return redirect(url_for("receiving.batch", batch_id=batch_id))
@@ -478,7 +479,7 @@ def ncr_dispose(ncr_id):
         justification=form.get("justification") or "",
         supplier_response=form.get("supplier_response") or "",
         accepted_qty=form.get("accepted_qty"),
-        qa_approved_by_name=form.get("qa_approved_by_name") or "")
+        qa_approved_by_name=profiles.strip_position(form.get("qa_approved_by_name")))
     if err:
         flash(err, "error")
     else:
@@ -493,7 +494,7 @@ def ncr_close(ncr_id):
     _ncr_or_404(ncr_id)
     record, err = services.close_ncr(
         ncr_id, current_user()["id"],
-        request.form.get("closure_verified_by_name") or "",
+        profiles.strip_position(request.form.get("closure_verified_by_name")),
         supplier_response=request.form.get("supplier_response") or "")
     if err:
         flash(err, "error")

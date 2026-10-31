@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_paper.html" import paper_head, paper_signoff, range_filter %}
+{% from "_paper.html" import doc, doc_h, doc_signoff, range_filter %}
 {% block title %}Products IN / OUT Report{% endblock %}
 {% block content %}
 <a class="back-link no-print" href="{{ url_for('product_moves.index') }}">{{ icon('arrow-left', 15) }} Products In / Out</a>
@@ -9,10 +9,9 @@
 {% endset %}
 {{ range_filter(url_for('product_moves.report'), date_from, date_to, downloads) }}
 
-<div class="paper">
-  {{ paper_head('Products IN / OUT Report', 'Finished goods taken in and issued out · ' ~ date_from ~ ' to ' ~ date_to) }}
-
-  <table class="paper-table">
+{% call doc('Products IN / OUT Report', subtitle='Finished goods taken in and issued out · ' ~ (date_from|longdate) ~ ' – ' ~ (date_to|longdate),
+            meta=[('Total IN', r.total_in|qty), ('Total OUT', r.total_out|qty), ('Products', r.rows|length), ('Movements', r.movements|length)]) %}
+  <table class="doc-table">
     <thead><tr>
       <th>Product</th><th>Unit</th><th class="num">Opening</th><th class="num">IN</th>
       <th class="num">OUT</th><th class="num">Closing</th><th>IN detail</th><th>OUT detail</th>
@@ -21,7 +20,7 @@
       {% for group, rows in r.rows|groupby('group') %}
       <tr class="group"><td colspan="8">{{ group }}</td></tr>
       {% for row in rows %}
-      <tr class="sub">
+      <tr>
         <td>{{ row.product_name }}{% if row.mismatch %} <b title="The stock ledger doesn't add up for this product">⚠</b>{% endif %}</td>
         <td>{{ row.unit }}</td>
         <td class="num">{{ row.opening|qty }}</td>
@@ -33,13 +32,13 @@
       </tr>
       {% endfor %}
       {% else %}
-      <tr><td colspan="8" style="text-align:center;color:#666;padding:20px">No product stock or movements in this period.</td></tr>
+      <tr><td colspan="8" class="empty">No product stock or movements in this period.</td></tr>
       {% endfor %}
     </tbody>
   </table>
 
-  <div class="paper-section">Totals by reason</div>
-  <table class="paper-table plain" style="max-width:560px">
+  {{ doc_h('Totals by reason') }}
+  <table class="doc-table is-narrow">
     <thead><tr><th>IN — reason</th><th class="num">Qty</th><th>OUT — reason</th><th class="num">Qty</th></tr></thead>
     <tbody>
       {% for i in range([r.in_totals|length, r.out_totals|length, 1]|max) %}
@@ -50,13 +49,13 @@
         <td>{{ b[0] if b else '' }}</td><td class="num">{{ b[1]|qty if b else '' }}</td>
       </tr>
       {% endfor %}
-      <tr><td><b>Total IN</b></td><td class="num"><b>{{ r.total_in|qty }}</b></td>
-          <td><b>Total OUT</b></td><td class="num"><b>{{ r.total_out|qty }}</b></td></tr>
+      <tr class="total"><td>Total IN</td><td class="num">{{ r.total_in|qty }}</td>
+          <td>Total OUT</td><td class="num">{{ r.total_out|qty }}</td></tr>
     </tbody>
   </table>
 
-  <div class="paper-section">Movements</div>
-  <table class="paper-table plain">
+  {{ doc_h('Movements') }}
+  <table class="doc-table">
     <thead><tr>
       <th>Date</th><th>Product</th><th class="num">IN</th><th class="num">OUT</th>
       <th>Unit</th><th>Reason</th><th>Reference</th><th>Person</th><th>Recorded by</th>
@@ -75,14 +74,14 @@
         <td>{{ m.recorded_by }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="9" style="text-align:center;color:#666;padding:14px">No movements in this period.</td></tr>
+      <tr><td colspan="9" class="empty">No movements in this period.</td></tr>
       {% endfor %}
     </tbody>
   </table>
   {% if r.mismatches %}
-  <div class="paper-note" style="color:#9b1c1c"><b>⚠ {{ r.mismatches }} product(s):</b> the stock ledger doesn't add up to the current stock figure, so the balance goes below zero. A starting stock or an older movement was never recorded. Correct the stock with a count adjustment to fix it.</div>
+  <div class="doc-callout" style="border-left-color:#b42318"><b>⚠ {{ r.mismatches }} product(s):</b> the stock ledger doesn't add up to the current stock figure, so the balance goes below zero. A starting stock or an older movement was never recorded. Correct the stock with a count adjustment to fix it.</div>
   {% endif %}
-  <div class="paper-note">Opening = stock at the start of the first day · Closing = stock at the end of the last day. IN / OUT come from the stock ledger: production, packing, sales, returns, count adjustments and Products In / Out.</div>
-  {{ paper_signoff(['Prepared by:', 'Checked by:', 'Approved by:']) }}
-</div>
+  <p class="doc-note">Opening = stock at the start of the first day · Closing = stock at the end of the last day. IN / OUT come from the stock ledger: production, packing, sales, returns, count adjustments and Products In / Out.</p>
+  {{ doc_signoff(['Prepared by', 'Checked by', 'Approved by']) }}
+{% endcall %}
 {% endblock %}

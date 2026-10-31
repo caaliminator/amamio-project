@@ -15,3 +15,7 @@ sales-platform/*
 !sales-platform/README.txt
 data/platform_sales.json
 data/platform_imports.json
+
+# Staff photos and e-signatures (Users & Profiles) are personal data —
+# they stay on this computer, never in the (public) repository.
+data/uploads/

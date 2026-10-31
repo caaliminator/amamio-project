@@ -44,9 +44,24 @@ SCHEMA = {
             "password_hash": "VARCHAR(255) NULL", "role": SHORT, "email": STR,
             "phone": SHORT, "team": SHORT, "theme": SHORT, "hide_notes": BOOL,
             "active": BOOL,
+            # Staff profile (profiles.py) — printed on the forms.
+            "first_name": STR, "middle_name": STR, "last_name": STR,
+            "suffix": SHORT, "position": STR, "gender": SHORT,
+            "birthdate": DATE, "employee_no": SHORT, "date_hired": DATE,
+            "address": TEXT, "emergency_contact": STR,
+            "photo": STR, "signature": STR,
             "last_login": TS, "created_at": TS,
         },
         "unique": ["username"],
+    },
+    # Staff without a system account (Super Admin → Employees) — picked as
+    # the requesting employee on a purchase request.
+    "employees": {
+        "columns": {
+            "id": ID, "first_name": STR, "middle_name": STR, "last_name": STR,
+            "suffix": SHORT, "name": STR, "position": STR, "department": SHORT,
+            "employee_no": SHORT, "phone": SHORT, "created_at": TS,
+        },
     },
     "roles": {
         "columns": {"id": ID, "key": SHORT, "name": STR, "description": TEXT},
@@ -533,6 +548,9 @@ SCHEMA = {
         "columns": {
             "id": ID, "type": SHORT, "pr_no": SHORT, "requestor_id": FK,
             "requested_by_name": STR, "department": SHORT, "purpose": TEXT,
+            # The team head who raised it signs it as approved by the dept.
+            "dept_head_id": FK, "dept_head_name": STR,
+            "dept_head_position": STR, "dept_approved_at": DATE,
             "date_requested": DATE, "product_id": FK, "product_name": STR,
             "qty": NUM, "reason": TEXT, "needed_by": DATE, "urgency": SHORT,
             "notes": TEXT, "total_estimated": MONEY, "status": SHORT,
@@ -543,7 +561,7 @@ SCHEMA = {
         },
         "children": {"items": "purchase_request_items"},
         "foreign_keys": {"requestor_id": "users", "product_id": "products",
-                         "decided_by": "users"},
+                         "decided_by": "users", "dept_head_id": "users"},
     },
     "purchase_request_items": {
         "columns": {
@@ -572,7 +590,7 @@ SCHEMA = {
             "supplier_reference": STR, "deliver_to": STR,
             "delivery_address": TEXT, "delivery_instructions": TEXT,
             "delivery_contact": STR, "subtotal": MONEY, "discount": MONEY,
-            "freight": MONEY, "labor": MONEY, "tax": MONEY,
+            "freight": MONEY, "labor": MONEY, "vat_rate": NUM, "tax": MONEY,
             "grand_total": MONEY,
             "terms": TEXT, "prepared_by_name": STR, "prepared_at": DATE,
             "checked_by_name": STR, "checked_at": DATE, "approved_by_name": STR,

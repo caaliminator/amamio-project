@@ -1,0 +1,122 @@
+{# The Purchase Order as a document — the printable copy, and the preview on
+   the form's last step (``preview``: built from the fields, not saved; each
+   part links back to the step that fills it). #}
+{% from "_paper.html" import doc_signs %}
+{% set pv = preview is defined and preview %}
+{% macro edit(step) %}{% if pv %}<a href="#" class="doc-edit no-print" data-wz-goto="{{ step }}">Edit</a>{% endif %}{% endmacro %}
+{% macro pct(rate) %}{{ '%g'|format(rate|float) }}%{% endmacro %}
+{% set mark = 'Preview' if pv else ('Cancelled' if po.status == 'Cancelled'
+               else ('Not yet approved' if po.status in ('Prepared', 'For Final Approval') else '')) %}
+
+<div class="doc-scroll">
+<article class="doc{{ ' is-marked' if mark }}" {% if mark %}data-mark="{{ mark }}"{% endif %}>
+
+  <header class="doc-head">
+    <div class="doc-brand">
+      <img src="{{ url_for('static', filename='img/amamio-logo.jpg') }}" alt="">
+      <div>
+        <div class="doc-org">Amamio Farm Products</div>
+        <div class="doc-addr"><span>District 4, Brgy. Kinabjangan, Nasipit, Agusan del Norte</span>
+          <span>0975 801 9089 · 0917 124 8356 · amamiofarm@gmail.com</span></div>
+      </div>
+    </div>
+    <div class="doc-title">
+      <div class="doc-kind">Purchase Order</div>
+      <div class="doc-no">No. <b>{{ po.po_no }}</b></div>
+      {% if pv %}<span class="doc-status is-preview">Preview · not saved yet</span>
+      {% else %}<span class="doc-status">{{ po.status }}</span>{% endif %}
+    </div>
+  </header>
+
+  <div class="doc-meta">
+    <div><span>PO date</span><b>{{ po.po_date|longdate or '—' }}</b></div>
+    <div><span>Expected delivery</span><b>{{ po.expected_delivery|longdate or '—' }}</b></div>
+    <div><span>Payment terms</span><b>{{ po.payment_terms or '—' }}</b></div>
+    <div><span>PR No.</span><b>{{ po.pr_no or '—' }}</b></div>
+    {{ edit(1) }}
+  </div>
+
+  <div class="doc-parties">
+    <section>
+      <h3>Supplier {{ edit(0) }}</h3>
+      <div class="doc-party-name">{{ po.supplier_name }}</div>
+      {% if po.supplier_address %}<p>{{ po.supplier_address }}</p>{% endif %}
+      <dl>
+        {% if po.supplier_contact_person %}<dt>Contact person</dt><dd>{{ po.supplier_contact_person }}</dd>{% endif %}
+        {% if po.supplier_contact %}<dt>Contact</dt><dd>{{ po.supplier_contact }}</dd>{% endif %}
+        {% if po.supplier_tin %}<dt>TIN</dt><dd>{{ po.supplier_tin }}</dd>{% endif %}
+        {% if po.supplier_reference %}<dt>Reference</dt><dd>{{ po.supplier_reference }}</dd>{% endif %}
+      </dl>
+    </section>
+    <section>
+      <h3>Deliver to {{ edit(1) }}</h3>
+      <div class="doc-party-name">{{ po.deliver_to }}</div>
+      {% if po.delivery_address %}<p>{{ po.delivery_address }}</p>{% endif %}
+      <dl>
+        {% if po.delivery_contact %}<dt>Contact</dt><dd>{{ po.delivery_contact }}</dd>{% endif %}
+        {% if po.delivery_instructions %}<dt>Instructions</dt><dd>{{ po.delivery_instructions }}</dd>{% endif %}
+      </dl>
+    </section>
+  </div>
+
+  <div class="doc-section-head"><h3>Items</h3>{{ edit(2) }}</div>
+  <table class="doc-items">
+    <thead>
+      <tr><th class="n">#</th><th>Description / specification</th><th class="num">Qty</th><th>Unit</th>
+        <th class="num">Unit price</th><th class="num">Amount</th></tr>
+    </thead>
+    <tbody>
+      {% for it in po['items'] %}
+      <tr>
+        <td class="n">{{ it.line_no }}</td>
+        <td>
+          <div class="doc-item">{{ it.description }}</div>
+          {% set sub = [it.brand_model,
+                        ('Deliver by ' ~ it.requested_delivery|longdate) if it.requested_delivery else '',
+                        ('VAT: ' ~ it.vat) if it.vat else '',
+                        it.remarks]|select|list %}
+          {% if sub %}<div class="doc-item-sub">{{ sub|join(' · ') }}</div>{% endif %}
+        </td>
+        <td class="num">{{ it.qty|qty }}</td>
+        <td>{{ it.unit }}</td>
+        <td class="num">{{ it.unit_price|peso }}</td>
+        <td class="num">{{ it.amount|peso }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="doc-bottom">
+    <div class="doc-terms">
+      <h3>Terms &amp; special instructions {{ edit(3) }}</h3>
+      <p>{{ po.terms }}</p>
+    </div>
+    <table class="doc-totals">
+      <tr><th>Subtotal</th><td>{{ po.subtotal|peso }}</td></tr>
+      {% if po.discount %}<tr><th>Discount</th><td>− {{ po.discount|peso }}</td></tr>{% endif %}
+      {% if po.freight %}<tr><th>Delivery / freight</th><td>{{ po.freight|peso }}</td></tr>{% endif %}
+      {% if po.labor %}<tr><th>Labor cost</th><td>{{ po.labor|peso }}</td></tr>{% endif %}
+      {% if po.vat_rate or po.tax %}<tr><th>VAT{{ ' (' ~ pct(po.vat_rate) ~ ')' if po.vat_rate }}</th><td>{{ po.tax|peso }}</td></tr>{% endif %}
+      <tr class="grand"><td colspan="2"><div class="doc-grand"><span>Grand total</span><b>{{ po.grand_total|peso }}</b></div></td></tr>
+      {% if po.advance_amount %}
+      <tr class="after"><th>Paid up front</th><td>{{ po.advance_amount|peso }}</td></tr>
+      <tr class="after"><th>Balance</th><td>{{ (po.grand_total - po.advance_amount)|peso }}</td></tr>
+      {% endif %}
+    </table>
+  </div>
+
+  {# Prepared by is the one preparing it, so they are signed from the preview
+     on.  The rest stay empty until that step is done: Checked by at the
+     Admin's check, Approved by at the Super Admin's approval. #}
+  {{ doc_signs([
+       ('Prepared by', po.prepared_by_name, po.created_by, po.prepared_at),
+       ('Checked by', po.checked_by_name, none, po.checked_at, 'Admin'),
+       ('Approved by', po.approved_by_name, none, po.approved_at, 'Super Admin'),
+       ('Supplier acknowledgment', po.supplier_ack_name, -1, po.supplier_ack_date, 'Signature over printed name')]) }}
+
+  <footer class="doc-foot">
+    <span>Amamio Farm Products · Purchase Order {{ po.po_no }}</span>
+    <span>Please quote the PO No. on invoices and delivery receipts · Controlled form</span>
+  </footer>
+</article>
+</div>

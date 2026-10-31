@@ -73,8 +73,9 @@
 /* Out-of-stock choices: red and not selectable (packing product list). */
 select option.opt-out, select option.opt-out:disabled { color: var(--danger); }
 .out-word { color: var(--danger); font-weight: 600; }
-/* A value filled in by the system that the user can't change. */
-.locked-field, .locked-field:hover, .locked-field:focus {
+/* A value filled in by the system that the user can't change.  input.…
+   outranks the base input[type=…] rule in style.css. */
+.locked-field, input.locked-field, input.locked-field:hover, input.locked-field:focus {
   background: var(--raise-3); border-color: var(--border); color: var(--text);
   cursor: not-allowed; box-shadow: none;
 }
@@ -456,3 +457,207 @@ select option.opt-out, select option.opt-out:disabled { color: var(--danger); }
   .paper-table th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .wizard .wz-nav, .back-link, .toolbar, .tabs { display: none !important; }
 }
+
+/* ---------- E-signatures on printed forms (profiles.py) ---------- */
+.sig-img { display: block; height: 42px; max-width: 92%; margin: -8px auto 0; object-fit: contain; }
+.sig-inline { display: inline-block; height: 34px; max-width: 150px; margin: -14px 6px -6px 0; vertical-align: bottom; object-fit: contain; }
+/* Equal sign-off boxes even when a label wraps to two lines. */
+.gform-sign > div { display: flex; flex-direction: column; }
+.gform-sign .who { min-height: 2.9em; display: flex; align-items: center; justify-content: center; }
+.gform-sign .name { flex: 1; }
+.gform-sign .pos { display: block; font-weight: 500; font-size: .68rem; text-transform: none; color: #333; margin-top: 2px; }
+
+/* ---------- Staff profile (Super Admin) ---------- */
+.profile-head { display: flex; align-items: center; gap: 16px; }
+.avatar-lg { width: 64px; height: 64px; font-size: 1.2rem; }
+.avatar-photo { object-fit: cover; padding: 0; }
+.user-cell { display: flex; align-items: center; gap: 10px; }
+.user-cell .avatar { width: 34px; height: 34px; }
+.profile-layout { display: grid; gap: 0 18px; grid-template-columns: 1fr; }
+@media (min-width: 1000px) { .profile-layout { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); } }
+.profile-actions { grid-column: 1 / -1; display: flex; gap: 10px; }
+.pic-box { display: grid; place-items: center; min-height: 150px; margin-bottom: 10px; border: 1px dashed var(--line-3); border-radius: var(--radius-sm); background: var(--surface-3); overflow: hidden; }
+.pic-photo { width: 150px; height: 150px; object-fit: cover; border-radius: 50%; margin: 12px; }
+.pic-paper { background: #fff; min-height: 110px; }
+.pic-sig { max-width: 90%; max-height: 100px; object-fit: contain; margin: 10px; }
+.pic-empty { color: var(--muted-2); font-size: .8rem; }
+.pic-paper .pic-empty { color: #888; }
+/* The "How it prints" sample: one signature block on paper. */
+.doc.doc-mini { min-width: 0; padding: 4px 24px 18px; border-top-width: 3px; box-shadow: none; }
+.doc.doc-mini .doc-sign { margin-top: 0; }
+
+/* ---------- PO lines: what the PR asked for, and fields changed from it ---------- */
+.pr-ref { margin: -2px 0 14px; padding: 10px 14px 12px; border-radius: var(--radius-xs); background: var(--surface-2); font-size: .8rem; }
+.pr-ref dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 18px; margin: 8px 0 0; }
+.pr-ref dt { font-size: .64rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-2); }
+.pr-ref dd { margin: 2px 0 0; color: var(--text); font-weight: 600; word-break: break-word; }
+@media (max-width: 760px) { .pr-ref dl { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.pr-ref-prev { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line-2); color: var(--gold-ink); font-weight: 600; }
+.pr-ref-tag { display: inline-block; padding: 1px 7px; border-radius: 4px; background: var(--gold-soft);
+  color: var(--gold-ink); font-size: .66rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.form-grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 1000px) { .form-grid.cols-4 { grid-template-columns: repeat(4, 1fr); } }
+input.is-edited, select.is-edited { border-color: var(--gold-line); background-color: var(--gold-soft); }
+
+/* ---------- An input with a unit inside it, e.g. "12 %" ---------- */
+.input-suffix { position: relative; }
+.input-suffix input { padding-right: 38px; }
+.input-suffix span { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); font-weight: 600; pointer-events: none; }
+
+/* ---------- Searchable dropdown (type to filter; app.js "combo") ---------- */
+.combo { position: relative; }
+.combo-list { position: absolute; z-index: 40; left: 0; right: 0; top: calc(100% + 4px); max-height: 300px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--line-3); border-radius: var(--radius-xs); box-shadow: var(--shadow); padding: 4px 0; }
+.combo-group { padding: 8px 12px 4px; font-size: .68rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2); }
+.combo-opt { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; cursor: pointer; font-size: .9rem; }
+.combo-opt small { color: var(--muted-2); white-space: nowrap; }
+.combo-opt mark { background: none; color: var(--gold-ink); font-weight: 700; }
+.combo-opt.is-active, .combo-opt:hover { background: var(--gold-soft); }
+.combo-note { padding: 8px 12px; font-size: .8rem; color: var(--muted); }
+
+/* ---------- Document kit: every printable form (templates/_paper.html) ----------
+   Fixed light "paper" colours, whatever the app theme, so screen and print
+   match.  Gold is the one accent; charcoal carries the grand total. */
+.doc-scroll { overflow-x: auto; padding: 4px 2px 18px; }
+.doc {
+  --ink: #1d1c1a; --soft-ink: #4a463f; --mute: #807a6e; --line: #e8e3d8; --gold: #a8862a; --wash: #faf7f0;
+  position: relative; color-scheme: light; background: #fff; color: var(--ink);
+  min-width: 720px; max-width: 960px; margin: 0 auto; padding: 38px 44px 26px;
+  border-top: 5px solid var(--gold); border-radius: 10px; box-shadow: 0 24px 60px rgba(0, 0, 0, .28);
+  font-size: .82rem; line-height: 1.45; overflow: hidden;
+}
+.doc.is-marked::after {
+  content: attr(data-mark); position: absolute; top: 46%; left: 50%; pointer-events: none; white-space: nowrap;
+  transform: translate(-50%, -50%) rotate(-22deg); font-size: 3.6rem; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; color: rgba(168, 134, 42, .08);
+}
+.doc h3 { margin: 0 0 8px; font-size: .64rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+.doc-edit { margin-left: 8px; font-size: .64rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); text-decoration: underline; }
+
+.doc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
+.doc-brand { display: flex; align-items: center; gap: 14px; flex: 1 1 auto; min-width: 0; }
+.doc-brand img { width: 62px; height: 62px; object-fit: cover; border-radius: 10px; flex: none; }
+.doc-org { font-size: 1.05rem; font-weight: 800; letter-spacing: .02em; }
+.doc-addr { margin-top: 3px; font-size: .7rem; color: var(--mute); line-height: 1.5; }
+.doc-addr span { display: block; }
+.doc-title { text-align: right; }
+.doc-kind { font-size: 1.55rem; font-weight: 300; letter-spacing: .2em; text-transform: uppercase; line-height: 1.1; white-space: nowrap; }
+.doc-no { margin-top: 6px; font-size: .82rem; color: var(--mute); }
+.doc-no b { color: var(--ink); font-weight: 700; letter-spacing: .02em; }
+.doc-status { display: inline-block; margin-top: 8px; padding: 3px 11px; border: 1px solid var(--gold); border-radius: 999px;
+  font-size: .64rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }
+.doc-status.is-preview { border-style: dashed; }
+.doc-title { flex: 0 1 auto; max-width: 50%; }
+.doc-kind.is-long { max-width: 340px; margin-left: auto; font-size: 1.12rem; font-weight: 400; letter-spacing: .12em; white-space: normal; line-height: 1.3; }
+.doc-subtitle { margin-top: 4px; font-size: .74rem; color: var(--soft-ink); }
+.doc-control { margin-top: 8px; font-size: .66rem; color: var(--mute); }
+.doc-control b { color: var(--soft-ink); font-weight: 600; }
+.doc-qr { display: block; width: 92px; height: 92px; margin: 10px 0 0 auto; }
+
+.doc-meta { position: relative; display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr); gap: 14px; margin: 22px 0 24px;
+  padding: 14px 18px; background: var(--wash); border-radius: 8px; }
+.doc-meta span { display: block; font-size: .62rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); }
+.doc-meta b { display: block; margin-top: 3px; font-size: .86rem; font-weight: 600; }
+.doc-meta > .doc-edit { position: absolute; top: 10px; right: 14px; margin: 0; }
+
+.doc-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 26px; }
+.doc-parties h3 { padding-bottom: 7px; border-bottom: 1px solid var(--line); }
+.doc-party-name { font-size: 1rem; font-weight: 700; }
+.doc-parties p { margin: 3px 0 8px; color: var(--soft-ink); }
+.doc-parties dl { display: grid; grid-template-columns: 104px 1fr; gap: 3px 10px; margin: 0; }
+.doc-parties dt { color: var(--mute); }
+.doc-parties dd { margin: 0; color: var(--soft-ink); word-break: break-word; }
+
+.doc-section-head { display: flex; align-items: baseline; margin-top: 24px; }
+.doc-items, .doc-table { width: 100%; border-collapse: collapse; }
+.doc-items th, .doc-table th { padding: 8px 10px; border-bottom: 1.5px solid var(--ink); text-align: left; vertical-align: bottom;
+  font-size: .62rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); }
+.doc-items td, .doc-table td { padding: 11px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.doc-items .num, .doc-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.doc-items .n, .doc-table .n { width: 30px; color: var(--mute); }
+.doc-table .c { text-align: center; }
+.doc-table .nowrap { white-space: nowrap; }
+.doc-table tr.group td { padding: 9px 10px 6px; background: var(--wash); border-bottom: 1px solid var(--line);
+  font-size: .64rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--gold); }
+.doc-table tr.sub td:first-child { padding-left: 20px; }
+.doc-table tr.total td { font-weight: 700; border-top: 1.5px solid var(--ink); }
+.doc-table td.empty { padding: 22px 10px; text-align: center; color: var(--mute); }
+.doc-table td.blank { height: 30px; }
+.doc-table .sub-line { display: block; margin-top: 2px; font-size: .72rem; color: var(--mute); font-weight: 400; }
+.doc-table.is-compact { font-size: .74rem; }
+.doc-table.is-compact th { padding: 6px 7px; font-size: .58rem; letter-spacing: .06em; }
+.doc-table.is-compact td { padding: 7px 7px; }
+.doc-table.is-narrow { max-width: 560px; }
+
+.doc-fields { display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); gap: 12px 24px; margin: 10px 0 4px; }
+.doc-fields > div { min-width: 0; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.doc-fields > div.is-wide { grid-column: 1 / -1; }
+.doc-fields dt { font-size: .62rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); }
+.doc-fields dd { margin: 3px 0 0; font-weight: 600; word-break: break-word; white-space: pre-line; }
+.doc-checks { display: flex; flex-wrap: wrap; gap: 8px 26px; margin: 10px 0 4px; padding: 0; list-style: none; color: var(--soft-ink); }
+.doc-checks li.is-on { color: var(--ink); font-weight: 600; }
+.doc-box { display: inline-grid; place-items: center; width: 15px; height: 15px; margin-right: 7px; vertical-align: -3px;
+  border: 1.5px solid var(--soft-ink); border-radius: 3px; font-size: .7rem; font-weight: 800; line-height: 1; color: var(--ink); }
+.doc-checks li.is-on .doc-box { border-color: var(--gold); background: #fbf5e2; }
+.doc-lines { margin: 8px 0 4px; }
+.doc-lines div { min-height: 28px; padding: 6px 0 4px; border-bottom: 1px solid var(--line); white-space: pre-line; }
+.doc-note { margin: 12px 0 0; font-size: .72rem; color: var(--mute); }
+.doc-callout { margin: 18px 0 0; padding: 10px 14px; border-left: 3px solid var(--gold); background: var(--wash);
+  font-size: .74rem; color: var(--soft-ink); border-radius: 0 6px 6px 0; }
+/* A many-column report: as wide as its table (the page scrolls sideways). */
+.doc.is-wide { max-width: none; width: max-content; min-width: 100%; overflow: visible; }
+.doc-item { font-weight: 600; }
+.doc-item-sub { margin-top: 2px; font-size: .72rem; color: var(--mute); }
+
+.doc-bottom { display: grid; grid-template-columns: 1fr 300px; gap: 36px; margin-top: 20px; align-items: start; }
+.doc-terms p { margin: 0; font-size: .76rem; color: var(--soft-ink); white-space: pre-line; }
+.doc-totals { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.doc-totals th { padding: 6px 0; text-align: left; font-weight: 500; color: var(--soft-ink); }
+.doc-totals td { padding: 6px 0; text-align: right; white-space: nowrap; }
+.doc-totals tr + tr th, .doc-totals tr + tr td { border-top: 1px solid var(--line); }
+/* The grand total is one bar in one cell, so it prints without a seam. */
+.doc-totals tr.grand td { padding: 8px 0 0; border: 0; text-align: left; }
+.doc-grand { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 11px 14px;
+  border-radius: 6px; background: var(--ink); color: #fff; font-size: .95rem; font-weight: 700;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.doc-grand b { color: #f0d68a; }
+.doc-totals tr.after th, .doc-totals tr.after td { font-size: .74rem; color: var(--mute); }
+.doc-totals tr.grand + tr.after th, .doc-totals tr.grand + tr.after td { border-top: 0; padding-top: 10px; }
+
+.doc-sign { display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr); gap: 22px; margin-top: 42px; text-align: center; }
+.doc-sig { height: 52px; display: flex; align-items: flex-end; justify-content: center; }
+.doc-sig .sig-img { height: 48px; max-width: 100%; margin: 0 0 -4px; }
+.doc-sign-name { min-height: 1.5em; padding-top: 6px; border-top: 1px solid var(--ink); font-size: .8rem; font-weight: 700; }
+.doc-sign-pos { min-height: 1.3em; font-size: .7rem; color: var(--soft-ink); }
+.doc-sign-role { margin-top: 3px; font-size: .62rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); }
+.doc-sign-date { margin-top: 2px; font-size: .68rem; color: var(--soft-ink); }
+
+.doc-foot { display: flex; justify-content: space-between; gap: 16px; margin-top: 32px; padding-top: 12px;
+  border-top: 1px solid var(--line); font-size: .64rem; color: var(--mute); }
+
+.doc-error { display: flex; gap: 12px; align-items: flex-start; padding: 16px 18px; border: 1px solid var(--danger);
+  border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); }
+.doc-error svg { color: var(--danger); flex: none; margin-top: 2px; }
+.wz-body.is-bare { background: transparent; border: 0; padding: 0; box-shadow: none; }
+
+@media print {
+  .doc-scroll { overflow: visible; padding: 0; }
+  .doc { min-width: 0; max-width: none; padding: 16px 0 0; border-radius: 0; box-shadow: none; font-size: 9.5pt; }
+  .doc.is-marked::after { font-size: 3rem; }
+  .doc-kind { font-size: 1.35rem; letter-spacing: .16em; }
+  .doc, .doc * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .doc-items thead, .doc-table thead { display: table-header-group; }
+  .doc-items tr, .doc-table tr, .doc-bottom, .doc-sign-wrap, .doc-fields, .doc-checks { break-inside: avoid; }
+  .doc-section-head { break-after: avoid; page-break-after: avoid; }
+  .doc.is-wide { width: auto; font-size: 8.5pt; }
+  .doc-addr { font-size: 6.8pt; }
+  .doc-section-head { margin-top: 16px; }
+  .doc-meta { margin: 16px 0 18px; }
+  .doc-sign { margin-top: 28px; }
+  .doc-sig { height: 44px; }
+  .doc.is-landscape { page: landscape; }
+  .doc-scroll + .doc-scroll { break-before: page; }
+}
+
+/* Reports with many columns print on a landscape page. */
+@page landscape { size: A4 landscape; margin: 8mm; }

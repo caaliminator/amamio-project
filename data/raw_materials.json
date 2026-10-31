@@ -20,7 +20,7 @@
     "subcategory": "Raw materials",
     "unit": "pc",
     "track_mode": "piece",
-    "stock_qty": 788.0,
+    "stock_qty": 938.0,
     "reorder_level": 250,
     "supplier_id": 2,
     "unit_cost": 12.0,
@@ -1100,7 +1100,7 @@
     "subcategory": "Honey",
     "unit": "kg",
     "track_mode": "weight",
-    "stock_qty": 54.2,
+    "stock_qty": 59.2,
     "reorder_level": 0,
     "supplier_id": null,
     "unit_cost": 0.0,
@@ -1108,5 +1108,18 @@
     "storage_location": "Production Area",
     "created_at": "2026-10-16T05:39:34.693573+00:00",
     "id": 74
+  },
+  {
+    "name": "qdw",
+    "category": "cleaning",
+    "subcategory": "",
+    "unit": "pc",
+    "track_mode": "piece",
+    "stock_qty": 0.0,
+    "reorder_level": 0,
+    "supplier_id": 5,
+    "unit_cost": 11111.0,
+    "created_at": "2026-10-31T17:26:57.027252+00:00",
+    "id": 75
   }
 ]

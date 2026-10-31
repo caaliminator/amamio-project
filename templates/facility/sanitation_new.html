@@ -79,7 +79,7 @@
       <div class="form-row">
         <label class="form-label" for="conducted_by">Conducted by <span class="req">*</span></label>
         <input type="text" id="conducted_by" name="conducted_by" maxlength="80" required
-               value="{{ form.conducted_by or me_name }}" placeholder="Name of the person who cleaned">
+               value="{{ form.conducted_by or with_position(name=me_name) }}" placeholder="Name of the person who cleaned">
       </div>
       <div class="form-row">
         <label class="form-label" for="inspected_by">Inspected by <span class="req">*</span></label>

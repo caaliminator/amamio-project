@@ -1,40 +1,31 @@
 {% extends "base.html" %}
-{% from "_paper.html" import paper_head %}
+{% from "_paper.html" import doc %}
 {% block title %}Daily Production Report{% endblock %}
 {% block content %}
 {% include "production/_inputs.html" %}
 <style>
-  .dpr-wrap { overflow-x: auto; }
-  .dpr { font-size: .72rem; width: 100%; }
-  .dpr th, .dpr td { padding: 4px 5px; white-space: nowrap; }
-  .dpr thead th { font-size: .68rem; }
+  .dpr th, .dpr td { white-space: nowrap; }
   .dpr td.num { min-width: 34px; }
-  .dpr td.bal { font-weight: 700; background: #f7f7f7; }
-  .dpr td.fwd { background: #fbf6e3; font-weight: 700; }
-  .dpr tr.fam td { font-weight: 800; background: #fff; }
-  .dpr tr.sub td:first-child { padding-left: 20px; }
-  .dpr td.future { background: repeating-linear-gradient(135deg, #fff, #fff 4px, #f3f3f3 4px, #f3f3f3 8px); }
-  .dpr .first { position: sticky; left: 0; z-index: 1; min-width: 170px; background: #fff; box-shadow: 1px 0 0 #555; }
-  .dpr thead .first { background: #1f4fbf; }
-  .dpr tr.group td.first { background: #f3f3f3; }
-  .dpr td.sep, .dpr th.sep { border-left: 2px solid #111; }
+  .dpr td.bal { font-weight: 700; background: #faf8f3; }
+  .dpr td.fwd { background: #fbf5e2; font-weight: 700; }
+  .dpr tr.fam td { font-weight: 700; }
+  .dpr td.future { background: repeating-linear-gradient(135deg, #fff, #fff 4px, #f4f1ea 4px, #f4f1ea 8px); }
+  .dpr .first { position: sticky; left: 0; z-index: 1; min-width: 170px; background: #fff; box-shadow: 1px 0 0 #e8e3d8; }
+  .dpr tr.group td.first { background: #faf7f0; }
+  .dpr td.sep, .dpr th.sep { border-left: 1.5px solid #1d1c1a; }
+  .dpr thead tr:first-child th { text-align: center; }
   .print-only { display: none; }
-  .dpr-chunk + .dpr-chunk { margin-top: 18px; }
   @media print {
-    @page { size: A4 landscape; margin: 8mm; }
     .print-only { display: block; }
-    .dpr { font-size: 7pt; }
-    .dpr thead th { font-size: 6.5pt; }
-    .dpr th, .dpr td { padding: 2px 3px; }
+    .doc-table.dpr { font-size: 7pt; }
+    .doc-table.dpr th, .doc-table.dpr td { padding: 2px 4px; }
     .dpr .first { position: static; box-shadow: none; min-width: 0; }
     .dpr td.future { background: #fff; }
-    .dpr-chunk { break-inside: avoid; }
-    .dpr-chunk + .dpr-chunk { break-before: page; page-break-before: always; margin-top: 0; }
   }
 </style>
 
 {% macro dpr_table(r, start, stop, with_total) %}
-<table class="paper-table dpr" data-no-paginate>
+<table class="doc-table is-compact dpr" data-no-paginate>
   <thead>
     <tr>
       <th rowspan="2" class="first">PRODUCTS</th>
@@ -78,7 +69,7 @@
         {% endfor %}
       {% endfor %}
     {% else %}
-      <tr><td colspan="{{ ncols }}" style="text-align:center;color:#666;padding:20px">No product had stock or movement this month.</td></tr>
+      <tr><td colspan="{{ ncols }}" class="empty">No product had stock or movement this month.</td></tr>
     {% endfor %}
   </tbody>
 </table>
@@ -109,25 +100,27 @@
 </div>
 
 {% set n = r.periods|length %}
+{% set legend %}<p class="doc-note">BAL. For. = balance forwarded from the previous month · IN = produced / returned to stock · OUT = released, sold, packed or adjusted out.</p>{% endset %}
 {% if r.view == 'day' %}
-  <div class="paper no-print">
-    {{ paper_head('Daily Production Report', 'For the month of ' ~ r.month_label) }}
-    <div class="dpr-wrap">{{ dpr_table(r, 0, n, true) }}</div>
+  <div class="no-print">
+    {% call doc('Daily Production Report', subtitle='For the month of ' ~ r.month_label, wide=true, landscape=true) %}
+      <div style="margin-top:18px">{{ dpr_table(r, 0, n, true) }}</div>
+      {{ legend }}
+    {% endcall %}
   </div>
   {# On paper: eight days per page, like the printed form. #}
   <div class="print-only">
     {% for start in range(0, n, 8) %}
-    <div class="paper dpr-chunk">
-      {{ paper_head('Daily Production Report', 'For the month of ' ~ r.month_label ~ ' · days ' ~ (start + 1) ~ '–' ~ ([start + 8, n]|min)) }}
-      {{ dpr_table(r, start, [start + 8, n]|min, start + 8 >= n) }}
-    </div>
+    {% call doc('Daily Production Report', subtitle='For the month of ' ~ r.month_label ~ ' · days ' ~ (start + 1) ~ '–' ~ ([start + 8, n]|min), wide=true, landscape=true) %}
+      <div style="margin-top:14px">{{ dpr_table(r, start, [start + 8, n]|min, start + 8 >= n) }}</div>
+      {{ legend }}
+    {% endcall %}
     {% endfor %}
   </div>
 {% else %}
-  <div class="paper">
-    {{ paper_head('Daily Production Report', 'For the month of ' ~ r.month_label) }}
-    <div class="dpr-wrap">{{ dpr_table(r, 0, n, true) }}</div>
-    <div class="paper-note">BAL. For. = balance forwarded from the previous month. IN = produced / returned to stock · OUT = released, sold, packed or adjusted out.</div>
-  </div>
+  {% call doc('Daily Production Report', subtitle='For the month of ' ~ r.month_label, wide=true, landscape=true) %}
+    <div style="margin-top:18px">{{ dpr_table(r, 0, n, true) }}</div>
+    {{ legend }}
+  {% endcall %}
 {% endif %}
 {% endblock %}

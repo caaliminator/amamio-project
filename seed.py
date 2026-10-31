@@ -25,16 +25,44 @@ from security import ROLE_LABELS, ROLES
 WEEKS = 12
 TAG = "seed-history"
 
-# (name, username, password, role) — change these before going live.
+# ((first, middle, last), position, username, password, role) — placeholder
+# staff; change these (Users & Profiles) before going live.
 DEMO_USERS = [
-    ("Amamio Super Admin", "superadmin", "super123", "super_admin"),
-    ("Amamio Admin", "admin", "admin123", "admin"),
-    ("Receiving Team Head", "receiving", "recv123", "receiving_head"),
-    ("Production Team Head", "production", "prod123", "production_head"),
-    ("Packing Team Head", "packing", "pack123", "packing_head"),
-    ("Packer — Joy", "packer1", "member123", "packing_member"),
-    ("Packer — Mark", "packer2", "member123", "packing_member"),
-    ("Assets Maintenance Head", "assets", "assets123", "assets_head"),
+    (("Ricardo", "Mendoza", "Villanueva"), "General Manager",
+     "superadmin", "super123", "super_admin"),
+    (("Liza", "Ramos", "Fernandez"), "Administrative Officer",
+     "admin", "admin123", "admin"),
+    (("Jerome", "Bautista", "Cabrera"), "Warehouse / Inventory Officer",
+     "receiving", "recv123", "receiving_head"),
+    (("Maria", "Santos", "Dela Cruz"), "Production Team Head",
+     "production", "prod123", "production_head"),
+    (("Angelica", "Torres", "Navarro"), "Packing Team Head",
+     "packing", "pack123", "packing_head"),
+    (("Joy", "Aquino", "Salazar"), "Packer",
+     "packer1", "member123", "packing_member"),
+    (("Mark Anthony", "Reyes", "Gonzales"), "Packer",
+     "packer2", "member123", "packing_member"),
+    (("Ronaldo", "Garcia", "Mercado"), "Assets Maintenance Head",
+     "assets", "assets123", "assets_head"),
+]
+
+# Staff without an account (Super Admin → Employees): placeholder names,
+# picked as the requesting employee on purchase requests.
+# ((first, middle, last), position, department)
+DEMO_EMPLOYEES = [
+    (("Jocelyn", "Pacana", "Lagura"), "Production Staff", "Production"),
+    (("Rodel", "Amper", "Tagalog"), "Machine Operator", "Production"),
+    (("Cristina", "Bacus", "Ompad"), "QA / QC Staff", "Production"),
+    (("Arnel", "Sumalinog", "Dagohoy"), "Production Staff", "Production"),
+    (("Dennis", "Mahinay", "Calunod"), "Warehouse Helper", "Warehouse"),
+    (("Rhea", "Cabahug", "Lumapas"), "Inventory Clerk", "Warehouse"),
+    (("Kimberly", "Ladera", "Abellana"), "Packing Staff", "Packing"),
+    (("Ruel", "Tampus", "Gabutero"), "Packing Staff", "Packing"),
+    (("Grace", "Ybañez", "Manlangit"), "Labeler", "Packing"),
+    (("Edgardo", "Pepito", "Sanchez"), "Maintenance Technician", "Assets & Maintenance"),
+    (("Nestor", "Villamor", "Bation"), "Utility / Sanitation Staff", "Assets & Maintenance"),
+    (("Carmela", "Dumdum", "Ocampo"), "Bookkeeper", "Office / Admin"),
+    (("Jessa Mae", "Bulahan", "Lim"), "Purchasing Clerk", "Office / Admin"),
 ]
 
 
@@ -58,6 +86,7 @@ def seed_if_empty():
 
     _seed_roles()
     users = _seed_users()
+    seed_employees()
     suppliers = _seed_suppliers()
     _seed_customers()
     materials = _seed_materials(suppliers)
@@ -120,8 +149,9 @@ def _seed_roles():
         db.insert("roles", {"key": key, "name": name, "description": desc})
 
 
-def make_user(name, username, password, role):
+def make_user(name, username, password, role, profile=None):
     return db.insert("users", {
+        **(profile or {}),
         "name": name, "username": username,
         "password_hash": generate_password_hash(password),
         "role": role, "email": "%s@amamio.ph" % username,
@@ -133,11 +163,27 @@ def make_user(name, username, password, role):
 
 def _seed_users():
     users = {}
-    for name, username, pw, role in DEMO_USERS:
-        u = make_user(name, username, pw, role)
+    for (first, middle, last), position, username, pw, role in DEMO_USERS:
+        u = make_user(" ".join((first, middle, last)), username, pw, role,
+                      {"first_name": first, "middle_name": middle,
+                       "last_name": last, "position": position})
         users.setdefault(role, u)
         users[username] = u
     return users
+
+
+def seed_employees():
+    """The placeholder employee list (only when it is empty)."""
+    if db.read("employees"):
+        return
+    now = services.now_iso()
+    db.insert_many("employees", [{
+        "first_name": first, "middle_name": middle, "last_name": last,
+        "suffix": "", "name": " ".join((first, middle, last)),
+        "position": position, "department": department,
+        "employee_no": "AFP-E-%03d" % n, "phone": "", "created_at": now,
+    } for n, ((first, middle, last), position, department)
+        in enumerate(DEMO_EMPLOYEES, 1)])
 
 
 def _seed_suppliers():
@@ -419,7 +465,7 @@ def _seed_receiving(users, suppliers, materials):
             box["id"], qa, good, unusable, damaged, ureason, dreason,
             cleaned=True, visual_inspection="Pass", coa_check="Not required",
             sampling_test="Not required", acceptance="Accepted",
-            verified_by_name="Amamio Admin",
+            verified_by_name=users["admin"]["name"],
             visual_description="Free from molds, insects, decay and rotten")
 
     # Delivery 2 — bottles, one carton held for a missing document.

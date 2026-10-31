@@ -1,73 +1,49 @@
 {% extends "base.html" %}
-{% from "_paper.html" import paper_head %}
+{% from "_paper.html" import doc, doc_h, doc_fields, doc_checks, doc_lines, doc_signs %}
 {% block title %}{{ ncr.report_no }}{% endblock %}
 {% block content %}
-<style>
-  .sop-box { display: inline-grid; place-items: center; width: 14px; height: 14px; border: 1.5px solid #111; margin-right: 5px; font-size: .72rem; line-height: 1; vertical-align: -2px; }
-  .sop-checks { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: .82rem; margin-bottom: 8px; }
-  .sop-lines div { border-bottom: 1px solid #999; min-height: 22px; padding: 3px 0; font-size: .82rem; }
-  .sop-note { font-size: .7rem; color: #444; margin-top: 14px; }
-</style>
 <div class="toolbar no-print">
   <a class="back-link" style="margin:0" href="{{ url_for('receiving.ncr', ncr_id=ncr.id) }}">{{ icon('arrow-left', 15) }} {{ ncr.report_no }}</a>
   <button class="btn btn-primary" type="button" onclick="window.print()">{{ icon('printer', 15) }} Print</button>
 </div>
 
-<div class="paper">
-  {{ paper_head('Nonconforming Material Hold / Rejection Report', '', doc_no='AFP-WH-FRM-003', revision='00') }}
-  <div class="paper-fields">
-    <div><b>Report No.:</b> {{ ncr.report_no }}</div>
-    <div><b>Date &amp; Time:</b> {{ ncr.created }}</div>
-    <div><b>Supplier:</b> {{ ncr.supplier_name }}</div>
-    <div><b>MRR / PO No.:</b> {{ [ncr.mrr_no, ncr.po_no]|select|join(' / ') }}</div>
-    <div><b>Material / Item:</b> {{ ncr.material_name }} ({{ ncr.box_code }})</div>
-    <div><b>Lot / Batch No.:</b> {{ ncr.lot_no }}</div>
-    <div><b>Quantity Affected:</b> {{ ncr.qty_affected|qty }}</div>
-    <div><b>Unit:</b> {{ ncr.unit }}</div>
-    <div><b>Reported By:</b> {{ ncr.reported_by_name }}</div>
-    <div><b>Department:</b> {{ ncr.department }}</div>
-  </div>
+{% call doc('Nonconforming Material Hold / Rejection Report', no=ncr.report_no, status=ncr.status,
+            doc_no='AFP-WH-FRM-003', revision='00',
+            meta=[('Date & time', (ncr.created|longdate) ~ ' · ' ~ ncr.created[11:16]), ('MRR / PO No.', [ncr.mrr_no, ncr.po_no]|select|join(' / ')),
+                  ('Lot / batch', ncr.lot_no), ('Quantity affected', ncr.qty_affected|qty(ncr.unit))]) %}
+  {{ doc_fields([('Supplier', ncr.supplier_name), ('Material / item', ncr.material_name ~ ' · ' ~ ncr.box_code),
+                 ('Reported by', ncr.reported_by_name ~ ((' · ' ~ ncr.department) if ncr.department else ''))]) }}
 
-  <div class="paper-section">A. Type of Nonconformity</div>
-  <div class="sop-checks">
-    {% for t in nc_types %}<span><span class="sop-box">{{ '✓' if t in ncr.nc_types }}</span>{{ t }}</span>{% endfor %}
-    <span><span class="sop-box">{{ '✓' if ncr.nc_other }}</span>Other: {{ ncr.nc_other or '__________' }}</span>
-  </div>
+  {{ doc_h('A. Type of nonconformity') }}
+  {% set types = [] %}
+  {% for t in nc_types %}{% set _ = types.append((t, t in ncr.nc_types)) %}{% endfor %}
+  {% set _ = types.append(('Other: ' ~ (ncr.nc_other or '__________'), ncr.nc_other)) %}
+  {{ doc_checks(types) }}
 
-  <div class="paper-section">B. Description of Findings</div>
-  <div class="sop-lines"><div>{{ ncr.findings }}</div><div></div></div>
+  {{ doc_h('B. Description of findings') }}
+  {{ doc_lines([ncr.findings]) }}
 
-  <div class="paper-section">C. Immediate Containment / Action</div>
-  <div class="sop-checks">
-    {% for c in containment %}<span><span class="sop-box">{{ '✓' if c in ncr.containment }}</span>{{ c }}</span>{% endfor %}
-  </div>
-  <div class="paper-fields">
-    <div style="grid-column:1 / -1"><b>Hold / quarantine location:</b> {{ ncr.hold_location }}</div>
-    <div><b>Quantity physically segregated:</b> {{ ncr.qty_segregated|qty(ncr.unit) if ncr.qty_segregated is not none else '' }}</div>
-    <div><b>Tag No.:</b> {{ ncr.tag_no }}</div>
-  </div>
+  {{ doc_h('C. Immediate containment / action') }}
+  {% set held = [] %}
+  {% for c in containment %}{% set _ = held.append((c, c in ncr.containment)) %}{% endfor %}
+  {{ doc_checks(held) }}
+  {{ doc_fields([('Hold / quarantine location', ncr.hold_location),
+                 ('Quantity physically segregated', ncr.qty_segregated|qty(ncr.unit) if ncr.qty_segregated is not none else ''),
+                 ('Tag No.', ncr.tag_no)]) }}
 
-  <div class="paper-section">D. Disposition (select one; obtain authorization)</div>
-  <div class="sop-checks">
-    {% for key, label, _ in dispositions %}<span><span class="sop-box">{{ '✓' if ncr.disposition == key }}</span>{{ label }}{% if key == 'rework' %} (QA approval required){% endif %}</span>{% endfor %}
-  </div>
-  <div class="paper-fields">
-    <div style="grid-column:1 / -1"><b>Disposition details / reference:</b> {{ ncr.disposition_details }}{% if ncr.accepted_qty %} — {{ ncr.accepted_qty|qty(ncr.unit) }} released{% endif %}</div>
-    {% if ncr.justification %}<div style="grid-column:1 / -1"><b>Justification:</b> {{ ncr.justification }}</div>{% endif %}
-    <div style="grid-column:1 / -1"><b>Supplier corrective action / response:</b> {{ ncr.supplier_response }}</div>
-  </div>
+  {{ doc_h('D. Disposition (select one; obtain authorization)') }}
+  {% set disp = [] %}
+  {% for key, label, _ in dispositions %}{% set _ = disp.append((label ~ (' (QA approval required)' if key == 'rework' else ''), ncr.disposition == key)) %}{% endfor %}
+  {{ doc_checks(disp) }}
+  {{ doc_fields([('Disposition details / reference', (ncr.disposition_details or '') ~ ((' — ' ~ ncr.accepted_qty|qty(ncr.unit) ~ ' released') if ncr.accepted_qty else ''), 'wide')]
+                + ([('Justification', ncr.justification, 'wide')] if ncr.justification else [])
+                + [('Supplier corrective action / response', ncr.supplier_response, 'wide')]) }}
 
-  <div class="paper-section">E. Closure and Approval</div>
-  <div class="paper-fields">
-    <div><b>Prepared by:</b> {{ ncr.reported_by_name }}</div>
-    <div><b>Date:</b> {{ ncr.created[:10] }}</div>
-    <div><b>Warehouse / Inventory Officer:</b> {{ ncr.contained_by_name }}</div>
-    <div><b>Date:</b> {{ ncr.contained[:10] }}</div>
-    <div><b>QA / Authorized approval:</b> {{ ncr.qa_approved_by_name }}</div>
-    <div><b>Date:</b> {{ ncr.disposed[:10] }}</div>
-    <div><b>Closure verified by:</b> {{ ncr.closure_verified_by_name }}</div>
-    <div><b>Date closed:</b> {{ ncr.closed[:10] }}</div>
-  </div>
-  <div class="sop-note"><b>CONTROL NOTE:</b> Materials on HOLD or REJECTED status must remain identified and physically segregated. They must not be issued to production unless formally released by authorized QA personnel.</div>
-</div>
+  <div class="doc-callout"><b>Control note:</b> Materials on HOLD or REJECTED status must remain identified and physically segregated. They must not be issued to production unless formally released by authorized QA personnel.</div>
+
+  {{ doc_signs(title='E. Closure and approval', blocks=[('Prepared by', ncr.reported_by_name, none, ncr.created),
+                ('Warehouse / inventory officer', ncr.contained_by_name, none, ncr.contained),
+                ('QA / authorized approval', ncr.qa_approved_by_name, none, ncr.disposed),
+                ('Closure verified by', ncr.closure_verified_by_name, none, ncr.closed)]) }}
+{% endcall %}
 {% endblock %}

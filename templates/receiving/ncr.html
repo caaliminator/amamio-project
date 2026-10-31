@@ -120,7 +120,7 @@
     </div>
     <div class="form-row">
       <label class="form-label" for="qa_approved_by_name">QA / authorized approval <span class="req">*</span></label>
-      <input type="text" id="qa_approved_by_name" name="qa_approved_by_name" maxlength="80" required value="{{ me_name }}">
+      <input type="text" id="qa_approved_by_name" name="qa_approved_by_name" maxlength="120" required value="{{ with_position(name=me_name) }}">
     </div>
     <button class="btn btn-primary" type="submit">Save disposition</button>
   </form>
@@ -166,7 +166,7 @@
   {% endif %}
   <div class="form-row">
     <label class="form-label" for="closure_verified_by_name">Closure verified by <span class="req">*</span></label>
-    <input type="text" id="closure_verified_by_name" name="closure_verified_by_name" maxlength="80" required value="{{ me_name }}">
+    <input type="text" id="closure_verified_by_name" name="closure_verified_by_name" maxlength="120" required value="{{ with_position(name=me_name) }}">
   </div>
   <button class="btn btn-primary" type="submit">Close report</button>
 </form>

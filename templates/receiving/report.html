@@ -1,24 +1,22 @@
 {% extends "base.html" %}
-{% from "_paper.html" import paper_head, paper_signoff, range_filter %}
+{% from "_paper.html" import doc, doc_signoff, range_filter %}
 {% block title %}Receiving & Inspection Report{% endblock %}
 {% block content %}
 <a class="back-link no-print" href="{{ url_for('receiving.index') if can('receiving') else url_for('receiving.inspection') }}">{{ icon('arrow-left', 15) }} Back</a>
 {{ range_filter(url_for('receiving.report'), date_from, date_to) }}
 
-<div class="paper">
-  {{ paper_head('Raw Materials Receiving and Inspection Report',
-                'Purpose: Record the receipt and quality inspection of incoming raw materials before acceptance for production · ' ~ (date_from|mdy) ~ ' to ' ~ (date_to|mdy)) }}
-  <div class="paper-doc" style="text-align:right;margin:-6px 0 10px">
-    Document No.: <b>{{ doc_no or '____________' }}</b> &nbsp; Revision: <b>{{ revision or '______' }}</b> &nbsp; Effective Date: <b>{{ effective or '____________' }}</b>
-  </div>
-  <table class="paper-table">
+{% call doc('Raw Materials Receiving and Inspection Report', subtitle=(date_from|longdate) ~ ' – ' ~ (date_to|longdate),
+            doc_no=doc_no or '____________', revision=revision or '______', effective=effective or '____________',
+            wide=true, landscape=true) %}
+  <p class="doc-note" style="margin:16px 0 4px">Purpose: record the receipt and quality inspection of incoming raw materials before acceptance for production.</p>
+  <table class="doc-table is-compact">
     <thead>
       <tr>
-        <th>Date Received</th><th>Supplier</th><th>PO/DR No.</th><th>Raw Material</th>
-        <th>Lot/Batch No.</th><th class="num">Qty Received</th><th>Unit</th><th>Expiry / Best Before</th>
-        <th>Packaging Condition</th><th>Visual / Organoleptic Inspection</th><th class="num">Temp. (°C)</th>
-        <th>COA / Document Check</th><th>Sampling / Test</th><th>Acceptance Status</th>
-        <th>Nonconformity / Remarks</th><th>Action Taken</th><th>Inspected By</th><th>Verified By</th>
+        <th>Date received</th><th>Supplier</th><th>PO / DR No.</th><th>Raw material</th>
+        <th>Lot / batch</th><th class="num">Qty</th><th>Unit</th><th>Expiry</th>
+        <th>Packaging</th><th>Visual / organoleptic</th><th class="num">Temp. °C</th>
+        <th>COA / docs</th><th>Sampling / test</th><th>Acceptance</th>
+        <th>Nonconformity / remarks</th><th>Action taken</th><th>Inspected by</th><th>Verified by</th>
       </tr>
     </thead>
     <tbody>
@@ -27,7 +25,7 @@
         <td class="nowrap">{{ r.received_date|mdy }}</td>
         <td>{{ r.supplier_name }}</td>
         <td>{{ r.po_dr }}</td>
-        <td>{{ r.material_name }}{% if r.boxes > 1 %} <span style="color:#666">({{ r.boxes }} boxes)</span>{% endif %}</td>
+        <td class="doc-item">{{ r.material_name }}{% if r.boxes > 1 %}<span class="sub-line">{{ r.boxes }} boxes</span>{% endif %}</td>
         <td>{{ r.lot_no }}</td>
         <td class="num">{{ r.qty|qty }}</td>
         <td>{{ r.unit }}</td>
@@ -38,19 +36,19 @@
         <td>{{ r.coa }}</td>
         <td>{{ r.sampling }}</td>
         <td><b>{{ r.acceptance }}</b>
-          {% if r.good_qty or r.unusable_qty or r.damaged_qty %}<br><span style="font-size:.68rem">{{ r.good_qty|qty }} usable{% if r.unusable_qty %}, {{ r.unusable_qty|qty }} unusable{% endif %}{% if r.damaged_qty %}, {{ r.damaged_qty|qty }} damaged{% endif %}</span>{% endif %}
-          {% if r.pending %}<br><span style="font-size:.68rem">{{ r.pending }} box(es) not inspected yet</span>{% endif %}</td>
+          {% if r.good_qty or r.unusable_qty or r.damaged_qty %}<span class="sub-line">{{ r.good_qty|qty }} usable{% if r.unusable_qty %}, {{ r.unusable_qty|qty }} unusable{% endif %}{% if r.damaged_qty %}, {{ r.damaged_qty|qty }} damaged{% endif %}</span>{% endif %}
+          {% if r.pending %}<span class="sub-line">{{ r.pending }} box(es) not inspected yet</span>{% endif %}</td>
         <td>{{ r.remarks }}</td>
         <td>{{ r.action }}</td>
         <td>{{ r.inspected_by }}</td>
         <td>{{ r.verified_by }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="18" style="text-align:center;color:#666;padding:20px">No deliveries received in this period.</td></tr>
+      <tr><td colspan="18" class="empty">No deliveries received in this period.</td></tr>
       {% endfor %}
     </tbody>
   </table>
-  <div class="paper-note">Acceptance Guide: ACCEPTED = meets specifications; REJECTED = does not meet requirements; HOLD = pending test/document/QA decision.</div>
-  {{ paper_signoff(['Prepared by:', 'Checked by:', 'Approved by:']) }}
-</div>
+  <p class="doc-note">Acceptance guide: ACCEPTED = meets specifications · REJECTED = does not meet requirements · HOLD = pending test / document / QA decision.</p>
+  {{ doc_signoff(['Prepared by', 'Checked by', 'Approved by']) }}
+{% endcall %}
 {% endblock %}

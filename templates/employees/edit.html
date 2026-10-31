@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "employees/_fields.html" import employee_fields %}
+{% block title %}Edit — {{ emp.name }}{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('employees.index') }}">{{ icon('arrow-left', 15) }} Employees</a>
+<div class="page-head">
+  <div>
+    <h1 class="page-title">{{ emp.name }}</h1>
+    <p class="page-sub">{{ emp.position or 'No position yet' }} · {{ emp.department }}</p>
+  </div>
+</div>
+
+<div class="card">
+  <form method="post" class="form">
+    {{ employee_fields(form, departments, suffixes) }}
+    <div class="form-hint mb">Purchase requests already raised keep the name as it was written.</div>
+    <button class="btn btn-primary" type="submit">Save</button>
+    <a class="btn btn-ghost" href="{{ url_for('employees.index') }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

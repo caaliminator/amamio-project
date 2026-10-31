@@ -4,7 +4,19 @@
 <a class="back-link" href="{{ url_for('requests.detail', id=req.id) }}">{{ icon('arrow-left', 15) }} PR {{ pr_no }}</a>
 
 {% set chosen = form.supplier_id or (suggested.id if suggested else '') %}
-{% macro sv(key, fallback='') %}{{ form.get(key) if form.get(key) is not none else fallback }}{% endmacro %}
+{# A field's value: what was typed (after a failed save), else the cancelled
+   PO's (start_from), else the default. #}
+{% macro sv(key, fallback='') -%}
+{%- set typed = form.get(key) -%}
+{{ typed if typed is not none else (start_from[key] if start_from.get(key) not in (none, '') else fallback) }}
+{%- endmacro %}
+
+{% if prev_po %}
+<div class="next-action">
+  <div class="next-action-text"><b>Filled in from PO {{ prev_po.po_no }}, which was cancelled</b>
+    <span>Its supplier, prices, discount, freight, labor, VAT and terms are the starting values — check them and change anything before preparing this PO. The PR's own details are shown on each item.</span></div>
+</div>
+{% endif %}
 
 <form method="post" class="wizard" data-wizard data-wizard-start="{{ start }}" id="poForm"
       data-submit-label="Prepare purchase order" data-cancel="{{ url_for('requests.detail', id=req.id) }}">
@@ -100,70 +112,101 @@
   </section>
 
   <section class="wz-step" id="itemsStep" data-title="Items and prices"
-           data-hint="These are the approved items on PR {{ pr_no }}. Untick one to leave it for another PO.">
+           data-hint="{{ ('Each line starts with the prices from cancelled PO ' ~ prev_po.po_no) if prev_po else ('Each line starts with what was requested on PR ' ~ pr_no) }}; change anything that differs on the supplier's quotation. Untick an item to leave it for another PO.">
     <div class="line-cards" id="lineCards">
       {% for it in items %}
+      {# The PR's values (pr_*) fill the line; after a failed save the typed
+         values (e) are kept instead. #}
+      {% set e = edits.get(it.item_id|string) %}
+      {% set pr_qty = '%g'|format((it.approved_qty if it.approved_qty is not none else it.requested_qty)|float) %}
+      {% set pr_unit = it.unit or 'pc' %}
+      {% set pr_price = ('%.2f'|format(it.est_unit_cost|float)) if it.est_unit_cost else '' %}
+      {% set pr_date = req.needed_by or '' %}
+      {% set pr_remarks = it.remark or (('For: ' ~ it.purpose_use) if it.purpose_use else '') %}
+      {# Starting from a cancelled PO: its line is the starting point. #}
+      {% set pl = prev_lines.get(it.item_id|string) %}
+      {% set pr_brand = pl.brand_model if pl else '' %}
+      {% if pl %}
+        {% set pr_qty = '%g'|format(pl.qty|float) %}
+        {% set pr_unit = pl.unit or pr_unit %}
+        {% set pr_price = ('%.2f'|format(pl.unit_price|float)) if pl.unit_price else '' %}
+        {% set pr_date = pl.requested_delivery or pr_date %}
+        {% set pr_remarks = pl.remarks or pr_remarks %}
+      {% endif %}
       <div class="line-card" data-line>
         <div class="line-card-head">
           <label class="flex gap-sm" style="align-items:center;margin:0">
-            <input type="checkbox" class="js-include" data-review-skip checked>
+            <input type="checkbox" class="js-include" data-review-skip {{ '' if e and e.include == '0' else 'checked' }}>
             <span class="line-card-num">Item {{ loop.index }}</span>
           </label>
-          <span class="muted small">approved {{ it.approved_qty|qty(it.unit) }}{% if it.preferred_supplier %} · preferred {{ it.preferred_supplier }}{% endif %}</span>
+          <a href="#" class="small js-reset" hidden>Undo my changes</a>
+        </div>
+        <div class="pr-ref">
+          <span class="pr-ref-tag">From PR {{ pr_no }}</span>
+          <dl>
+            <div><dt>Requested</dt><dd>{{ it.requested_qty|qty(pr_unit) }}</dd></div>
+            <div><dt>Approved</dt><dd>{{ it.approved_qty|qty(pr_unit) if it.approved_qty is not none else '—' }}</dd></div>
+            <div><dt>Est. unit cost</dt><dd>{{ it.est_unit_cost|peso if it.est_unit_cost else '—' }}</dd></div>
+            <div><dt>Est. total</dt><dd>{{ (it.requested_qty|float * it.est_unit_cost|float)|peso if it.est_unit_cost else '—' }}</dd></div>
+            <div><dt>Purpose / use</dt><dd>{{ it.purpose_use or '—' }}</dd></div>
+            <div><dt>Budget / category</dt><dd>{{ it.budget_category or '—' }}</dd></div>
+            <div><dt>Preferred supplier</dt><dd>{{ it.preferred_supplier or '—' }}</dd></div>
+            <div><dt>Remark</dt><dd>{{ it.remark or '—' }}</dd></div>
+          </dl>
+          {% if pl %}<div class="pr-ref-prev">Starting values from cancelled PO {{ prev_po.po_no }}: {{ pl.qty|qty(pl.unit) }} × {{ pl.unit_price|peso }} = {{ pl.amount|peso }}{% if pl.brand_model %} · {{ pl.brand_model }}{% endif %}</div>{% endif %}
         </div>
         <input type="hidden" name="pr_item_id" value="{{ it.item_id }}">
-        <input type="hidden" name="include" value="1" class="js-include-val">
+        <input type="hidden" name="include" value="{{ e.include if e else '1' }}" class="js-include-val">
         <div class="form-grid cols-2">
+          {# Fixed: the item is ordered exactly as approved on the PR. #}
           <div class="form-row">
             <label class="form-label">Description / specification</label>
-            <select name="description" required>
-              {% if it.name not in known_items %}
-              <optgroup label="As requested on the PR"><option selected>{{ it.name }}</option></optgroup>
-              {% endif %}
-              {% for group, rows in catalog %}
-              <optgroup label="{{ group }}">
-                {% for r in rows %}<option {{ 'selected' if r.name == it.name }}>{{ r.name }}</option>{% endfor %}
-              </optgroup>
-              {% endfor %}
-            </select>
+            <input type="text" value="{{ it.name }}" readonly tabindex="-1" class="locked-field js-desc"
+                   title="As approved on PR {{ pr_no }}" data-review-skip>
           </div>
           <div class="form-row">
             <label class="form-label">Brand / model</label>
-            <input type="text" name="brand_model" maxlength="80" placeholder="Optional">
+            <input type="text" name="brand_model" maxlength="80" placeholder="Optional" value="{{ e.brand_model if e else pr_brand }}" data-pr="{{ pr_brand }}">
           </div>
         </div>
-        <div class="form-grid cols-3">
+        <div class="form-grid cols-4">
           <div class="form-row">
             <label class="form-label">Qty</label>
-            <input type="number" name="qty" min="0.01" step="any" inputmode="decimal" value="{{ "%g"|format(it.approved_qty|float) }}" class="js-qty">
+            <input type="number" name="qty" min="0.01" step="any" inputmode="decimal" value="{{ e.qty if e else pr_qty }}" data-pr="{{ pr_qty }}" class="js-qty">
           </div>
           <div class="form-row">
             <label class="form-label">Unit</label>
-            <select name="unit">
-              {% for u in units %}<option {{ 'selected' if (it.unit or 'pc') == u }}>{{ u }}</option>{% endfor %}
-              {% if it.unit and it.unit not in units %}<option selected>{{ it.unit }}</option>{% endif %}
+            {% set chosen = e.unit if e else pr_unit %}
+            <select name="unit" data-pr="{{ pr_unit }}">
+              {% for u in units %}<option {{ 'selected' if chosen == u }}>{{ u }}</option>{% endfor %}
+              {% if chosen not in units %}<option selected>{{ chosen }}</option>{% endif %}
+              {% if pr_unit not in units and pr_unit != chosen %}<option>{{ pr_unit }}</option>{% endif %}
             </select>
           </div>
           <div class="form-row">
             <label class="form-label">Unit price (₱)</label>
-            <input type="number" name="unit_price" min="0" step="0.01" inputmode="decimal" value="{{ it.est_unit_cost or '' }}" class="js-price">
+            <input type="number" name="unit_price" min="0" step="0.01" inputmode="decimal" value="{{ e.unit_price if e else pr_price }}" data-pr="{{ pr_price }}"
+                   placeholder="{{ '0.00' if pr_price else 'No estimate on the PR' }}" class="js-price">
+          </div>
+          {# Amount = qty × unit price; typing an amount works out the unit
+             price (only qty and unit price are sent — the server computes
+             the amount). #}
+          <div class="form-row">
+            <label class="form-label">Amount (₱)</label>
+            <input type="number" min="0" step="0.01" inputmode="decimal" class="js-line-amount" data-review-skip
+                   value="{{ '%.2f'|format(pr_qty|float * pr_price|float) if pr_price else '' }}" placeholder="0.00">
           </div>
         </div>
-        <div class="form-grid cols-3">
+        <div class="form-grid cols-2">
           <div class="form-row">
             <label class="form-label">Requested delivery</label>
-            <input type="date" name="requested_delivery">
-          </div>
-          <div class="form-row">
-            <label class="form-label">VAT / tax</label>
-            <input type="text" name="vat" maxlength="20" placeholder="e.g. 12% or VAT-ex">
+            <input type="date" name="requested_delivery" value="{{ e.requested_delivery if e else pr_date }}" data-pr="{{ pr_date }}">
           </div>
           <div class="form-row">
             <label class="form-label">Remarks</label>
-            <input type="text" name="remarks" maxlength="160" value="{{ it.remark or '' }}">
+            <input type="text" name="remarks" maxlength="160" value="{{ e.remarks if e else pr_remarks }}" data-pr="{{ pr_remarks }}">
           </div>
         </div>
-        <div class="tally js-amount" style="margin-top:0;margin-bottom:12px"></div>
       </div>
       {% endfor %}
     </div>
@@ -186,8 +229,13 @@
           <input type="number" id="labor" name="labor" min="0" step="0.01" value="{{ sv('labor') }}" placeholder="0.00" class="js-adj">
         </div>
         <div class="form-row">
-          <label class="form-label" for="tax">VAT / other tax (₱)</label>
-          <input type="number" id="tax" name="tax" min="0" step="0.01" value="{{ sv('tax') }}" placeholder="0.00" class="js-adj">
+          <label class="form-label" for="vat_rate">VAT (%)</label>
+          <div class="input-suffix">
+            <input type="number" id="vat_rate" name="vat_rate" min="0" max="100" step="0.01" inputmode="decimal"
+                   value="{{ sv('vat_rate') }}" placeholder="0" class="js-adj">
+            <span aria-hidden="true">%</span>
+          </div>
+          <div class="form-hint" id="vatHint">Of the items after the discount — e.g. 12 for 12% VAT; leave blank or 0 if VAT-exempt.</div>
         </div>
       </div>
       <div class="tally is-even" id="grandTotal"></div>
@@ -198,7 +246,7 @@
       <div class="form-grid cols-3" data-review-skip>
         <div class="form-row">
           <label class="form-label" for="prepared_by">Prepared by</label>
-          <input type="text" id="prepared_by" value="{{ me.name }}" readonly class="locked-field">
+          <input type="text" id="prepared_by" value="{{ with_position(me.id) }}" readonly class="locked-field">
         </div>
         <div class="form-row">
           <label class="form-label" for="checked_by">Checked by</label>
@@ -213,9 +261,9 @@
     </div>
   </section>
 
-  <section class="wz-step" data-title="Check and prepare" data-review
-           data-hint="The PO is saved as Prepared and the Admin is notified to check it; the Super Admin approves it last.">
-    <div class="wz-body"></div>
+  <section class="wz-step" id="reviewStep" data-title="Check and prepare" data-review
+           data-hint="This is the purchase order as it will print. Preparing saves it and notifies the Admin to check it; the Super Admin approves it last.">
+    <div class="wz-body is-bare"></div>
   </section>
 </form>
 
@@ -253,20 +301,75 @@
       var amt = num(c.querySelector(".js-qty")) * num(c.querySelector(".js-price"));
       c.querySelector(".js-include-val").value = on ? "1" : "0";
       c.style.opacity = on ? "" : ".5";
-      c.querySelector(".js-amount").innerHTML = "<span>Amount</span><b>" + peso(on ? amt : 0) + "</b>";
       if (on) sum += amt;
     });
     return sum;
   }
+  // VAT is a percentage of the items after the discount (same as the server).
+  function vatAmount(sub) {
+    var rate = Math.min(100, Math.max(0, num(document.getElementById("vat_rate"))));
+    return Math.round(Math.max(0, sub - num(document.getElementById("discount"))) * rate) / 100;
+  }
   function update() {
-    var sub = subtotal();
+    var sub = subtotal(), vat = vatAmount(sub);
     var adj = function (id) { return num(document.getElementById(id)); };
+    var rate = num(document.getElementById("vat_rate"));
     document.getElementById("subtotal").innerHTML = "<span>Subtotal</span><b>" + peso(sub) + "</b>";
+    document.getElementById("vatHint").textContent = rate
+      ? "VAT " + rate + "% of " + peso(Math.max(0, sub - adj("discount"))) + " = " + peso(vat)
+      : "Of the items after the discount — e.g. 12 for 12% VAT; leave blank or 0 if VAT-exempt.";
     document.getElementById("grandTotal").innerHTML = "<span>Grand total</span><b>" +
-      peso(sub - adj("discount") + adj("freight") + adj("labor") + adj("tax")) + "</b>";
+      peso(sub - adj("discount") + adj("freight") + adj("labor") + vat) + "</b>";
   }
   document.getElementById("poForm").addEventListener("input", update);
   document.getElementById("poForm").addEventListener("change", update);
+
+  // Amount and unit price follow each other: change the qty or price and the
+  // amount is worked out; type an amount and the unit price is.
+  function showAmount(card) {
+    var amt = num(card.querySelector(".js-qty")) * num(card.querySelector(".js-price"));
+    card.querySelector(".js-line-amount").value = card.querySelector(".js-price").value === "" ? "" : amt.toFixed(2);
+  }
+  cards.addEventListener("input", function (e) {
+    var card = e.target.closest && e.target.closest("[data-line]");
+    if (!card) return;
+    if (e.target.classList.contains("js-line-amount")) {
+      var q = num(card.querySelector(".js-qty"));
+      card.querySelector(".js-price").value = q > 0 && e.target.value !== "" ? (num(e.target) / q).toFixed(2) : "";
+    } else if (e.target.classList.contains("js-qty") || e.target.classList.contains("js-price")) {
+      showAmount(card);
+    }
+  }, true);
+  cards.addEventListener("change", function (e) {
+    // Tidy the amount to the rounded unit price once the typing is done.
+    if (e.target.classList && e.target.classList.contains("js-line-amount")) showAmount(e.target.closest("[data-line]"));
+  });
+
+  // A field changed from its starting value (the PR's, or the cancelled
+  // PO's) is marked; "Undo my changes" puts the line back.
+  function markEdits(card) {
+    var edited = false;
+    card.querySelectorAll("[data-pr]").forEach(function (el) {
+      var differs = el.value !== el.getAttribute("data-pr");
+      el.classList.toggle("is-edited", differs);
+      if (differs) edited = true;
+    });
+    card.querySelector(".js-reset").hidden = !edited;
+  }
+  function cardOf(e) { return e.target.closest && e.target.closest("[data-line]"); }
+  cards.addEventListener("input", function (e) { if (cardOf(e)) markEdits(cardOf(e)); });
+  cards.addEventListener("change", function (e) { if (cardOf(e)) markEdits(cardOf(e)); });
+  cards.addEventListener("click", function (e) {
+    var link = e.target.closest(".js-reset");
+    if (!link) return;
+    e.preventDefault();
+    var card = link.closest("[data-line]");
+    card.querySelectorAll("[data-pr]").forEach(function (el) { el.value = el.getAttribute("data-pr"); });
+    showAmount(card);
+    markEdits(card);
+    update();
+  });
+  cards.querySelectorAll("[data-line]").forEach(function (c) { showAmount(c); markEdits(c); });
   update();
 
   var step = document.getElementById("itemsStep");
@@ -275,26 +378,23 @@
       e.preventDefault(); e.detail.message = "Keep at least one item on this PO.";
     }
   });
-  step.reviewHtml = function () {
-    var esc = window.IMS.esc, out = [];
-    cards.querySelectorAll("[data-line]").forEach(function (c) {
-      if (!c.querySelector(".js-include").checked) return;
-      var q = num(c.querySelector(".js-qty")), p = num(c.querySelector(".js-price"));
-      out.push("<dt>" + esc(c.querySelector("[name=description]").value) + "</dt><dd>" + q + " " +
-        esc(c.querySelector("[name=unit]").value) + " × " + peso(p) + " = " + peso(q * p) + "</dd>");
-    });
-    out.push("<dt>Subtotal</dt><dd>" + peso(subtotal()) + "</dd>");
-    return out.join("");
-  };
-  document.getElementById("totalsStep").reviewHtml = function () {
-    var g = document.getElementById("grandTotal").querySelector("b").textContent;
-    var esc = window.IMS.esc;
-    var labor = num(document.getElementById("labor"));
-    return (labor ? "<dt>Labor cost</dt><dd>" + peso(labor) + "</dd>" : "") +
-      "<dt>Grand total</dt><dd>" + g + "</dd>" +
-      "<dt>Prepared by</dt><dd>" + esc(document.getElementById("prepared_by").value) + "</dd>" +
-      "<dt>Checked by / Approved by</dt><dd>The Admin, then the Super Admin</dd>";
-  };
+
+  // Last step: the PO exactly as it will print, built by the server from the
+  // fields so far (same template and totals as the saved copy).
+  var reviewStep = document.getElementById("reviewStep");
+  var previewUrl = {{ url_for('purchasing.preview')|tojson }};
+  var seq = 0;
+  reviewStep.addEventListener("wz:enter", function () {
+    var box = reviewStep.querySelector(".review"), mine = ++seq;
+    box.innerHTML = '<p class="muted">Preparing the preview…</p>';
+    fetch(previewUrl, { method: "POST", body: new FormData(document.getElementById("poForm")),
+                        headers: { "X-Requested-With": "fetch" } })
+      .then(function (r) { return r.text(); })
+      .then(function (html) { if (mine === seq) box.innerHTML = html; })
+      .catch(function () {
+        if (mine === seq) box.innerHTML = '<div class="doc-error">The preview could not be loaded. Check your connection and open this step again.</div>';
+      });
+  });
 })();
 </script>
 {% endblock %}

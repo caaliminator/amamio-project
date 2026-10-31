@@ -1,0 +1,44 @@
+{# The employee form fields, shared by Add and Edit. #}
+{% macro employee_fields(form, departments, suffixes) %}
+<div class="form-grid cols-3">
+  <div class="form-row">
+    <label class="form-label" for="first_name">First name <span class="req">*</span></label>
+    <input type="text" id="first_name" name="first_name" required maxlength="60" value="{{ form.first_name or '' }}">
+  </div>
+  <div class="form-row">
+    <label class="form-label" for="middle_name">Middle name</label>
+    <input type="text" id="middle_name" name="middle_name" maxlength="60" value="{{ form.middle_name or '' }}">
+  </div>
+  <div class="form-row">
+    <label class="form-label" for="last_name">Last name <span class="req">*</span></label>
+    <input type="text" id="last_name" name="last_name" required maxlength="60" value="{{ form.last_name or '' }}">
+  </div>
+  <div class="form-row">
+    <label class="form-label" for="suffix">Suffix</label>
+    <select id="suffix" name="suffix">
+      {% for s in suffixes %}<option value="{{ s }}" {{ 'selected' if (form.suffix or '') == s }}>{{ s or '—' }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="form-row">
+    <label class="form-label" for="position">Position</label>
+    <input type="text" id="position" name="position" maxlength="80" value="{{ form.position or '' }}" placeholder="e.g. Machine Operator">
+  </div>
+  <div class="form-row">
+    <label class="form-label" for="employee_no">Employee no.</label>
+    <input type="text" id="employee_no" name="employee_no" maxlength="30" value="{{ form.employee_no or '' }}">
+  </div>
+</div>
+<div class="form-row">
+  <div class="form-label">Department <span class="req">*</span></div>
+  <div class="chip-choices">
+    {% for d in departments %}
+    <label class="chip-choice"><input type="radio" name="department" value="{{ d }}" required
+           {{ 'checked' if form.department == d }}><span>{{ d }}</span></label>
+    {% endfor %}
+  </div>
+</div>
+<div class="form-row">
+  <label class="form-label" for="phone">Mobile no.</label>
+  <input type="text" id="phone" name="phone" maxlength="30" value="{{ form.phone or '' }}" placeholder="09xx xxx xxxx" style="max-width:280px">
+</div>
+{% endmacro %}

@@ -33,8 +33,16 @@
   <form method="post" class="form">
     <div class="form-grid cols-3">
       <div class="form-row">
-        <label class="form-label" for="name">Full name <span class="req">*</span></label>
-        <input type="text" id="name" name="name" required>
+        <label class="form-label" for="first_name">First name <span class="req">*</span></label>
+        <input type="text" id="first_name" name="first_name" required maxlength="60">
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="middle_name">Middle name</label>
+        <input type="text" id="middle_name" name="middle_name" maxlength="60">
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="last_name">Last name <span class="req">*</span></label>
+        <input type="text" id="last_name" name="last_name" required maxlength="60">
       </div>
       <div class="form-row">
         <label class="form-label" for="username">Username <span class="req">*</span></label>
@@ -65,6 +73,7 @@
         <input type="text" id="phone" name="phone">
       </div>
     </div>
+    {% if can_manage_super %}<p class="form-hint">Position, gender, birthdate, photo and e-signature are added on the user's profile after creating the account.</p>{% endif %}
     <button class="btn btn-primary" type="submit">Create user</button>
   </form>
 </div>
@@ -76,15 +85,22 @@
       <thead>
         <tr>
           <th class="wrap-sm">Name</th><th>Username</th><th class="wrap-sm">Contact</th><th>Role</th>
-          <th>Status</th><th>Last login</th><th>Actions</th>
+          <th>Status</th>{% if can_manage_super %}<th>E-signature</th>{% endif %}<th>Last login</th><th>Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for u in users %}
         <tr>
           <td class="wrap-sm">
-            {{ u.name }}
-            {% if u.id == current_user.id %}<span class="badge badge-gold">you</span>{% endif %}
+            <div class="user-cell">
+              {% if u.photo_url %}<img class="avatar avatar-photo" src="{{ u.photo_url }}" alt="">
+              {% else %}<span class="avatar">{{ (u.name or '?')[0]|upper }}</span>{% endif %}
+              <span>
+                {{ u.name }}
+                {% if u.id == current_user.id %}<span class="badge badge-gold">you</span>{% endif %}
+                {% if u.position %}<span class="cell-sub">{{ u.position }}</span>{% endif %}
+              </span>
+            </div>
           </td>
           <td class="code">{{ u.username }}</td>
           <td class="wrap-sm muted small">
@@ -106,8 +122,14 @@
             {% if u.active %}<span class="badge badge-ok">Active</span>
             {% else %}<span class="badge badge-danger">Disabled</span>{% endif %}
           </td>
+          {% if can_manage_super %}
+          <td>{% if u.has_signature %}<span class="badge badge-ok">On file</span>{% else %}<span class="badge badge-muted">None</span>{% endif %}</td>
+          {% endif %}
           <td class="muted small">{{ u.last_login }}</td>
           <td class="nowrap">
+            {% if can_manage_super %}
+            <a class="btn btn-sm btn-primary" href="{{ url_for('auth.user_profile', id=u.id) }}">Edit profile</a>
+            {% endif %}
             <form method="post" action="{{ url_for('auth.toggle_user', id=u.id) }}"
                   style="display:inline"
                   data-confirm="{{ 'Disable' if u.active else 'Enable' }} {{ u.username }}?">

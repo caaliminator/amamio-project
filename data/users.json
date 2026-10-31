@@ -1,6 +1,6 @@
 [
   {
-    "name": "Amamio Super Admin",
+    "name": "Ricardo Mendoza Villanueva",
     "username": "superadmin",
     "password_hash": "scrypt:32768:8:1$d1C0HLJQ8uXs5bsR$ab1794e7ec224578fe5343f3c95718c2652dfe17153c0405e55cf9fd850407fded12b2560ada2b1cc1a8462f33cd8f7db9864cfd4db241bd055ddcce044e6ef0",
     "role": "super_admin",
@@ -8,13 +8,18 @@
     "phone": "",
     "team": "Super Admin",
     "active": true,
-    "last_login": "2026-10-26T15:34:54.555640+00:00",
+    "last_login": "2026-10-31T17:29:56.368336+00:00",
     "created_at": "2026-10-16T05:39:27.615487+00:00",
     "id": 1,
-    "theme": "light"
+    "theme": "light",
+    "first_name": "Ricardo",
+    "middle_name": "Mendoza",
+    "last_name": "Villanueva",
+    "suffix": "",
+    "position": "General Manager"
   },
   {
-    "name": "Amamio Admin",
+    "name": "Liza Ramos Fernandez",
     "username": "admin",
     "password_hash": "scrypt:32768:8:1$gOQXwmR1UVYObvpF$fdcb45c914c83887cd94664808b42c0fe56e6113a9216525e6580afcf7d85f2c733b7f83c63e56ecb1b691fcbd6168be319ceb97aeb1a2d9860cd21eb83649f8",
     "role": "admin",
@@ -22,13 +27,18 @@
     "phone": "",
     "team": "Admin",
     "active": true,
-    "last_login": "2026-10-31T05:53:50.044794+00:00",
+    "last_login": "2026-10-31T17:29:10.773214+00:00",
     "created_at": "2026-10-16T05:39:27.863422+00:00",
     "id": 2,
-    "theme": "light"
+    "theme": "light",
+    "first_name": "Liza",
+    "middle_name": "Ramos",
+    "last_name": "Fernandez",
+    "suffix": "",
+    "position": "Administrative Officer"
   },
   {
-    "name": "Receiving Team Head",
+    "name": "Jerome Bautista Cabrera",
     "username": "receiving",
     "password_hash": "scrypt:32768:8:1$jdAdulaUa0C9a1Tk$aecacc761424f1bec138f257dded6bd725965fcde6e0a49ebe23b352bf26ba1ac52ea6b14b57b0776deff6309aeb2a26dab764e142baeed821cbc811973dea14",
     "role": "receiving_head",
@@ -36,13 +46,18 @@
     "phone": "",
     "team": "Receiving Team Head",
     "active": true,
-    "last_login": "2026-10-31T05:41:56.926348+00:00",
+    "last_login": "2026-10-31T17:26:17.119819+00:00",
     "created_at": "2026-10-16T05:39:28.171588+00:00",
     "id": 3,
-    "theme": "light"
+    "theme": "light",
+    "first_name": "Jerome",
+    "middle_name": "Bautista",
+    "last_name": "Cabrera",
+    "suffix": "",
+    "position": "Warehouse / Inventory Officer"
   },
   {
-    "name": "Production Team Head",
+    "name": "Maria Santos Dela Cruz",
     "username": "production",
     "password_hash": "scrypt:32768:8:1$iAyOIfuxhCN5aFRF$3e4e81c94138cf160472d8865647575e0ad3806397416a4bda918126bb59926bc64870afde9793d8e51662764ebf992374f070e65d35ca00bf5d70a94ed6dfc7",
     "role": "production_head",
@@ -50,13 +65,18 @@
     "phone": "",
     "team": "Production Team Head",
     "active": true,
-    "last_login": "2026-10-31T05:49:25.267832+00:00",
+    "last_login": "2026-10-31T17:25:24.242995+00:00",
     "created_at": "2026-10-16T05:39:28.504636+00:00",
     "id": 4,
-    "theme": "light"
+    "theme": "light",
+    "first_name": "Maria",
+    "middle_name": "Santos",
+    "last_name": "Dela Cruz",
+    "suffix": "",
+    "position": "Production Team Head"
   },
   {
-    "name": "Packing Team Head",
+    "name": "Angelica Torres Navarro",
     "username": "packing",
     "password_hash": "scrypt:32768:8:1$EJNzdBkYmEd58tYx$3e0ec57d4b01e770b6d84a09370506bebe28230f5837ddf9fa928a81bd68de1a3af5f7ba1129e7d348172d5d7b70f324b67217d111ea171dc2d8de05a8a47df8",
     "role": "packing_head",
@@ -66,10 +86,15 @@
     "active": true,
     "last_login": "2026-10-31T05:53:03.502964+00:00",
     "created_at": "2026-10-16T05:39:28.805061+00:00",
-    "id": 5
+    "id": 5,
+    "first_name": "Angelica",
+    "middle_name": "Torres",
+    "last_name": "Navarro",
+    "suffix": "",
+    "position": "Packing Team Head"
   },
   {
-    "name": "Packer — Joy",
+    "name": "Joy Aquino Salazar",
     "username": "packer1",
     "password_hash": "scrypt:32768:8:1$8KV09XCx1JAqYEan$831473275734df365175cf3e47f2148b1fe12bcb5eb65d3147e0517f11aff7168ba4b136a947bb7088a112cbc00ee338a3cbf670c44c0670e208bfd7d60abad8",
     "role": "packing_member",
@@ -80,10 +105,15 @@
     "last_login": "2026-10-16T06:47:23.607767+00:00",
     "created_at": "2026-10-16T05:39:29.107579+00:00",
     "id": 6,
-    "theme": "light"
+    "theme": "light",
+    "first_name": "Joy",
+    "middle_name": "Aquino",
+    "last_name": "Salazar",
+    "suffix": "",
+    "position": "Packer"
   },
   {
-    "name": "Packer — Mark",
+    "name": "Mark Anthony Reyes Gonzales",
     "username": "packer2",
     "password_hash": "scrypt:32768:8:1$c7g7TUjVR5xHEZ5P$70304f00a41fcd0a121677c252a0ce4025530ab8e029dd07dc1a8fe505e702a47f4b369270f90a3bd4f3570b998be309a1f65022338efcaccc8c71e267d890cc",
     "role": "packing_member",
@@ -93,10 +123,15 @@
     "active": true,
     "last_login": null,
     "created_at": "2026-10-16T05:39:29.490339+00:00",
-    "id": 7
+    "id": 7,
+    "first_name": "Mark Anthony",
+    "middle_name": "Reyes",
+    "last_name": "Gonzales",
+    "suffix": "",
+    "position": "Packer"
   },
   {
-    "name": "Assets Maintenance Head",
+    "name": "Ronaldo Garcia Mercado",
     "username": "assets",
     "password_hash": "scrypt:32768:8:1$o8BocpRn6cdF8Uej$325e8c55f127b148c1408f2bacc9b686a554a0f01f59067d8d7b3892c530fdc78185fec4752e05678bac2e8d53fe66ced1f7a3fa7a714c5a9c79a16ad254f40f",
     "role": "assets_head",
@@ -106,6 +141,11 @@
     "active": true,
     "last_login": null,
     "created_at": "2026-10-16T05:39:29.904973+00:00",
-    "id": 8
+    "id": 8,
+    "first_name": "Ronaldo",
+    "middle_name": "Garcia",
+    "last_name": "Mercado",
+    "suffix": "",
+    "position": "Assets Maintenance Head"
   }
 ]

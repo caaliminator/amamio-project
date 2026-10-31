@@ -116,7 +116,7 @@ NOT_PAGES = {"static", "auth.root", "auth.login", "auth.logout",
              "honey.suggest", "qr.lookup", "qr.image", "qr.go",
              "platforms.export_csv", "platforms.import_file",
              "migration.download", "requests.bom_calc", "production.new",
-             "requests.new_material"}
+             "requests.new_material", "auth.user_image"}
 pages = {r.endpoint for r in application.url_map.iter_rules()
          if "GET" in r.methods and r.endpoint not in NOT_PAGES}
 missing = sorted(p for p in pages if not page_notes.for_endpoint(p))
@@ -345,7 +345,7 @@ with application.test_client() as c:
           "receiving & inspection report renders")
     page = r.data.decode("utf-8")
     today = services.today_iso()
-    check(services.fmt_mdy(today) in page and "Document No.:" in page
+    check(services.fmt_mdy(today) in page and "Doc. No." in page
           and "Free from molds, insects, decay and rotten" in page,
           "the report prints MM-DD-YY dates, the document header and the visual description")
     lot_a = [row for row in services.receiving_report_rows(today, today)
@@ -623,9 +623,10 @@ check(demo_po and abs(demo_po[0]["grand_total"] - 1100) < 0.01
 with application.test_client() as c:
     login(c, "production", "prod123")
     page = c.get("/requests/new").data.decode("utf-8")
-    check('name="material_id"' in page and '<select name="preferred_supplier"' in page
+    check('name="material_id"' in page and 'data-combo="itemOptions"' in page
+          and 'data-combo="supplierOptions"' in page
           and 'name="requested_by_name"' in page and "Expected date" in page,
-          "PR form has the item and supplier dropdowns, expected date and requestor")
+          "PR form has the item and supplier search boxes, expected date and requestor")
     c.post("/requests/new", data={
         "department": "Production", "purpose": "Spare parts for the sealer",
         "needed_by": "", "notes": "Heating element burnt", "urgency": "Urgent",
@@ -747,7 +748,7 @@ with application.test_client() as c:
 with application.test_client() as c:
     login(c, "admin", "admin123")
     page = c.get("/purchasing/%d/print" % po["id"]).data.decode("utf-8")
-    check("Purchase Order" in page and super_name in page and "Labor Cost" in page,
+    check("Purchase Order" in page and super_name in page and "Labor cost" in page,
           "PO prints as the Purchase Order form")
     # Supplier ledger: the issued PO is a credit; payments are debits.
     before = pur_svc.ledger_entries(trimix["id"])

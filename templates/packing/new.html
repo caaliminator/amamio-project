@@ -66,7 +66,7 @@
           </select>
           {% else %}
           {# A packer always records packing as themselves. #}
-          <input type="text" id="packer_id" name="packed_by_display" value="{{ me.name }}" readonly
+          <input type="text" id="packer_id" name="packed_by_display" value="{{ with_position(me.id) }}" readonly
                  class="locked-field" aria-readonly="true" data-review-label="Packed by">
           <div class="form-hint">Recorded under your account.</div>
           {% endif %}

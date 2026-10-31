@@ -11,6 +11,7 @@ from flask import (Blueprint, abort, flash, g, redirect, render_template,
 
 import db
 import facility_service as fs
+import profiles
 import services
 from security import current_user, module_required
 
@@ -69,7 +70,7 @@ def sanitation_new():
         try:
             rec = fs.save_sanitation(
                 _me().get("id"), form.get("record_date"), form.get("phase"),
-                _sanitation_areas_from(form), form.get("conducted_by"),
+                _sanitation_areas_from(form), profiles.strip_position(form.get("conducted_by")),
                 form.get("inspected_by"), remarks=form.get("remarks") or "")
         except fs.RecordError as exc:
             flash(str(exc), "error")
@@ -183,7 +184,7 @@ def pest_new():
         try:
             rec = fs.save_pest(_me().get("id"), form.get("period"),
                                form.get("record_date"), _pest_areas_from(form),
-                               form.get("monitored_by"),
+                               profiles.strip_position(form.get("monitored_by")),
                                remarks=form.get("remarks") or "")
         except fs.RecordError as exc:
             flash(str(exc), "error")

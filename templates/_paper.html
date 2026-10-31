@@ -1,29 +1,129 @@
-{# Shared header for the printable copies of Amamio's paper forms. #}
-{% macro paper_head(title, subtitle='', doc_no='', revision='', effective='') %}
-<div class="paper-head">
-  <img src="{{ url_for('static', filename='img/amamio-logo.jpg') }}" alt="Amamio Farm Products">
-  <div>
-    <div class="paper-org">AMAMIO FARM PRODUCTS</div>
-    <div class="paper-addr">District 4, Brgy. Kinabjangan, Nasipit, Agusan del Norte<br>
-      Mobile No.: 0975.801.9089 / 0917.124.8356 · amamiofarm@gmail.com · www.amamiofarm.com</div>
-  </div>
-  {% if doc_no or revision or effective %}
-  <div class="paper-doc">
-    {% if doc_no %}Document No.: <b>{{ doc_no }}</b><br>{% endif %}
-    {% if revision %}Revision: <b>{{ revision }}</b><br>{% endif %}
-    {% if effective %}Effective date: <b>{{ effective }}</b>{% endif %}
-  </div>
-  {% endif %}
+{# The document kit: every printable form is built from these, so they all
+   share one look (letterhead, details strip, sections, tables, signature row,
+   footer — styles: .doc in flow.css).  A form wraps its body in doc():
+
+     {% call doc('Material Receiving Report', no=batch.ref_no, doc_no='AFP-WH-FRM-001',
+                 meta=[('Date received', batch.received_date|longdate), …]) %}
+       {{ doc_h('A. Materials received') }}
+       <table class="doc-table">…</table>
+       {{ doc_signs([('Received by', name, user_id, date), …]) }}
+     {% endcall %}
+#}
+
+{# The e-signature of whoever signed — found by user id, else by the name
+   written on the form — drawn over their name.  Nothing when none is on
+   file (profiles.py).  ``inline`` sizes it for a "Name: ____" line. #}
+{% macro sig(name, user_id=none, inline=false) -%}
+{%- set url = signature_url(user_id, name) if (name or user_id) else '' -%}
+{%- if url %}<img class="{{ 'sig-inline' if inline else 'sig-img' }}" src="{{ url }}" alt="">{% endif -%}
+{%- endmacro %}
+
+{# The page: letterhead, title block, optional details strip, the body
+   (caller), footer.  ``mark`` is a faint watermark (e.g. "Not yet
+   approved"); ``wide`` lets a many-column report use the full width and
+   ``landscape`` prints it on a landscape page; ``qr`` puts a QR code in the
+   title block. #}
+{% macro doc(title, no='', status='', mark='', subtitle='', doc_no='', revision='', effective='',
+             meta=[], wide=false, landscape=false, qr='', note='Controlled form · uncontrolled when printed') %}
+<div class="doc-scroll">
+<article class="doc{{ ' is-wide' if wide }}{{ ' is-landscape' if landscape }}{{ ' is-marked' if mark }}"{% if mark %} data-mark="{{ mark }}"{% endif %}>
+  <header class="doc-head">
+    <div class="doc-brand">
+      <img src="{{ url_for('static', filename='img/amamio-logo.jpg') }}" alt="">
+      <div>
+        <div class="doc-org">Amamio Farm Products</div>
+        <div class="doc-addr"><span>District 4, Brgy. Kinabjangan, Nasipit, Agusan del Norte</span>
+          <span>0975 801 9089 · 0917 124 8356 · amamiofarm@gmail.com</span></div>
+      </div>
+    </div>
+    <div class="doc-title">
+      <div class="doc-kind{{ ' is-long' if title|length > 24 }}">{{ title }}</div>
+      {% if no %}<div class="doc-no">No. <b>{{ no }}</b></div>{% endif %}
+      {% if subtitle %}<div class="doc-subtitle">{{ subtitle }}</div>{% endif %}
+      {% if status %}<span class="doc-status">{{ status }}</span>{% endif %}
+      {% if doc_no or revision or effective %}
+      <div class="doc-control">
+        {%- if doc_no %}Doc. No. <b>{{ doc_no }}</b>{% endif -%}
+        {%- if revision %}{{ ' · ' if doc_no }}Rev. <b>{{ revision }}</b>{% endif -%}
+        {%- if effective %}{{ ' · ' if doc_no or revision }}Effective <b>{{ effective }}</b>{% endif -%}
+      </div>
+      {% endif %}
+      {% if qr %}<img class="doc-qr" src="{{ qr }}" alt="">{% endif %}
+    </div>
+  </header>
+  {% if meta %}{{ doc_meta(meta) }}{% endif %}
+  {{ caller() }}
+  <footer class="doc-foot">
+    <span>Amamio Farm Products · {{ title }}{{ ' ' ~ no if no }}</span>
+    <span>{{ note }}</span>
+  </footer>
+</article>
 </div>
-<div class="paper-title">{{ title }}</div>
-{% if subtitle %}<div class="paper-sub">{{ subtitle }}</div>{% endif %}
 {% endmacro %}
 
-{% macro paper_signoff(labels) %}
-<div class="paper-foot">
-  {% for label in labels %}<div>{{ label }}</div>{% endfor %}
+{# The shaded details strip under the letterhead: [(label, value), …]. #}
+{% macro doc_meta(pairs) %}
+<div class="doc-meta" style="--cols:{{ [pairs|length, 4]|min }}">
+  {% for label, value in pairs %}<div><span>{{ label }}</span><b>{{ value if value not in (none, '') else '—' }}</b></div>{% endfor %}
 </div>
 {% endmacro %}
+
+{# A gold section heading, e.g. "A. Materials received". #}
+{% macro doc_h(title) %}<div class="doc-section-head"><h3>{{ title }}</h3></div>{% endmacro %}
+
+{# Labelled values in a grid: [(label, value), …]; a third item 'wide' makes
+   the field span the whole row. #}
+{% macro doc_fields(pairs, cols=3) %}
+<dl class="doc-fields" style="--cols:{{ cols }}">
+  {% for f in pairs %}
+  <div{{ ' class="is-wide"'|safe if f|length > 2 and f[2] == 'wide' }}><dt>{{ f[0] }}</dt><dd>{{ f[1] if f[1] not in (none, '') else '—' }}</dd></div>
+  {% endfor %}
+</dl>
+{% endmacro %}
+
+{# Tick boxes as on the paper form: [(label, ticked), …]. #}
+{% macro doc_checks(items) %}
+<ul class="doc-checks">
+  {% for label, on in items %}<li class="{{ 'is-on' if on }}"><span class="doc-box">{{ '✓' if on }}</span>{{ label }}</li>{% endfor %}
+</ul>
+{% endmacro %}
+
+{# Ruled lines for written remarks: the texts, padded to ``min`` lines. #}
+{% macro doc_lines(texts, min=2) %}
+<div class="doc-lines">
+  {% for t in texts if t %}<div>{{ t }}</div>{% endfor %}
+  {% for _ in range([0, min - (texts|select|list|length)]|max) %}<div></div>{% endfor %}
+</div>
+{% endmacro %}
+
+{# The signature row: [(role, name, user_id, date[, caption]), …] — leave
+   the name empty until that person has signed; ``caption`` then shows under
+   the empty line (e.g. "Admin").  user_id -1 means signed by hand (no
+   e-signature lookup), e.g. a supplier. #}
+{% macro doc_signs(blocks, title='') %}
+{# With a ``title`` the heading stays on the same printed page as the row. #}
+<div class="doc-sign-wrap">
+{% if title %}{{ doc_h(title) }}{% endif %}
+<div class="doc-sign" style="--cols:{{ blocks|length }}">
+  {% for b in blocks %}
+  {% set name, uid, on = b[1], b[2], b[3] %}
+  <div>
+    <div class="doc-sig">{% if name and uid != -1 %}{{ sig(name, uid) }}{% endif %}</div>
+    <div class="doc-sign-name">{{ name or '' }}</div>
+    <div class="doc-sign-pos">{{ (position_of(uid, name) if name and uid != -1 else '') or (b[4] if b|length > 4 else '') }}</div>
+    <div class="doc-sign-role">{{ b[0] }}</div>
+    <div class="doc-sign-date">{{ on|longdate if on else 'Date: ____________' }}</div>
+  </div>
+  {% endfor %}
+</div>
+</div>
+{% endmacro %}
+
+{# Blank sign-off lines for a report signed by hand: ['Prepared by', …]. #}
+{% macro doc_signoff(roles) %}
+{%- set blocks = [] %}{% for r in roles %}{% set _ = blocks.append((r, '', none, '')) %}{% endfor -%}
+{{ doc_signs(blocks) }}
+{%- endmacro %}
 
 {# Date-range / month filter shown above a paper form (hidden on print). #}
 {% macro range_filter(action, date_from, date_to, extra='') %}

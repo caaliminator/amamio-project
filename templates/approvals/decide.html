@@ -11,7 +11,7 @@
   <div>
     <div class="record-code">PR No. {{ req.pr_label }}</div>
     <h1 class="record-title">{{ req.purpose or req.reason or 'Purchase request' }}</h1>
-    <div class="muted small">{{ req.department or ('Production' if req.type == 'production' else '—') }} · requested by {{ req.requestor_name }}
+    <div class="muted small">{{ req.department or ('Production' if req.type == 'production' else '—') }} · requested by {{ req.requestor_name }}{% if req.dept_head_name and req.dept_head_name != req.requestor_name %} · approved by dept. head {{ req.dept_head_name }}{% endif %}
       · {{ req.date_requested or (req.created_at or '')[:10] }}{% if req.needed_by %} · required {{ req.needed_by }}{% endif %}</div>
   </div>
   <span class="badge {{ urgency_badge.get(req.urgency or 'Normal', 'badge-muted') }}">{{ req.urgency or 'Normal' }}</span>
@@ -81,11 +81,11 @@
     <div class="form-grid cols-2">
       <div class="form-row">
         <label class="form-label">Checked by (Admin)</label>
-        <input type="text" value="{{ me.name if stage == 'initial' else req.checked_by_name }}" readonly class="locked-field">
+        <input type="text" value="{{ with_position(me.id) if stage == 'initial' else with_position(name=req.checked_by_name) }}" readonly class="locked-field">
       </div>
       <div class="form-row">
         <label class="form-label">Approved by (Super Admin)</label>
-        <input type="text" value="{{ me.name if stage == 'final' else 'Filled in at the final approval' }}" readonly class="locked-field">
+        <input type="text" value="{{ with_position(me.id) if stage == 'final' else 'Filled in at the final approval' }}" readonly class="locked-field">
       </div>
     </div>
     <div class="form-row">

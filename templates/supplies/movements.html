@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_paper.html" import paper_head, paper_signoff, range_filter %}
+{% from "_paper.html" import doc, doc_h, doc_signoff, range_filter %}
 {% block title %}Supplies IN / OUT log{% endblock %}
 {% block content %}
 <div class="no-print">
@@ -29,10 +29,9 @@
 {% endset %}
 {{ range_filter(url_for('supplies.movements'), date_from, date_to, extra) }}
 
-<div class="paper">
-  {{ paper_head('Supplies IN / OUT', cat_label ~ ' · ' ~ date_from ~ ' to ' ~ date_to) }}
-
-  <table class="paper-table" style="max-width:640px">
+{% call doc('Supplies IN / OUT', subtitle=cat_label ~ ' · ' ~ (date_from|longdate) ~ ' – ' ~ (date_to|longdate),
+            meta=[('Items moved', totals|length), ('Movements', moves|length)]) %}
+  <table class="doc-table is-narrow">
     <thead><tr><th>Item</th><th>Unit</th><th class="num">IN</th><th class="num">OUT</th></tr></thead>
     <tbody>
       {% for t in totals %}
@@ -40,13 +39,13 @@
         <td class="num">{{ t['in']|qty if t['in'] else '' }}</td>
         <td class="num">{{ t.out|qty if t.out else '' }}</td></tr>
       {% else %}
-      <tr><td colspan="4" style="text-align:center;color:#666;padding:14px">Nothing taken in or issued out in this period.</td></tr>
+      <tr><td colspan="4" class="empty">Nothing taken in or issued out in this period.</td></tr>
       {% endfor %}
     </tbody>
   </table>
 
-  <div class="paper-section">Movements</div>
-  <table class="paper-table plain">
+  {{ doc_h('Movements') }}
+  <table class="doc-table">
     <thead><tr>
       <th>Date</th><th>Item</th><th class="num">IN</th><th class="num">OUT</th><th>Unit</th>
       <th>Reason</th><th>Person</th><th>Reference</th><th class="num">Balance after</th><th>Recorded by</th>
@@ -59,17 +58,17 @@
         <td class="num">{{ mv.qty|qty if mv.direction == 'IN' else '' }}</td>
         <td class="num">{{ mv.qty|qty if mv.direction == 'OUT' else '' }}</td>
         <td>{{ mv.unit }}</td>
-        <td>{{ mv.reason }}{% if mv.notes %}<br><span style="color:#666">{{ mv.notes }}</span>{% endif %}</td>
+        <td>{{ mv.reason }}{% if mv.notes %}<span class="sub-line">{{ mv.notes }}</span>{% endif %}</td>
         <td>{{ mv.person or '' }}</td>
         <td>{{ mv.reference or '' }}</td>
         <td class="num">{{ mv.balance_after|qty }}</td>
         <td>{{ mv.recorded_by_name }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="10" style="text-align:center;color:#666;padding:14px">No movements in this period.</td></tr>
+      <tr><td colspan="10" class="empty">No movements in this period.</td></tr>
       {% endfor %}
     </tbody>
   </table>
-  {{ paper_signoff(['Prepared by:', 'Checked by:', 'Approved by:']) }}
-</div>
+  {{ doc_signoff(['Prepared by', 'Checked by', 'Approved by']) }}
+{% endcall %}
 {% endblock %}

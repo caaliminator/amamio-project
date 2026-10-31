@@ -785,38 +785,6 @@
   },
   {
     "user_id": 1,
-    "message": "New production request #1 awaiting approval — Out of stock.",
-    "link": "/approvals/1",
-    "is_read": false,
-    "created_at": "2026-10-16T05:39:37.001423+00:00",
-    "id": 99
-  },
-  {
-    "user_id": 2,
-    "message": "New production request #1 awaiting approval — Out of stock.",
-    "link": "/approvals/1",
-    "is_read": false,
-    "created_at": "2026-10-16T05:39:37.028144+00:00",
-    "id": 100
-  },
-  {
-    "user_id": 1,
-    "message": "New material request #2 awaiting approval — Below reorder level.",
-    "link": "/approvals/2",
-    "is_read": false,
-    "created_at": "2026-10-16T05:39:37.088734+00:00",
-    "id": 101
-  },
-  {
-    "user_id": 2,
-    "message": "New material request #2 awaiting approval — Below reorder level.",
-    "link": "/approvals/2",
-    "is_read": false,
-    "created_at": "2026-10-16T05:39:37.120595+00:00",
-    "id": 102
-  },
-  {
-    "user_id": 1,
     "message": "New sales request #97 awaiting approval.",
     "link": "/sales/",
     "is_read": false,
@@ -1025,66 +993,274 @@
   },
   {
     "user_id": 1,
-    "message": "Purchase request #1 was checked by Amamio Admin — awaiting your final approval.",
-    "link": "/approvals/1",
+    "message": "Received at the Receiving Area — MRR-2026-0001 from Agusan Cacao Growers: Honey for Processing (QC failed) 5 kg in 1 box(es) (PO 2026-10-001). Ready for inspection & cleaning.",
+    "link": "/receiving/4",
     "is_read": false,
-    "created_at": "2026-10-26T11:45:24.451813+00:00",
-    "id": 129
-  },
-  {
-    "user_id": 4,
-    "message": "Your purchase request #1 was checked by Amamio Admin and is waiting for the Super Admin's final approval.",
-    "link": "/requests/1",
-    "is_read": false,
-    "created_at": "2026-10-26T11:45:24.494499+00:00",
-    "id": 130
-  },
-  {
-    "user_id": 4,
-    "message": "Your purchase request #1 was revised.",
-    "link": "/requests/1",
-    "is_read": false,
-    "created_at": "2026-10-26T11:46:09.104711+00:00",
-    "id": 131
-  },
-  {
-    "user_id": 4,
-    "message": "PO PR1 prepared for your request #1 (Agusan Cacao Growers).",
-    "link": "/requests/1",
-    "is_read": false,
-    "created_at": "2026-10-26T15:32:36.422395+00:00",
-    "id": 132
+    "created_at": "2026-10-31T10:56:45.895874+00:00",
+    "id": 146
   },
   {
     "user_id": 2,
-    "message": "PO PR1 to Agusan Cacao Growers (₱14,510.00) prepared by Amamio Admin — awaiting your check.",
-    "link": "/purchasing/1",
+    "message": "Received at the Receiving Area — MRR-2026-0001 from Agusan Cacao Growers: Honey for Processing (QC failed) 5 kg in 1 box(es) (PO 2026-10-001). Ready for inspection & cleaning.",
+    "link": "/receiving/4",
     "is_read": false,
-    "created_at": "2026-10-26T15:32:36.454403+00:00",
-    "id": 133
-  },
-  {
-    "user_id": 1,
-    "message": "PO PR1 to Agusan Cacao Growers was checked by Amamio Admin — awaiting your final approval.",
-    "link": "/purchasing/1",
-    "is_read": false,
-    "created_at": "2026-10-26T15:33:06.709756+00:00",
-    "id": 134
-  },
-  {
-    "user_id": 2,
-    "message": "PO PR1 to Agusan Cacao Growers is approved — print it and send it to the supplier.",
-    "link": "/purchasing/1",
-    "is_read": false,
-    "created_at": "2026-10-26T15:35:09.102934+00:00",
-    "id": 135
+    "created_at": "2026-10-31T10:56:45.895874+00:00",
+    "id": 147
   },
   {
     "user_id": 3,
-    "message": "PO PR1 from Agusan Cacao Growers is approved — expect the delivery on 2026-10-30.",
+    "message": "Received at the Receiving Area — MRR-2026-0001 from Agusan Cacao Growers: Honey for Processing (QC failed) 5 kg in 1 box(es) (PO 2026-10-001). Ready for inspection & cleaning.",
+    "link": "/receiving/4",
+    "is_read": false,
+    "created_at": "2026-10-31T10:56:45.895874+00:00",
+    "id": 148
+  },
+  {
+    "user_id": 4,
+    "message": "Received at the Receiving Area — MRR-2026-0001 from Agusan Cacao Growers: Honey for Processing (QC failed) 5 kg in 1 box(es) (PO 2026-10-001). Ready for inspection & cleaning.",
+    "link": "/receiving/4",
+    "is_read": false,
+    "created_at": "2026-10-31T10:56:45.895874+00:00",
+    "id": 149
+  },
+  {
+    "user_id": 1,
+    "message": "Inspected RB-15 (Honey for Processing (QC failed)): 5 kg usable, 0 kg can't be used, 0 kg damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/15",
+    "is_read": false,
+    "created_at": "2026-10-31T11:17:27.803194+00:00",
+    "id": 152
+  },
+  {
+    "user_id": 2,
+    "message": "Inspected RB-15 (Honey for Processing (QC failed)): 5 kg usable, 0 kg can't be used, 0 kg damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/15",
+    "is_read": false,
+    "created_at": "2026-10-31T11:17:27.803194+00:00",
+    "id": 153
+  },
+  {
+    "user_id": 3,
+    "message": "Inspected RB-15 (Honey for Processing (QC failed)): 5 kg usable, 0 kg can't be used, 0 kg damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/15",
+    "is_read": false,
+    "created_at": "2026-10-31T11:17:27.803194+00:00",
+    "id": 154
+  },
+  {
+    "user_id": 4,
+    "message": "Inspected RB-15 (Honey for Processing (QC failed)): 5 kg usable, 0 kg can't be used, 0 kg damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/15",
+    "is_read": false,
+    "created_at": "2026-10-31T11:17:27.803194+00:00",
+    "id": 155
+  },
+  {
+    "user_id": 1,
+    "message": "Inspected RB-14 (Lemon): 150 pc usable, 0 pc can't be used, 0 pc damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/14",
+    "is_read": false,
+    "created_at": "2026-10-31T11:35:08.773205+00:00",
+    "id": 156
+  },
+  {
+    "user_id": 2,
+    "message": "Inspected RB-14 (Lemon): 150 pc usable, 0 pc can't be used, 0 pc damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/14",
+    "is_read": false,
+    "created_at": "2026-10-31T11:35:08.773205+00:00",
+    "id": 157
+  },
+  {
+    "user_id": 3,
+    "message": "Inspected RB-14 (Lemon): 150 pc usable, 0 pc can't be used, 0 pc damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/14",
+    "is_read": false,
+    "created_at": "2026-10-31T11:35:08.773205+00:00",
+    "id": 158
+  },
+  {
+    "user_id": 4,
+    "message": "Inspected RB-14 (Lemon): 150 pc usable, 0 pc can't be used, 0 pc damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/14",
+    "is_read": false,
+    "created_at": "2026-10-31T11:35:08.773205+00:00",
+    "id": 159
+  },
+  {
+    "user_id": 2,
+    "message": "Purchase request 2026-11-001 from Production — qwd (est. ₱44,444.00) awaiting your check.",
+    "link": "/approvals/1",
+    "is_read": false,
+    "created_at": "2026-10-31T16:50:58.922359+00:00",
+    "id": 160
+  },
+  {
+    "user_id": 1,
+    "message": "Purchase request 2026-11-001 was checked by Liza Ramos Fernandez — awaiting your final approval.",
+    "link": "/approvals/1",
+    "is_read": false,
+    "created_at": "2026-10-31T16:51:17.680835+00:00",
+    "id": 161
+  },
+  {
+    "user_id": 4,
+    "message": "Your purchase request 2026-11-001 was checked by Liza Ramos Fernandez and is waiting for the Super Admin's final approval.",
+    "link": "/requests/1",
+    "is_read": false,
+    "created_at": "2026-10-31T16:51:17.700604+00:00",
+    "id": 162
+  },
+  {
+    "user_id": 4,
+    "message": "Your purchase request 2026-11-001 was approved.",
+    "link": "/requests/1",
+    "is_read": false,
+    "created_at": "2026-10-31T17:02:48.898337+00:00",
+    "id": 163
+  },
+  {
+    "user_id": 4,
+    "message": "PO 2026-11-001 prepared for your request 2026-11-001 (Akiro Store).",
+    "link": "/requests/1",
+    "is_read": false,
+    "created_at": "2026-10-31T17:19:28.485819+00:00",
+    "id": 164
+  },
+  {
+    "user_id": 2,
+    "message": "PO 2026-11-001 to Akiro Store (₱54,205.62) prepared by Liza Ramos Fernandez — awaiting your check.",
+    "link": "/purchasing/1",
+    "is_read": false,
+    "created_at": "2026-10-31T17:19:28.503261+00:00",
+    "id": 165
+  },
+  {
+    "user_id": 1,
+    "message": "PO 2026-11-001 to Akiro Store was checked by Liza Ramos Fernandez — awaiting your final approval.",
+    "link": "/purchasing/1",
+    "is_read": false,
+    "created_at": "2026-10-31T17:19:31.446461+00:00",
+    "id": 166
+  },
+  {
+    "user_id": 2,
+    "message": "PO 2026-11-001 to Akiro Store is approved — print it and send it to the supplier.",
+    "link": "/purchasing/1",
+    "is_read": false,
+    "created_at": "2026-10-31T17:24:06.845309+00:00",
+    "id": 167
+  },
+  {
+    "user_id": 3,
+    "message": "PO 2026-11-001 from Akiro Store is approved — expect the delivery on 2026-11-21.",
     "link": "/receiving/",
     "is_read": false,
-    "created_at": "2026-10-26T15:35:09.153255+00:00",
-    "id": 136
+    "created_at": "2026-10-31T17:24:06.859123+00:00",
+    "id": 168
+  },
+  {
+    "user_id": 2,
+    "message": "Purchase request 2026-11-002 from Warehouse — qwdqwd (est. ₱111.00) awaiting your check.",
+    "link": "/approvals/2",
+    "is_read": false,
+    "created_at": "2026-10-31T17:25:54.478853+00:00",
+    "id": 169
+  },
+  {
+    "user_id": 1,
+    "message": "Received at the Receiving Area — MRR-2026-0002 from Akiro Store: qdw 4 pc in 1 box(es) (PO 2026-11-001). Ready for inspection & cleaning.",
+    "link": "/receiving/5",
+    "is_read": false,
+    "created_at": "2026-10-31T17:26:57.204844+00:00",
+    "id": 170
+  },
+  {
+    "user_id": 2,
+    "message": "Received at the Receiving Area — MRR-2026-0002 from Akiro Store: qdw 4 pc in 1 box(es) (PO 2026-11-001). Ready for inspection & cleaning.",
+    "link": "/receiving/5",
+    "is_read": false,
+    "created_at": "2026-10-31T17:26:57.204844+00:00",
+    "id": 171
+  },
+  {
+    "user_id": 3,
+    "message": "Received at the Receiving Area — MRR-2026-0002 from Akiro Store: qdw 4 pc in 1 box(es) (PO 2026-11-001). Ready for inspection & cleaning.",
+    "link": "/receiving/5",
+    "is_read": false,
+    "created_at": "2026-10-31T17:26:57.204844+00:00",
+    "id": 172
+  },
+  {
+    "user_id": 4,
+    "message": "Received at the Receiving Area — MRR-2026-0002 from Akiro Store: qdw 4 pc in 1 box(es) (PO 2026-11-001). Ready for inspection & cleaning.",
+    "link": "/receiving/5",
+    "is_read": false,
+    "created_at": "2026-10-31T17:26:57.204844+00:00",
+    "id": 173
+  },
+  {
+    "user_id": 1,
+    "message": "Purchase request 2026-11-002 was checked by Liza Ramos Fernandez — awaiting your final approval.",
+    "link": "/approvals/2",
+    "is_read": false,
+    "created_at": "2026-10-31T17:27:46.698573+00:00",
+    "id": 174
+  },
+  {
+    "user_id": 4,
+    "message": "Your purchase request 2026-11-002 was checked by Liza Ramos Fernandez and is waiting for the Super Admin's final approval.",
+    "link": "/requests/2",
+    "is_read": false,
+    "created_at": "2026-10-31T17:27:46.713671+00:00",
+    "id": 175
+  },
+  {
+    "user_id": 4,
+    "message": "Your purchase request 2026-11-002 was approved.",
+    "link": "/requests/2",
+    "is_read": false,
+    "created_at": "2026-10-31T17:28:19.315185+00:00",
+    "id": 176
+  },
+  {
+    "user_id": 4,
+    "message": "PO 2026-11-002 prepared for your request 2026-11-002 (Davao CVI).",
+    "link": "/requests/2",
+    "is_read": false,
+    "created_at": "2026-10-31T17:29:34.600254+00:00",
+    "id": 177
+  },
+  {
+    "user_id": 2,
+    "message": "PO 2026-11-002 to Davao CVI (₱168.10) prepared by Liza Ramos Fernandez — awaiting your check.",
+    "link": "/purchasing/2",
+    "is_read": false,
+    "created_at": "2026-10-31T17:29:34.613554+00:00",
+    "id": 178
+  },
+  {
+    "user_id": 1,
+    "message": "PO 2026-11-002 to Davao CVI was checked by Liza Ramos Fernandez — awaiting your final approval.",
+    "link": "/purchasing/2",
+    "is_read": false,
+    "created_at": "2026-10-31T17:29:39.931805+00:00",
+    "id": 179
+  },
+  {
+    "user_id": 2,
+    "message": "PO 2026-11-002 to Davao CVI is approved — print it and send it to the supplier.",
+    "link": "/purchasing/2",
+    "is_read": false,
+    "created_at": "2026-10-31T17:30:07.248515+00:00",
+    "id": 180
+  },
+  {
+    "user_id": 3,
+    "message": "PO 2026-11-002 from Davao CVI is approved — expect the delivery on 2026-11-11.",
+    "link": "/receiving/",
+    "is_read": false,
+    "created_at": "2026-10-31T17:30:07.262680+00:00",
+    "id": 181
   }
 ]

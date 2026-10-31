@@ -1,70 +1,49 @@
 {% extends "base.html" %}
-{% from "_paper.html" import paper_head %}
+{% from "_paper.html" import doc, doc_h, doc_fields, doc_checks, doc_signs %}
 {% block title %}Inspection {{ box.inspection_no or box.box_code }}{% endblock %}
 {% block content %}
-<style>
-  .sop-box { display: inline-grid; place-items: center; width: 14px; height: 14px; border: 1.5px solid #111; margin-right: 5px; font-size: .72rem; line-height: 1; vertical-align: -2px; }
-  .sop-checks { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: .82rem; margin-bottom: 8px; }
-  .paper-table td.mark { text-align: center; width: 42px; }
-  .sop-note { font-size: .7rem; color: #444; text-align: center; margin-top: 14px; font-style: italic; }
-</style>
 <div class="toolbar no-print">
   <a class="back-link" style="margin:0" href="{{ url_for('receiving.box', box_id=box.id) }}">{{ icon('arrow-left', 15) }} {{ box.box_code }}</a>
   <button class="btn btn-primary" type="button" onclick="window.print()">{{ icon('printer', 15) }} Print</button>
 </div>
 
-<div class="paper">
-  {{ paper_head('Incoming Material Inspection Checklist', '', doc_no='AFP-WH-FRM-002', revision='00') }}
-  <div class="paper-fields">
-    <div><b>Inspection No.:</b> {{ box.inspection_no }}</div>
-    <div><b>Date:</b> {{ box.checked_at }}</div>
-    <div><b>Supplier:</b> {{ box.supplier_name }}</div>
-    <div><b>MRR No.:</b> {{ box.batch_ref }}</div>
-    <div><b>Material / Item:</b> {{ box.material_name }} ({{ box.box_code }})</div>
-    <div><b>Lot / Batch No.:</b> {{ box.lot_no or '' }}</div>
-    <div><b>Quantity / Unit:</b> {{ box.declared_qty|qty(box.unit) }}</div>
-    <div><b>Inspector:</b> {{ box.checked_by }}</div>
-  </div>
+{% call doc('Incoming Material Inspection Checklist', no=box.inspection_no, status=box.acceptance_status,
+            doc_no='AFP-WH-FRM-002', revision='00',
+            meta=[('Inspection date', box.checked_at|longdate), ('MRR No.', box.batch_ref),
+                  ('Lot / batch', box.lot_no), ('Quantity', box.declared_qty|qty(box.unit))]) %}
+  {{ doc_fields([('Supplier', box.supplier_name), ('Material / item', box.material_name ~ ' · ' ~ box.box_code),
+                 ('Inspector', box.checked_by)]
+                + ([('Visual / organoleptic description', box.visual_description, 'wide')] if box.visual_description else [])) }}
 
-  {% if box.visual_description %}<div class="paper-fields"><div style="grid-column:1 / -1"><b>Visual / organoleptic:</b> {{ box.visual_description }}</div></div>{% endif %}
-  <div class="paper-section">A. Inspection Checklist</div>
-  <table class="paper-table">
-    <thead><tr><th>Inspection Point</th><th>Acceptable Requirement / Check</th><th>Pass</th><th>Fail</th><th>N/A</th><th>Remarks</th></tr></thead>
+  {{ doc_h('A. Inspection checklist') }}
+  <table class="doc-table">
+    <thead><tr><th>Inspection point</th><th>Acceptable requirement / check</th><th class="c">Pass</th><th class="c">Fail</th><th class="c">N/A</th><th>Remarks</th></tr></thead>
     <tbody>
       {% for key, point, requirement in points %}
       {% set entry = box.checklist.get(key) or {} %}
       <tr>
-        <td><b>{{ point }}</b></td>
+        <td class="doc-item">{{ point }}</td>
         <td>{{ requirement }}</td>
-        {% for r in ('Pass', 'Fail', 'N/A') %}<td class="mark"><span class="sop-box">{{ '✓' if entry.result == r }}</span></td>{% endfor %}
+        {% for r in ('Pass', 'Fail', 'N/A') %}<td class="c"><span class="doc-box">{{ '✓' if entry.result == r }}</span></td>{% endfor %}
         <td>{{ entry.remarks or '' }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
-  {% if not box.checklist %}<div class="paper-note">Inspected before the checklist was introduced — results: visual {{ box.visual_inspection or '—' }}, COA {{ box.coa_check or '—' }}, sampling {{ box.sampling_test or '—' }}.</div>{% endif %}
+  {% if not box.checklist %}<p class="doc-note">Inspected before the checklist was introduced — results: visual {{ box.visual_inspection or '—' }}, COA {{ box.coa_check or '—' }}, sampling {{ box.sampling_test or '—' }}.</p>{% endif %}
 
-  <div class="paper-section">B. Test Results (if applicable)</div>
-  <div class="paper-fields">
-    <div><b>Parameter:</b> {{ box.test_parameter }}</div>
-    <div><b>Specification:</b> {{ box.test_spec }}</div>
-    <div><b>Actual Result:</b> {{ box.test_result }}</div>
-    <div><b>Instrument / Method:</b> {{ box.test_method }}</div>
-  </div>
+  {{ doc_h('B. Test results (if applicable)') }}
+  {{ doc_fields([('Parameter', box.test_parameter), ('Specification', box.test_spec),
+                 ('Actual result', box.test_result), ('Instrument / method', box.test_method)], cols=4) }}
 
-  <div class="paper-section">C. Inspection Decision</div>
-  <div class="sop-checks">
-    <span><span class="sop-box">{{ '✓' if box.acceptance_status == 'Accepted' }}</span>ACCEPTED – meets requirements</span>
-    <span><span class="sop-box">{{ '✓' if box.acceptance_status == 'Hold' }}</span>HOLD / QUARANTINE – pending evaluation</span>
-    <span><span class="sop-box">{{ '✓' if box.acceptance_status == 'Rejected' }}</span>REJECTED – does not meet requirements</span>
-  </div>
-  <div class="paper-fields">
-    <div style="grid-column:1 / -1"><b>Reason / Findings:</b> {{ [box.nonconformity, box.unusable_reason and ("can't be used: " ~ box.unusable_reason), box.damage_reason and ("damaged: " ~ box.damage_reason)]|select|join('; ') }}</div>
-    <div><b>Inspector (signature):</b> {{ box.checked_by }}</div>
-    <div><b>Date:</b> {{ box.checked_at }}</div>
-    <div><b>QA / Authorized disposition:</b> {{ box.verified_by_name or '' }}</div>
-    <div><b>Usable / can't be used / damaged:</b> {{ box.good_qty|qty }} / {{ box.unusable_qty|qty }} / {{ box.damaged_qty|qty }} {{ box.unit }}</div>
-  </div>
-  <div class="sop-note">AMAMIO FARM PRODUCTS · Controlled Form – Uncontrolled when printed</div>
-</div>
+  {{ doc_h('C. Inspection decision') }}
+  {{ doc_checks([('Accepted — meets requirements', box.acceptance_status == 'Accepted'),
+                 ('Hold / quarantine — pending evaluation', box.acceptance_status == 'Hold'),
+                 ('Rejected — does not meet requirements', box.acceptance_status == 'Rejected')]) }}
+  {{ doc_fields([('Reason / findings', [box.nonconformity, box.unusable_reason and ("can't be used: " ~ box.unusable_reason), box.damage_reason and ("damaged: " ~ box.damage_reason)]|select|join('; '), 'wide'),
+                 ('Usable', box.good_qty|qty(box.unit)), ("Can't be used", box.unusable_qty|qty(box.unit)), ('Damaged', box.damaged_qty|qty(box.unit))]) }}
+
+  {{ doc_signs([('Inspector', box.checked_by, none, box.checked_at),
+                ('QA / authorized disposition', box.verified_by_name, none, box.checked_at if box.verified_by_name else '')]) }}
+{% endcall %}
 {% endblock %}

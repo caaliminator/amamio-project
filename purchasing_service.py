@@ -13,9 +13,10 @@ PURCHASE ORDER — PO No. (the PR's number), PO date, expected delivery date,
 payment terms; supplier information (name, address, contact no. / email,
 TIN, contact person, supplier reference); delivery information (deliver to,
 address, instructions, contact); lines of description / specification,
-brand / model, qty, unit, unit price, amount, requested delivery, VAT / tax,
-remarks; subtotal, discount, delivery / freight, VAT / other tax, grand
-total; terms / special instructions; Prepared by, Checked by, Approved by,
+brand / model, qty, unit, unit price, amount, requested delivery, remarks
+(the description is the item as approved on the PR); subtotal, discount,
+delivery / freight, labor, VAT (a percentage of the items after the
+discount), grand total; terms / special instructions; Prepared by, Checked by, Approved by,
 Supplier acknowledgment.
 
 Flow: a head raises a PR → the Admin checks it (initial approval; may change
@@ -31,6 +32,7 @@ short).
 from datetime import date
 
 import db
+import profiles
 import security
 import services
 from services import _to_float, now_iso, today_iso
@@ -38,10 +40,10 @@ from services import _to_float, now_iso, today_iso
 COMPANY_NAME = "Amamio Farm Products"
 COMPANY_ADDRESS = "Dist. 4, Brgy. Kinabjangan, Nasipit, Agusan del Norte"
 
-DEPARTMENTS = ["Production", "Receiving", "Packing", "Assets & Maintenance",
+DEPARTMENTS = ["Production", "Warehouse", "Packing", "Assets & Maintenance",
                "Office / Admin"]
 ROLE_DEPARTMENT = {"production_head": "Production",
-                   "receiving_head": "Receiving",
+                   "receiving_head": "Warehouse",
                    "packing_head": "Packing", "packing_member": "Packing",
                    "assets_head": "Assets & Maintenance"}
 BUDGET_CATEGORIES = ["Raw materials", "Packaging", "Production supplies",
@@ -220,17 +222,20 @@ def _clean_lines(lines):
 
 def create_purchase_request(user, department, purpose, required_date, lines,
                             notes="", urgency="Normal", pr_no="",
-                            date_requested="", requested_by_name=""):
+                            date_requested="", requested_by_name="", save=True):
     """Raise a PR from the paper-form fields.  Returns (request, error).
+    With ``save=False`` it is only built and checked, for the form's preview.
 
-    ``requested_by_name`` is the requestor written on the form — the person
-    signed in unless someone else asked for the items."""
+    ``requested_by_name`` is the requesting employee written on the form —
+    the person signed in unless someone else asked for the items.  The team
+    head who submits it (``user``) signs it as Approved By (Dept. Head)."""
     if department not in DEPARTMENTS:
         return None, "Choose the requesting department."
     purpose = (purpose or "").strip()
     if not purpose:
         return None, "Give the purpose / justification — the approver sees it."
-    requestor = (requested_by_name or user.get("name") or "").strip()
+    # The field shows "Name (Position)" for a user; keep the bare name.
+    requestor = profiles.strip_position(requested_by_name or user.get("name") or "")
     if not requestor:
         return None, "Enter the requestor's name."
     items, problems = _clean_lines(lines)
@@ -246,11 +251,15 @@ def create_purchase_request(user, department, purpose, required_date, lines,
         number = pr_no or next_pr_no(date.fromisoformat(requested_on))
     except ValueError:
         number = next_pr_no()
-    req = db.insert("purchase_requests", {
+    req = {
         "type": "general",
         "pr_no": number,
         "requestor_id": int(user["id"]),
         "requested_by_name": requestor,
+        "dept_head_id": int(user["id"]),
+        "dept_head_name": user.get("name") or "",
+        "dept_head_position": profiles.position_label(user),
+        "dept_approved_at": requested_on,
         "department": department,
         "purpose": purpose,
         "reason": purpose,
@@ -269,7 +278,10 @@ def create_purchase_request(user, department, purpose, required_date, lines,
         "purchasing_date": "",
         "items": items,
         "created_at": now_iso(),
-    })
+    }
+    if not save:
+        return req, None
+    req = db.insert("purchase_requests", req)
     _notify_role(
         "admin", "Purchase request %s from %s — %s (est. %s) awaiting your check."
         % (number, department, purpose[:60], services.fmt_peso(req["total_estimated"])),
@@ -389,27 +401,36 @@ def next_po_no(req):
     return "%s-%d" % (base, len(taken) + 1)
 
 
-def _totals(items, discount, freight, tax, labor=0):
+def _totals(items, discount, freight, vat_rate, labor=0):
+    """Subtotal, adjustments and grand total.  VAT is a percentage of the
+    items after the discount (``tax`` keeps the peso amount)."""
     subtotal = round(sum(i["amount"] for i in items), 2)
-    discount, freight, tax, labor = (round(max(0.0, _to_float(v)), 2)
-                                     for v in (discount, freight, tax, labor))
+    discount, freight, labor = (round(max(0.0, _to_float(v)), 2)
+                                for v in (discount, freight, labor))
+    rate = round(min(100.0, max(0.0, _to_float(vat_rate))), 2)
+    tax = round(max(0.0, subtotal - discount) * rate / 100, 2)
     return {"subtotal": subtotal, "discount": discount, "freight": freight,
-            "labor": labor, "tax": tax,
+            "labor": labor, "vat_rate": rate, "tax": tax,
             "grand_total": round(subtotal - discount + freight + labor + tax, 2)}
 
 
 def create_purchase_order(request_id, user, header, supplier, delivery, lines,
-                          totals, signoffs=None):
+                          totals, signoffs=None, save=True):
     """Prepare a PO from an approved PR.  Returns (po, error).
+
+    With ``save=False`` nothing is stored or sent: the PO is only built and
+    checked, for the preview on the form's last step.
 
     supplier: {id (from the Supplier Directory, required), address, contact,
                tin, contact_person, reference} — the name always comes from
                the directory, the other details can be corrected for this PO.
     header:   {po_date, expected_delivery, payment_terms, advance_amount} —
               the amount is required for advance / partial payment terms.
-    lines: [{pr_item_id, description, brand_model, qty, unit, unit_price,
-             requested_delivery, vat, remarks}] — only approved PR lines that
-    are not on another PO yet.
+    lines: [{pr_item_id, brand_model, qty, unit, unit_price,
+             requested_delivery, remarks}] — only approved PR lines that
+    are not on another PO yet.  The description is always the item as
+    approved on the PR.
+    totals: {discount, freight, labor, vat_rate (%), terms}.
     Prepared by is the person signed in; Checked by and Approved by are
     filled in by the two approvals."""
     req = db.get("purchase_requests", request_id)
@@ -448,11 +469,9 @@ def create_purchase_order(request_id, user, header, supplier, delivery, lines,
             return None, "Enter a quantity for %s." % open_items[pr_item_id]["name"]
         if price < 0:
             return None, "Unit prices can't be negative."
-        description = (raw.get("description") or open_items[pr_item_id]["name"]).strip()
-        # A different item picked from the dropdown is received as that item.
-        material_id = (open_items[pr_item_id].get("material_id")
-                       if description == open_items[pr_item_id]["name"]
-                       else _match_material(description))
+        # Ordered exactly as approved on the PR — not editable on the PO.
+        description = open_items[pr_item_id]["name"]
+        material_id = open_items[pr_item_id].get("material_id")
         items.append({
             "line_no": len(items) + 1,
             "pr_item_id": pr_item_id,
@@ -464,7 +483,6 @@ def create_purchase_order(request_id, user, header, supplier, delivery, lines,
             "unit_price": round(price, 2),
             "amount": round(qty * price, 2),
             "requested_delivery": (raw.get("requested_delivery") or "").strip(),
-            "vat": (raw.get("vat") or "").strip(),
             "remarks": (raw.get("remarks") or "").strip(),
         })
     if not items:
@@ -473,8 +491,11 @@ def create_purchase_order(request_id, user, header, supplier, delivery, lines,
     expected = (header.get("expected_delivery") or "").strip()
     if expected and expected < po_date:
         return None, "The expected delivery date can't be before the PO date."
+    rate = _to_float(totals.get("vat_rate"))
+    if rate < 0 or rate > 100:
+        return None, "VAT is a percentage between 0 and 100."
     money = _totals(items, totals.get("discount"), totals.get("freight"),
-                    totals.get("tax"), totals.get("labor"))
+                    rate, totals.get("labor"))
     terms = (header.get("payment_terms") or "").strip()
     advance = 0.0
     if terms in UPFRONT_TERMS:
@@ -485,7 +506,7 @@ def create_purchase_order(request_id, user, header, supplier, delivery, lines,
             return None, "The amount paid up front can't be more than the grand total."
 
     signoffs = signoffs or {}
-    po = db.insert("purchase_orders", dict(
+    po = dict(
         po_no=next_po_no(req),
         purchase_request_id=req["id"],
         pr_no=req.get("pr_no") or "",
@@ -520,7 +541,10 @@ def create_purchase_order(request_id, user, header, supplier, delivery, lines,
         created_by=user["id"],
         created_at=now_iso(),
         **money,
-    ))
+    )
+    if not save:
+        return po, None
+    po = db.insert("purchase_orders", po)
     # The PR lines now point at their PO; the PR's Purchasing / Procurement
     # sign-off is whoever prepared it.
     ordered = {i["pr_item_id"] for i in items}

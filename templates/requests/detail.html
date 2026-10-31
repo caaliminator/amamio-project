@@ -92,6 +92,7 @@
   <div class="card-title">Sign-offs</div>
   <dl class="review-list">
     <dt>Requested by</dt><dd>{{ row.requested_by }} · {{ row.date_requested }}</dd>
+    {% if req.dept_head_name %}<dt>Approved by (dept. head)</dt><dd>{{ req.dept_head_name }}{% if req.dept_head_position %} — {{ req.dept_head_position }}{% endif %} · {{ req.dept_approved_at }}</dd>{% endif %}
     <dt>Checked by</dt><dd>{{ req.checked_by_name or '—' }}{% if req.checked_by_name and (req.checked_at or decided_on) %} · {{ (req.checked_at or decided_on)[:10] }}{% endif %}</dd>
     <dt>Approved by</dt><dd>{{ req.approved_by_name or '—' }}{% if req.approved_by_name and decided_on %} · {{ decided_on }}{% endif %}</dd>
     <dt>Purchasing / Procurement</dt><dd>{{ req.purchasing_by_name or '—' }}{% if req.purchasing_date %} · {{ req.purchasing_date }}{% endif %}</dd>

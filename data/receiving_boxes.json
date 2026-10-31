@@ -24,7 +24,7 @@
     "acceptance_status": "Accepted",
     "nonconformity": "",
     "action_taken": "",
-    "verified_by_name": "Amamio Admin",
+    "verified_by_name": "Liza Ramos Fernandez",
     "checked_by": 4,
     "checked_at": "2026-10-16T05:39:31.358403+00:00",
     "status": "Accepted",
@@ -61,7 +61,7 @@
     "acceptance_status": "Accepted",
     "nonconformity": "",
     "action_taken": "",
-    "verified_by_name": "Amamio Admin",
+    "verified_by_name": "Liza Ramos Fernandez",
     "checked_by": 4,
     "checked_at": "2026-10-16T05:39:31.545103+00:00",
     "status": "Accepted",
@@ -98,7 +98,7 @@
     "acceptance_status": "Accepted",
     "nonconformity": "",
     "action_taken": "",
-    "verified_by_name": "Amamio Admin",
+    "verified_by_name": "Liza Ramos Fernandez",
     "checked_by": 4,
     "checked_at": "2026-10-16T05:39:31.767411+00:00",
     "status": "Accepted",
@@ -135,7 +135,7 @@
     "acceptance_status": "Accepted",
     "nonconformity": "",
     "action_taken": "",
-    "verified_by_name": "Amamio Admin",
+    "verified_by_name": "Liza Ramos Fernandez",
     "checked_by": 4,
     "checked_at": "2026-10-16T05:39:31.995969+00:00",
     "status": "Accepted",
@@ -172,7 +172,7 @@
     "acceptance_status": "Accepted",
     "nonconformity": "",
     "action_taken": "",
-    "verified_by_name": "Amamio Admin",
+    "verified_by_name": "Liza Ramos Fernandez",
     "checked_by": 4,
     "checked_at": "2026-10-16T05:39:32.209261+00:00",
     "status": "Accepted",
@@ -209,7 +209,7 @@
     "acceptance_status": "Accepted",
     "nonconformity": "",
     "action_taken": "",
-    "verified_by_name": "Amamio Admin",
+    "verified_by_name": "Liza Ramos Fernandez",
     "checked_by": 4,
     "checked_at": "2026-10-16T05:39:32.441232+00:00",
     "status": "Accepted",
@@ -493,6 +493,188 @@
     "expiry_date": "",
     "packaging_condition": "Good / intact",
     "temperature_c": 26.5,
+    "good_qty": 150.0,
+    "unusable_qty": 0.0,
+    "unusable_reason": "",
+    "damaged_qty": 0.0,
+    "damage_reason": "",
+    "cleaned": true,
+    "visual_inspection": "Pass",
+    "coa_check": "Complete",
+    "sampling_test": "Passed",
+    "acceptance_status": "Accepted",
+    "nonconformity": "",
+    "action_taken": "Accepted",
+    "verified_by_name": "",
+    "checked_by": 3,
+    "checked_at": "2026-10-31T11:35:08.581523+00:00",
+    "status": "Accepted",
+    "stage": "Storage Area",
+    "location": "Receiving Area",
+    "released_to": "",
+    "released_at": null,
+    "received_by": 3,
+    "created_at": "2026-10-16T05:39:33.645632+00:00",
+    "id": 14,
+    "visual_description": "aw",
+    "inspection_no": "INS-2026-0002",
+    "checklist": {
+      "identity": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "quantity": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "packaging": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "cleanliness": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "pest": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "odor": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "lot": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "dates": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "coa": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "transport": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "test": {
+        "result": "Pass",
+        "remarks": ""
+      }
+    },
+    "test_parameter": "1qwe",
+    "test_spec": "123",
+    "test_result": "1",
+    "test_method": "q"
+  },
+  {
+    "batch_id": 4,
+    "box_code": "RB-15",
+    "seq": 1,
+    "material_id": 74,
+    "material_name": "Honey for Processing (QC failed)",
+    "unit": "kg",
+    "po_id": null,
+    "po_line_no": null,
+    "track_mode": "weight",
+    "declared_qty": 5.0,
+    "lot_no": "",
+    "expiry_date": "",
+    "packaging_condition": "",
+    "temperature_c": null,
+    "good_qty": 5.0,
+    "unusable_qty": 0.0,
+    "unusable_reason": "",
+    "damaged_qty": 0.0,
+    "damage_reason": "",
+    "cleaned": true,
+    "visual_inspection": "Pass",
+    "coa_check": "Complete",
+    "sampling_test": "Passed",
+    "acceptance_status": "Accepted",
+    "nonconformity": "",
+    "action_taken": "Accepted",
+    "verified_by_name": "",
+    "inspection_no": "INS-2026-0001",
+    "visual_description": "ww",
+    "checklist": {
+      "identity": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "quantity": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "packaging": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "cleanliness": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "pest": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "odor": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "lot": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "dates": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "coa": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "transport": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "test": {
+        "result": "Pass",
+        "remarks": ""
+      }
+    },
+    "test_parameter": "Moisture",
+    "test_spec": "20",
+    "test_result": "18",
+    "test_method": "refr",
+    "checked_by": 3,
+    "checked_at": "2026-10-31T11:17:27.571878+00:00",
+    "status": "Accepted",
+    "stage": "Storage Area",
+    "location": "Receiving Area",
+    "released_to": "",
+    "released_at": null,
+    "received_by": 3,
+    "created_at": "2026-10-31T10:56:45.781200+00:00",
+    "id": 15
+  },
+  {
+    "batch_id": 5,
+    "box_code": "RB-16",
+    "seq": 1,
+    "material_id": 75,
+    "material_name": "qdw",
+    "unit": "pc",
+    "po_id": 1,
+    "po_line_no": 1,
+    "track_mode": "piece",
+    "declared_qty": 4.0,
+    "lot_no": "",
+    "expiry_date": "",
+    "packaging_condition": "",
+    "temperature_c": null,
     "good_qty": null,
     "unusable_qty": 0.0,
     "unusable_reason": "",
@@ -506,6 +688,13 @@
     "nonconformity": "",
     "action_taken": "",
     "verified_by_name": "",
+    "inspection_no": "",
+    "visual_description": "",
+    "checklist": {},
+    "test_parameter": "",
+    "test_spec": "",
+    "test_result": "",
+    "test_method": "",
     "checked_by": null,
     "checked_at": null,
     "status": "Awaiting Inspection",
@@ -514,7 +703,7 @@
     "released_to": "",
     "released_at": null,
     "received_by": 3,
-    "created_at": "2026-10-16T05:39:33.645632+00:00",
-    "id": 14
+    "created_at": "2026-10-31T17:26:57.114461+00:00",
+    "id": 16
   }
 ]

@@ -17,8 +17,8 @@ from security import current_user, module_required
 
 purchasing_bp = Blueprint("purchasing", __name__)
 
-LINE_KEYS = ("pr_item_id", "include", "description", "brand_model", "qty",
-             "unit", "unit_price", "requested_delivery", "vat", "remarks")
+LINE_KEYS = ("pr_item_id", "include", "brand_model", "qty",
+             "unit", "unit_price", "requested_delivery", "remarks")
 
 
 @purchasing_bp.route("/")
@@ -60,6 +60,64 @@ def _suggested_supplier(items, suppliers):
     return None
 
 
+def _po_from_form(request_id, user, form, save=True):
+    """Build (and, with ``save``, store) a PO from the form's fields."""
+    f = form.get
+    return pur.create_purchase_order(
+        request_id, user,
+        {"po_date": f("po_date"), "expected_delivery": f("expected_delivery"),
+         "payment_terms": f("payment_terms"),
+         "advance_amount": f("advance_amount")},
+        {"id": f("supplier_id"),
+         "address": f("supplier_address"), "contact": f("supplier_contact"),
+         "tin": f("supplier_tin"), "contact_person": f("supplier_contact_person"),
+         "reference": f("supplier_reference")},
+        {"deliver_to": f("deliver_to"), "address": f("delivery_address"),
+         "instructions": f("delivery_instructions"), "contact": f("delivery_contact")},
+        _lines_from_form(form),
+        {"discount": f("discount"), "freight": f("freight"),
+         "vat_rate": f("vat_rate"), "labor": f("labor"), "terms": f("terms")},
+        save=save)
+
+
+def _cancelled_po(req):
+    """The latest cancelled PO prepared from this PR, if any."""
+    return max((p for p in db.read("purchase_orders")
+                if p.get("purchase_request_id") == req["id"]
+                and p.get("status") == pur.PO_CANCELLED),
+               key=lambda p: p["id"], default=None)
+
+
+def _po_start_values(po):
+    """A cancelled PO's header and totals, as form values to start from."""
+    def number(v):
+        v = services._to_float(v)
+        return ("%g" % v) if v else ""
+    values = {k: po.get(k) or "" for k in (
+        "supplier_tin", "supplier_address", "supplier_contact_person",
+        "supplier_contact", "supplier_reference", "expected_delivery",
+        "payment_terms", "deliver_to", "delivery_address", "delivery_contact",
+        "delivery_instructions", "terms")}
+    values.update({k: number(po.get(k)) for k in (
+        "advance_amount", "discount", "freight", "labor", "vat_rate")})
+    return values
+
+
+@purchasing_bp.route("/new/preview", methods=["POST"])
+@module_required("purchasing")
+def preview():
+    """The form's last step: the PO exactly as it will print, built from the
+    fields typed so far (nothing is saved)."""
+    try:
+        request_id = int(request.form.get("request_id"))
+    except (TypeError, ValueError):
+        abort(400)
+    po, err = _po_from_form(request_id, current_user(), request.form, save=False)
+    if err:
+        return render_template("purchasing/_preview_error.html", error=err), 422
+    return render_template("purchasing/_document.html", po=po, preview=True)
+
+
 @purchasing_bp.route("/new", methods=["GET", "POST"])
 @module_required("purchasing")
 def new():
@@ -80,21 +138,7 @@ def new():
     user = current_user()
     form = request.form
     if request.method == "POST":
-        f = form.get
-        po, err = pur.create_purchase_order(
-            request_id, user,
-            {"po_date": f("po_date"), "expected_delivery": f("expected_delivery"),
-             "payment_terms": f("payment_terms"),
-             "advance_amount": f("advance_amount")},
-            {"id": f("supplier_id"),
-             "address": f("supplier_address"), "contact": f("supplier_contact"),
-             "tin": f("supplier_tin"), "contact_person": f("supplier_contact_person"),
-             "reference": f("supplier_reference")},
-            {"deliver_to": f("deliver_to"), "address": f("delivery_address"),
-             "instructions": f("delivery_instructions"), "contact": f("delivery_contact")},
-            _lines_from_form(form),
-            {"discount": f("discount"), "freight": f("freight"), "tax": f("tax"),
-             "labor": f("labor"), "terms": f("terms")})
+        po, err = _po_from_form(request_id, user, form)
         if not err:
             flash("Purchase order %s prepared — the Admin has been notified to "
                   "check it." % po["po_no"], "success")
@@ -104,14 +148,25 @@ def new():
     suppliers = sorted(db.read("suppliers"), key=lambda s: (s.get("name") or "").lower())
     suggested = _suggested_supplier(items, suppliers)
     catalog = pur.item_choices()
-    known = {r["name"] for _, rows in catalog for r in rows}
+    # After a failed save the lines keep what was typed, not the PR values.
+    edits = ({str(l["pr_item_id"]): l for l in _lines_from_form(form)}
+             if request.method == "POST" else {})
+    # A PO for this PR that was cancelled: the new one starts from it.
+    prev, start_from, prev_lines = _cancelled_po(req), {}, {}
+    if prev:
+        start_from = _po_start_values(prev)
+        prev_lines = {str(it["pr_item_id"]): it for it in prev.get("items") or []}
+        directory = db.get("suppliers", prev.get("supplier_id")) if prev.get("supplier_id") else None
+        if directory and services.supplier_approved(directory):
+            suggested = directory
     return render_template(
-        "purchasing/new.html", req=req, pr_no=pur.pr_number(req), items=items,
+        "purchasing/new.html", req=req, pr_no=pur.pr_number(req), items=items, edits=edits,
+        prev_po=prev, start_from=start_from, prev_lines=prev_lines,
         form=form, me=user, today=services.today_iso(),
         suppliers=[pur.supplier_card(s) for s in suppliers],
         suggested=pur.supplier_card(suggested) if suggested else None,
         payment_terms=pur.PAYMENT_TERMS, upfront_terms=pur.UPFRONT_TERMS,
-        catalog=catalog, known_items=known, units=pur.units_for(catalog),
+        units=pur.units_for(catalog),
         company_name=pur.COMPANY_NAME, company_address=pur.COMPANY_ADDRESS,
         default_terms=pur.DEFAULT_TERMS, po_no=pur.next_po_no(req),
         start=1 if request.method == "POST" else 0)

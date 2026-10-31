@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_paper.html" import paper_head, paper_signoff %}
+{% from "_paper.html" import doc, doc_signoff %}
 {% block title %}Inventory of Assets{% endblock %}
 {% block content %}
 <a class="back-link no-print" href="{{ url_for('assets.index') }}">{{ icon('arrow-left', 15) }} Equipment &amp; Assets</a>
@@ -8,22 +8,22 @@
   <button class="btn btn-primary" type="button" onclick="window.print()">{{ icon('printer', 15) }} Print</button>
 </div>
 
-<div class="paper">
-  {{ paper_head('Inventory of Assets', 'As of ' ~ today) }}
-  <table class="paper-table">
+{% call doc('Inventory of Assets', subtitle='As of ' ~ (today|longdate),
+            meta=[('Categories', groups|length), ('Units in total', total_units|qty)]) %}
+  <table class="doc-table">
     <thead>
       <tr>
-        <th>Item No.</th><th>Description</th><th class="num">Cost per Item</th><th class="num">Quantity</th>
-        <th>Unit/Pcs</th><th>Serviceable / Non-serviceable</th><th class="num">No. of Years</th><th>Remarks</th>
+        <th>Item No.</th><th>Description</th><th class="num">Cost per item</th><th class="num">Qty</th>
+        <th>Unit</th><th>Condition</th><th class="num">Years</th><th>Remarks</th>
       </tr>
     </thead>
     <tbody>
       {% for category, rows in groups %}
       <tr class="group"><td colspan="8">{{ category }}</td></tr>
       {% for a in rows %}
-      <tr class="sub">
-        <td>{{ a.item_no }}</td>
-        <td>{{ a.name }}</td>
+      <tr>
+        <td class="nowrap">{{ a.item_no }}</td>
+        <td class="doc-item">{{ a.name }}</td>
         <td class="num">{{ a.cost_per_item|peso if a.cost_per_item not in (none, '') else '' }}</td>
         <td class="num">{{ a.quantity|qty }}</td>
         <td>{{ a.unit }}</td>
@@ -33,11 +33,10 @@
       </tr>
       {% endfor %}
       {% else %}
-      <tr><td colspan="8" style="text-align:center;color:#666;padding:20px">No equipment on the register.</td></tr>
+      <tr><td colspan="8" class="empty">No equipment on the register.</td></tr>
       {% endfor %}
     </tbody>
   </table>
-  <div class="paper-note">{{ groups|length }} categories · {{ total_units|qty }} units in total.</div>
-  {{ paper_signoff(['Prepared by:', 'Checked by:', 'Approved by:']) }}
-</div>
+  {{ doc_signoff(['Prepared by', 'Checked by', 'Approved by']) }}
+{% endcall %}
 {% endblock %}

@@ -58,7 +58,7 @@
       <div class="form-row">
         <label class="form-label" for="monitored_by">Monitoring in-charge <span class="req">*</span></label>
         <input type="text" id="monitored_by" name="monitored_by" maxlength="80" required
-               value="{{ form.monitored_by or me_name }}" placeholder="Full name">
+               value="{{ form.monitored_by or with_position(name=me_name) }}" placeholder="Full name">
       </div>
       <div class="form-row">
         <label class="form-label" for="remarks">Remarks</label>
