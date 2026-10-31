@@ -4708,5 +4708,735 @@
     "user_id": null,
     "timestamp": "2026-10-05T08:59:00+00:00",
     "id": 471
+  },
+  {
+    "item_type": "product",
+    "item_id": 3,
+    "change_qty": 36.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 472
+  },
+  {
+    "item_type": "product",
+    "item_id": 7,
+    "change_qty": 30.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-10-16T05:38:35+00:00",
+    "id": 473
+  },
+  {
+    "item_type": "product",
+    "item_id": 11,
+    "change_qty": 40.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 474
+  },
+  {
+    "item_type": "product",
+    "item_id": 28,
+    "change_qty": 25.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-10-06T08:29:00+00:00",
+    "id": 475
+  },
+  {
+    "item_type": "product",
+    "item_id": 32,
+    "change_qty": 30.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 476
+  },
+  {
+    "item_type": "material",
+    "item_id": 1,
+    "change_qty": 679.02,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:59:00+00:00",
+    "id": 477
+  },
+  {
+    "item_type": "material",
+    "item_id": 2,
+    "change_qty": 1445.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:59:00+00:00",
+    "id": 478
+  },
+  {
+    "item_type": "material",
+    "item_id": 3,
+    "change_qty": 114.91,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:59:00+00:00",
+    "id": 479
+  },
+  {
+    "item_type": "material",
+    "item_id": 6,
+    "change_qty": 138.25,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:59:00+00:00",
+    "id": 480
+  },
+  {
+    "item_type": "material",
+    "item_id": 7,
+    "change_qty": 9.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-10-06T08:29:00+00:00",
+    "id": 481
+  },
+  {
+    "item_type": "material",
+    "item_id": 9,
+    "change_qty": 20.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 482
+  },
+  {
+    "item_type": "material",
+    "item_id": 12,
+    "change_qty": 15.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 483
+  },
+  {
+    "item_type": "material",
+    "item_id": 13,
+    "change_qty": 320.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 484
+  },
+  {
+    "item_type": "material",
+    "item_id": 14,
+    "change_qty": 240.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 485
+  },
+  {
+    "item_type": "material",
+    "item_id": 15,
+    "change_qty": 180.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 486
+  },
+  {
+    "item_type": "material",
+    "item_id": 16,
+    "change_qty": 580.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:59:00+00:00",
+    "id": 487
+  },
+  {
+    "item_type": "material",
+    "item_id": 17,
+    "change_qty": 1410.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:59:00+00:00",
+    "id": 488
+  },
+  {
+    "item_type": "material",
+    "item_id": 18,
+    "change_qty": 150.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 489
+  },
+  {
+    "item_type": "material",
+    "item_id": 19,
+    "change_qty": 334.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:59:00+00:00",
+    "id": 490
+  },
+  {
+    "item_type": "material",
+    "item_id": 20,
+    "change_qty": 25.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 491
+  },
+  {
+    "item_type": "material",
+    "item_id": 21,
+    "change_qty": 140.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 492
+  },
+  {
+    "item_type": "material",
+    "item_id": 22,
+    "change_qty": 110.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 493
+  },
+  {
+    "item_type": "material",
+    "item_id": 23,
+    "change_qty": 90.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 494
+  },
+  {
+    "item_type": "material",
+    "item_id": 24,
+    "change_qty": 500.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-09-26T14:14:00+00:00",
+    "id": 495
+  },
+  {
+    "item_type": "material",
+    "item_id": 25,
+    "change_qty": 685.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-28T08:59:00+00:00",
+    "id": 496
+  },
+  {
+    "item_type": "material",
+    "item_id": 26,
+    "change_qty": 550.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-29T08:59:00+00:00",
+    "id": 497
+  },
+  {
+    "item_type": "material",
+    "item_id": 27,
+    "change_qty": 200.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 498
+  },
+  {
+    "item_type": "material",
+    "item_id": 28,
+    "change_qty": 839.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:59:00+00:00",
+    "id": 499
+  },
+  {
+    "item_type": "material",
+    "item_id": 29,
+    "change_qty": 400.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 500
+  },
+  {
+    "item_type": "material",
+    "item_id": 30,
+    "change_qty": 300.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 501
+  },
+  {
+    "item_type": "material",
+    "item_id": 31,
+    "change_qty": 640.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:59:00+00:00",
+    "id": 502
+  },
+  {
+    "item_type": "material",
+    "item_id": 32,
+    "change_qty": 180.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 503
+  },
+  {
+    "item_type": "material",
+    "item_id": 33,
+    "change_qty": 220.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 504
+  },
+  {
+    "item_type": "material",
+    "item_id": 34,
+    "change_qty": 160.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 505
+  },
+  {
+    "item_type": "material",
+    "item_id": 35,
+    "change_qty": 6.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-10-15T14:14:00+00:00",
+    "id": 506
+  },
+  {
+    "item_type": "material",
+    "item_id": 36,
+    "change_qty": 24.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-10-05T14:14:00+00:00",
+    "id": 507
+  },
+  {
+    "item_type": "material",
+    "item_id": 37,
+    "change_qty": 5.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 508
+  },
+  {
+    "item_type": "material",
+    "item_id": 38,
+    "change_qty": 10.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 509
+  },
+  {
+    "item_type": "material",
+    "item_id": 39,
+    "change_qty": 120.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 510
+  },
+  {
+    "item_type": "material",
+    "item_id": 40,
+    "change_qty": 150.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 511
+  },
+  {
+    "item_type": "material",
+    "item_id": 41,
+    "change_qty": 90.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 512
+  },
+  {
+    "item_type": "material",
+    "item_id": 42,
+    "change_qty": 40.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 513
+  },
+  {
+    "item_type": "material",
+    "item_id": 43,
+    "change_qty": 12.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-10-01T14:14:00+00:00",
+    "id": 514
+  },
+  {
+    "item_type": "material",
+    "item_id": 44,
+    "change_qty": 36.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 515
+  },
+  {
+    "item_type": "material",
+    "item_id": 45,
+    "change_qty": 8.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 516
+  },
+  {
+    "item_type": "material",
+    "item_id": 46,
+    "change_qty": 4.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-10-09T14:14:00+00:00",
+    "id": 517
+  },
+  {
+    "item_type": "material",
+    "item_id": 47,
+    "change_qty": 3.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 518
+  },
+  {
+    "item_type": "material",
+    "item_id": 48,
+    "change_qty": 3.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 519
+  },
+  {
+    "item_type": "material",
+    "item_id": 49,
+    "change_qty": 6.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 520
+  },
+  {
+    "item_type": "material",
+    "item_id": 50,
+    "change_qty": 20.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 521
+  },
+  {
+    "item_type": "material",
+    "item_id": 51,
+    "change_qty": 4.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 522
+  },
+  {
+    "item_type": "material",
+    "item_id": 52,
+    "change_qty": 15.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 523
+  },
+  {
+    "item_type": "material",
+    "item_id": 53,
+    "change_qty": 8.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-10-03T14:14:00+00:00",
+    "id": 524
+  },
+  {
+    "item_type": "material",
+    "item_id": 54,
+    "change_qty": 5.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 525
+  },
+  {
+    "item_type": "material",
+    "item_id": 55,
+    "change_qty": 6.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 526
+  },
+  {
+    "item_type": "material",
+    "item_id": 56,
+    "change_qty": 4.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 527
+  },
+  {
+    "item_type": "material",
+    "item_id": 57,
+    "change_qty": 24.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 528
+  },
+  {
+    "item_type": "material",
+    "item_id": 58,
+    "change_qty": 12.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 529
+  },
+  {
+    "item_type": "material",
+    "item_id": 59,
+    "change_qty": 24.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 530
+  },
+  {
+    "item_type": "material",
+    "item_id": 60,
+    "change_qty": 10.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 531
+  },
+  {
+    "item_type": "material",
+    "item_id": 61,
+    "change_qty": 4.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 532
+  },
+  {
+    "item_type": "material",
+    "item_id": 62,
+    "change_qty": 3.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 533
+  },
+  {
+    "item_type": "material",
+    "item_id": 63,
+    "change_qty": 6.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 534
+  },
+  {
+    "item_type": "material",
+    "item_id": 64,
+    "change_qty": 3.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 535
+  },
+  {
+    "item_type": "material",
+    "item_id": 65,
+    "change_qty": 4.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 536
+  },
+  {
+    "item_type": "material",
+    "item_id": 66,
+    "change_qty": 5.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 537
+  },
+  {
+    "item_type": "material",
+    "item_id": 67,
+    "change_qty": 10.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 538
+  },
+  {
+    "item_type": "material",
+    "item_id": 68,
+    "change_qty": 2.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 539
+  },
+  {
+    "item_type": "material",
+    "item_id": 69,
+    "change_qty": 3.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 540
+  },
+  {
+    "item_type": "material",
+    "item_id": 70,
+    "change_qty": 2.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 541
+  },
+  {
+    "item_type": "material",
+    "item_id": 71,
+    "change_qty": 2.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 542
+  },
+  {
+    "item_type": "material",
+    "item_id": 72,
+    "change_qty": 30.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 543
+  },
+  {
+    "item_type": "material",
+    "item_id": 73,
+    "change_qty": 3.0,
+    "txn_type": "adjusted",
+    "reference_id": "opening balance",
+    "user_id": null,
+    "timestamp": "2026-07-27T08:58:00+00:00",
+    "id": 544
   }
 ]
