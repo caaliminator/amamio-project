@@ -1,0 +1,78 @@
+{# The Material Receiving Report (AFP-WH-FRM-001) as a document — the printed
+   MRR, and the preview on the receive form's last step (``preview``: built
+   from the fields, not saved; each part links back to its step). #}
+{% from "_paper.html" import doc, doc_checks, doc_lines, doc_signs %}
+{% set pv = preview is defined and preview %}
+{% macro edit(step) %}{% if pv %}<a href="#" class="doc-edit no-print" data-wz-goto="{{ step }}">Edit</a>{% endif %}{% endmacro %}
+{% macro head(title, step) %}<div class="doc-section-head"><h3>{{ title }}</h3>{{ edit(step) }}</div>{% endmacro %}
+
+{% call doc('Material Receiving Report', no=batch.ref_no, doc_no='AFP-WH-FRM-001', revision='00',
+            status=('Preview · not saved yet' if pv else batch.status), mark=('Preview' if pv else '')) %}
+  <div class="doc-meta">
+    <div><span>Date &amp; time received</span><b>{{ batch.received_date|longdate }}{{ (' · ' ~ batch.received_time) if batch.received_time }}</b></div>
+    <div><span>Purchase order (PO) No.</span><b>{{ batch.po_no or '—' }}</b></div>
+    <div><span>Delivery receipt (DR) No.</span><b>{{ batch.delivery_ref or '—' }}</b></div>
+    <div><span>Receiving area</span><b>{{ batch.receiving_area or 'Receiving Area' }}</b></div>
+    {{ edit(0) }}
+  </div>
+
+  <div class="doc-parties">
+    <section>
+      <h3>Supplier {{ edit(0) }}</h3>
+      <div class="doc-party-name">{{ batch.supplier_name or '—' }}</div>
+      <dl>{% if batch.supplier_contact %}<dt>Contact</dt><dd>{{ batch.supplier_contact }}</dd>{% endif %}</dl>
+    </section>
+    <section>
+      <h3>Delivery {{ edit(0) }}</h3>
+      <dl>
+        <dt>Delivered by</dt><dd>{{ batch.delivered_by or '—' }}</dd>
+        <dt>Vehicle / plate</dt><dd>{{ batch.vehicle_plate or '—' }}</dd>
+        <dt>Received by</dt><dd>{{ received_by or '—' }}</dd>
+      </dl>
+    </section>
+  </div>
+
+  {{ head('A. Materials received', 2) }}
+  <table class="doc-table">
+    <thead><tr>
+      <th class="n">No.</th><th>Material / item description</th><th>Unit</th><th class="num">PO qty</th>
+      <th class="num">Actual qty</th><th class="num">Accepted qty</th><th>Lot / batch No.</th><th>Expiry / best before</th>
+      {% if not pv %}<th>Status</th>{% endif %}
+    </tr></thead>
+    <tbody>
+      {% for l in lines %}
+      <tr>
+        <td class="n">{{ loop.index }}</td>
+        <td><div class="doc-item">{{ l.material_name }}</div><span class="sub-line">{{ l.boxes }} box{{ 'es' if l.boxes != 1 }}{{ (' · PO line ' ~ l.po_line_no) if l.po_line_no }}</span></td>
+        <td>{{ l.unit }}</td>
+        <td class="num">{{ l.po_qty|qty if l.po_qty is not none else '' }}</td>
+        <td class="num">{{ l.actual_qty|qty }}</td>
+        <td class="num">{{ l.accepted_qty|qty if l.status != 'Pending inspection' else '' }}</td>
+        <td>{{ l.lot_no }}</td>
+        <td class="nowrap">{{ l.expiry_date|longdate }}</td>
+        {% if not pv %}<td><b>{{ l.status }}</b>{% if l.hold_qty %}<span class="sub-line">{{ l.hold_qty|qty }} on hold</span>{% endif %}{% if l.rejected_qty %}<span class="sub-line">{{ l.rejected_qty|qty }} rejected</span>{% endif %}</td>{% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if pv %}<p class="doc-note">Accepted quantities are filled in after inspection; each box gets a QR label when you save.</p>{% endif %}
+
+  {{ head('B. Documents checked', 1) }}
+  {% set checks = [] %}
+  {% for d in docs %}{% set _ = checks.append((d ~ (' (if required)' if d == 'Certificate of Analysis' else ''), d in (batch.docs_checked or []))) %}{% endfor %}
+  {% set _ = checks.append(('Other: ' ~ (batch.docs_other or '__________'), batch.docs_other)) %}
+  {{ doc_checks(checks) }}
+  {% if pv and proof_name %}<p class="doc-note">Picture of the delivery receipt attached: {{ proof_name }}</p>
+  {% elif not pv and batch.proof %}<p class="doc-note no-print">A picture of the delivery receipt is on file with this delivery.</p>{% endif %}
+
+  {{ head('C. Receiving remarks / discrepancies', 1) }}
+  {{ doc_lines([batch.remarks] + (batch.discrepancies or [])) }}
+
+  {# Received by is whoever records the delivery — signed from the preview
+     on; the rest stay empty until that step is done. #}
+  {{ doc_signs([
+       ('Received by', received_by, batch.received_by, batch.received_date),
+       ('Inventory updated by', inventory_by, batch.inventory_updated_by, batch.inventory_updated_at),
+       ('Verified by', batch.checked_by_name, none, batch.closed_at if batch.checked_by_name else ''),
+       ('QA / authorized approval', batch.approved_by_name, none, batch.closed_at if batch.approved_by_name else '')]) }}
+{% endcall %}

@@ -9,7 +9,7 @@
             doc_no=doc_no or '____________', revision=revision or '______', effective=effective or '____________',
             wide=true, landscape=true) %}
   <p class="doc-note" style="margin:16px 0 4px">Purpose: record the receipt and quality inspection of incoming raw materials before acceptance for production.</p>
-  <table class="doc-table is-compact">
+  <table class="doc-table is-compact" data-paginate>
     <thead>
       <tr>
         <th>Date received</th><th>Supplier</th><th>PO / DR No.</th><th>Raw material</th>
@@ -21,11 +21,13 @@
     </thead>
     <tbody>
       {% for r in rows %}
-      <tr>
+      {% set line_url = url_for('receiving.report_line', batch=r.batch_id, material=r.material_id, lot=r.lot_key or none,
+                                expiry=r.expiry_key or none, back=request.full_path) %}
+      <tr class="is-link" data-href="{{ line_url }}">
         <td class="nowrap">{{ r.received_date|mdy }}</td>
         <td>{{ r.supplier_name }}</td>
         <td>{{ r.po_dr }}</td>
-        <td class="doc-item">{{ r.material_name }}{% if r.boxes > 1 %}<span class="sub-line">{{ r.boxes }} boxes</span>{% endif %}</td>
+        <td class="doc-item"><a href="{{ line_url }}">{{ r.material_name }}</a>{% if r.boxes > 1 %}<span class="sub-line">{{ r.boxes }} boxes</span>{% endif %}</td>
         <td>{{ r.lot_no }}</td>
         <td class="num">{{ r.qty|qty }}</td>
         <td>{{ r.unit }}</td>
@@ -48,7 +50,16 @@
       {% endfor %}
     </tbody>
   </table>
+  <p class="doc-note no-print">Click a row to see that item in detail.</p>
   <p class="doc-note">Acceptance guide: ACCEPTED = meets specifications · REJECTED = does not meet requirements · HOLD = pending test / document / QA decision.</p>
   {{ doc_signoff(['Prepared by', 'Checked by', 'Approved by']) }}
 {% endcall %}
+<script>
+// A whole row opens that item's detail (the material name is the link too).
+document.querySelectorAll(".doc-table tr.is-link").forEach(function (tr) {
+  tr.addEventListener("click", function (e) {
+    if (!e.target.closest("a")) window.location = tr.getAttribute("data-href");
+  });
+});
+</script>
 {% endblock %}

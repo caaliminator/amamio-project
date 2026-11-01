@@ -196,17 +196,16 @@ ROLE_NAV = {
             ("dashboard", "Receiving Home",     "dashboard", "auth.dashboard"),
             ("receiving", "Receiving Log",      "clipboard", "receiving.index"),
             ("receiving", "Receive a Delivery", "in", "receiving.new"),
+            ("inspection", "Boxes for Inspection", "inspect", "receiving.inspection"),
             ("honey",     "Honey Containers",   "honey", "honey.index"),
             ("supplies",  "Supplies In / Out",  "swap", "supplies.index"),
             ("qr",        "Scan a QR Label",    "qr", "qr.scan"),
         ]),
-        ("Inspection & Hold", [
-            ("inspection", "Boxes for Inspection",     "inspect", "receiving.inspection"),
-            ("inspection", "Hold & Rejection Reports", "shield", "receiving.ncr_list"),
-        ]),
+        # The records the receiving and inspection work produces.
         ("Receiving Reports", [
-            ("receiving", "Receiving & Inspection Report", "reports", "receiving.report"),
-            ("receiving", "Damage Report",                 "alert", "receiving.damage"),
+            ("receiving",  "Receiving & Inspection Report", "reports", "receiving.report"),
+            ("inspection", "Hold & Rejection Reports",      "shield", "receiving.ncr_list"),
+            ("receiving",  "Damage Report",                 "alert", "receiving.damage"),
         ]),
         ("Suppliers & Requests", [
             ("suppliers", "Supplier Directory", "suppliers", "suppliers.index"),

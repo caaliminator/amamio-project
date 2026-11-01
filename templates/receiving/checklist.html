@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% from "_paper.html" import doc, doc_h, doc_fields, doc_checks, doc_signs %}
 {% block title %}Inspection {{ box.inspection_no or box.box_code }}{% endblock %}
 {% block content %}
 <div class="toolbar no-print">
@@ -7,43 +6,5 @@
   <button class="btn btn-primary" type="button" onclick="window.print()">{{ icon('printer', 15) }} Print</button>
 </div>
 
-{% call doc('Incoming Material Inspection Checklist', no=box.inspection_no, status=box.acceptance_status,
-            doc_no='AFP-WH-FRM-002', revision='00',
-            meta=[('Inspection date', box.checked_at|longdate), ('MRR No.', box.batch_ref),
-                  ('Lot / batch', box.lot_no), ('Quantity', box.declared_qty|qty(box.unit))]) %}
-  {{ doc_fields([('Supplier', box.supplier_name), ('Material / item', box.material_name ~ ' · ' ~ box.box_code),
-                 ('Inspector', box.checked_by)]
-                + ([('Visual / organoleptic description', box.visual_description, 'wide')] if box.visual_description else [])) }}
-
-  {{ doc_h('A. Inspection checklist') }}
-  <table class="doc-table">
-    <thead><tr><th>Inspection point</th><th>Acceptable requirement / check</th><th class="c">Pass</th><th class="c">Fail</th><th class="c">N/A</th><th>Remarks</th></tr></thead>
-    <tbody>
-      {% for key, point, requirement in points %}
-      {% set entry = box.checklist.get(key) or {} %}
-      <tr>
-        <td class="doc-item">{{ point }}</td>
-        <td>{{ requirement }}</td>
-        {% for r in ('Pass', 'Fail', 'N/A') %}<td class="c"><span class="doc-box">{{ '✓' if entry.result == r }}</span></td>{% endfor %}
-        <td>{{ entry.remarks or '' }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% if not box.checklist %}<p class="doc-note">Inspected before the checklist was introduced — results: visual {{ box.visual_inspection or '—' }}, COA {{ box.coa_check or '—' }}, sampling {{ box.sampling_test or '—' }}.</p>{% endif %}
-
-  {{ doc_h('B. Test results (if applicable)') }}
-  {{ doc_fields([('Parameter', box.test_parameter), ('Specification', box.test_spec),
-                 ('Actual result', box.test_result), ('Instrument / method', box.test_method)], cols=4) }}
-
-  {{ doc_h('C. Inspection decision') }}
-  {{ doc_checks([('Accepted — meets requirements', box.acceptance_status == 'Accepted'),
-                 ('Hold / quarantine — pending evaluation', box.acceptance_status == 'Hold'),
-                 ('Rejected — does not meet requirements', box.acceptance_status == 'Rejected')]) }}
-  {{ doc_fields([('Reason / findings', [box.nonconformity, box.unusable_reason and ("can't be used: " ~ box.unusable_reason), box.damage_reason and ("damaged: " ~ box.damage_reason)]|select|join('; '), 'wide'),
-                 ('Usable', box.good_qty|qty(box.unit)), ("Can't be used", box.unusable_qty|qty(box.unit)), ('Damaged', box.damaged_qty|qty(box.unit))]) }}
-
-  {{ doc_signs([('Inspector', box.checked_by, none, box.checked_at),
-                ('QA / authorized disposition', box.verified_by_name, none, box.checked_at if box.verified_by_name else '')]) }}
-{% endcall %}
+{% include "receiving/_checklist_document.html" %}
 {% endblock %}

@@ -11,7 +11,7 @@
 
 {% call doc('Products IN / OUT Report', subtitle='Finished goods taken in and issued out · ' ~ (date_from|longdate) ~ ' – ' ~ (date_to|longdate),
             meta=[('Total IN', r.total_in|qty), ('Total OUT', r.total_out|qty), ('Products', r.rows|length), ('Movements', r.movements|length)]) %}
-  <table class="doc-table">
+  <table class="doc-table" data-paginate>
     <thead><tr>
       <th>Product</th><th>Unit</th><th class="num">Opening</th><th class="num">IN</th>
       <th class="num">OUT</th><th class="num">Closing</th><th>IN detail</th><th>OUT detail</th>
@@ -38,7 +38,7 @@
   </table>
 
   {{ doc_h('Totals by reason') }}
-  <table class="doc-table is-narrow">
+  <table class="doc-table is-narrow" data-paginate>
     <thead><tr><th>IN — reason</th><th class="num">Qty</th><th>OUT — reason</th><th class="num">Qty</th></tr></thead>
     <tbody>
       {% for i in range([r.in_totals|length, r.out_totals|length, 1]|max) %}
@@ -55,7 +55,7 @@
   </table>
 
   {{ doc_h('Movements') }}
-  <table class="doc-table">
+  <table class="doc-table" data-paginate>
     <thead><tr>
       <th>Date</th><th>Product</th><th class="num">IN</th><th class="num">OUT</th>
       <th>Unit</th><th>Reason</th><th>Reference</th><th>Person</th><th>Recorded by</th>

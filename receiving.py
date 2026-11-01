@@ -20,16 +20,18 @@ Rejected opens a Nonconforming Material Hold / Rejection Report
 receipt is closed with the SOP's Quick Control Check.  The printable "Raw
 Materials Receiving and Inspection Report" is built from these records.
 """
+import os
 from datetime import datetime
 
 from flask import (Blueprint, abort, flash, g, redirect, render_template,
-                   request, url_for)
+                   request, send_file, url_for)
 
 import db
 import profiles
 import purchasing_service as pur
 import services
-from security import can, current_user, module_required
+import uploads
+from security import can, current_user, login_required, module_required
 
 receiving_bp = Blueprint("receiving", __name__)
 
@@ -131,19 +133,15 @@ def new():
             return redirect(url_for("receiving.new"))
 
     if request.method == "POST":
-        batch, boxes, err = services.receive_delivery(
-            current_user()["id"], _int(form.get("supplier_id")),
-            form.get("received_date") or services.today_iso(),
-            _lines_from_form(form), po_no=form.get("po_no") or "",
-            delivery_ref=form.get("delivery_ref") or "",
-            remarks=form.get("remarks") or "", po_id=po["id"] if po else None,
-            received_time=form.get("received_time") or "",
-            delivered_by=form.get("delivered_by") or "",
-            vehicle_plate=form.get("vehicle_plate") or "",
-            receiving_area=form.get("receiving_area") or "",
-            docs_checked=form.getlist("docs_checked"),
-            docs_other=form.get("docs_other") or "")
+        # The receipt picture is checked first, so a bad file saves nothing.
+        picture, err = uploads.read_picture(request.files.get("proof"))
+        if err:
+            err = "Delivery receipt picture: " + err
+        else:
+            batch, boxes, err = _receive(form, po)
         if not err:
+            if picture:
+                _save_proof(batch, picture)
             flash("Delivery %s recorded — %d box(es) labelled. Print the QR "
                   "labels and stick one on each box." % (batch.get("ref_no"),
                                                          len(boxes)), "success")
@@ -151,6 +149,61 @@ def new():
                                     fresh=1))
         flash(err, "error")
 
+    return _new_form(form, po)
+
+
+def _delivery_fields(form, po):
+    """The receive form's fields, as receive_delivery / preview_delivery
+    take them."""
+    return dict(
+        supplier_id=_int(form.get("supplier_id")),
+        received_date=form.get("received_date") or services.today_iso(),
+        lines=_lines_from_form(form), po_no=form.get("po_no") or "",
+        delivery_ref=form.get("delivery_ref") or "",
+        remarks=form.get("remarks") or "", po_id=po["id"] if po else None,
+        received_time=form.get("received_time") or "",
+        delivered_by=form.get("delivered_by") or "",
+        vehicle_plate=form.get("vehicle_plate") or "",
+        receiving_area=form.get("receiving_area") or "",
+        docs_checked=form.getlist("docs_checked"),
+        docs_other=form.get("docs_other") or "")
+
+
+def _receive(form, po):
+    """Save the delivery from the wizard's fields."""
+    return services.receive_delivery(current_user()["id"], **_delivery_fields(form, po))
+
+
+@receiving_bp.route("/new/preview", methods=["POST"])
+@module_required("receiving")
+def new_preview():
+    """The form's last step: the Material Receiving Report this delivery
+    makes, built from the fields so far (nothing is saved)."""
+    po = None
+    if request.args.get("po") not in (None, "", "none"):
+        po = db.get("purchase_orders", _int(request.args.get("po")))
+    batch, lines, err = services.preview_delivery(current_user(), **_delivery_fields(request.form, po))
+    if err:
+        return render_template("receiving/_preview_error.html", error=err), 422
+    return render_template("receiving/_mrr_document.html", batch=batch, lines=lines,
+                           received_by=current_user().get("name") or "", inventory_by="",
+                           docs=services.DOCS_CHECKED, preview=True,
+                           proof_name=request.form.get("proof_name") or "")
+
+
+def _save_proof(batch, picture):
+    """Store (or replace) the picture of a delivery's receipt."""
+    old = uploads.picture_path("deliveries", batch.get("proof"))
+    db.update("receiving_batches", batch["id"], {
+        "proof": uploads.save_picture("deliveries", "delivery-%d" % batch["id"], picture)})
+    if old:
+        try:
+            os.remove(old)
+        except OSError:
+            pass
+
+
+def _new_form(form, po):
     return render_template(
         "receiving/new.html", suppliers=sorted(db.read("suppliers"),
                                                key=lambda s: s.get("name") or ""),
@@ -197,6 +250,33 @@ def mrr(batch_id):
         inventory_by=services.user_name(record.get("inventory_updated_by"))
         if record.get("inventory_updated_by") else "",
         docs=services.DOCS_CHECKED)
+
+
+@receiving_bp.route("/<int:batch_id>/proof", methods=["GET", "POST"])
+@login_required
+def delivery_proof(batch_id):
+    """The picture of a delivery's receipt: anyone on receiving or inspection
+    can view it; the receiving team can add or replace it."""
+    user = current_user()
+    record = db.get("receiving_batches", batch_id)
+    if not record:
+        abort(404)
+    if request.method == "POST":
+        if not can(user, "receiving"):
+            abort(403)
+        picture, err = uploads.read_picture(request.files.get("proof"))
+        if err or not picture:
+            flash(err or "Choose the picture of the delivery receipt.", "error")
+        else:
+            _save_proof(record, picture)
+            flash("Delivery receipt picture saved.", "success")
+        return redirect(url_for("receiving.batch", batch_id=batch_id))
+    if not (can(user, "receiving") or can(user, "inspection")):
+        abort(403)
+    path = uploads.picture_path("deliveries", record.get("proof"))
+    if not path:
+        abort(404)
+    return send_file(path, max_age=3600)
 
 
 @receiving_bp.route("/<int:batch_id>/add", methods=["GET", "POST"])
@@ -385,27 +465,32 @@ def inspect(box_id):
         return redirect(url_for("receiving.box", box_id=box_id))
     form = request.form
     if request.method == "POST":
-        box, err = services.inspect_receiving_box(
-            box_id, current_user()["id"],
-            usable_qty=form.get("usable_qty"),
-            unusable_qty=form.get("unusable_qty") or 0,
-            damaged_qty=form.get("damaged_qty") or 0,
-            unusable_reason=form.get("unusable_reason") or "",
-            damage_reason=form.get("damage_reason") or "",
-            cleaned=form.get("cleaned") == "1",
-            acceptance=form.get("acceptance") or "",
-            nonconformity=form.get("nonconformity") or "",
-            action_taken=form.get("action_taken") or "",
-            verified_by_name=form.get("verified_by_name") or "",
-            checklist=_checklist_from_form(form),
-            test_parameter=form.get("test_parameter") or "",
-            test_spec=form.get("test_spec") or "",
-            test_result=form.get("test_result") or "",
-            test_method=form.get("test_method") or "",
-            nc_types=form.getlist("nc_types"),
-            nc_other=form.get("nc_other") or "",
-            visual_description=form.get("visual_description") or "")
+        # The photos are checked first, so a bad file saves nothing.
+        pictures, err = _read_photos(request.files.getlist("photos"))
         if not err:
+            box, err = services.inspect_receiving_box(
+                box_id, current_user()["id"],
+                usable_qty=form.get("usable_qty"),
+                unusable_qty=form.get("unusable_qty") or 0,
+                damaged_qty=form.get("damaged_qty") or 0,
+                unusable_reason=form.get("unusable_reason") or "",
+                damage_reason=form.get("damage_reason") or "",
+                cleaned=form.get("cleaned") == "1",
+                acceptance=form.get("acceptance") or "",
+                nonconformity=form.get("nonconformity") or "",
+                action_taken=form.get("action_taken") or "",
+                verified_by_name=form.get("verified_by_name") or "",
+                checklist=_checklist_from_form(form),
+                test_parameter=form.get("test_parameter") or "",
+                test_spec=form.get("test_spec") or "",
+                test_result=form.get("test_result") or "",
+                test_method=form.get("test_method") or "",
+                nc_types=form.getlist("nc_types"),
+                nc_other=form.get("nc_other") or "",
+                visual_description=form.get("visual_description") or "")
+        if not err:
+            if pictures:
+                _add_photos(box_id, pictures)
             flash("Box %s inspected — %s." % (box.get("box_code"),
                                               box.get("acceptance_status")),
                   "success" if box.get("acceptance_status") == "Accepted"
@@ -423,6 +508,112 @@ def inspect(box_id):
         waiting_count=len(services.receiving_box_rows(
             status=services.BOX_AWAITING)),
         start=1 if request.method == "POST" else 0)
+
+
+@receiving_bp.route("/box/<int:box_id>/inspect/preview", methods=["POST"])
+@module_required("inspection")
+def inspect_preview(box_id):
+    """The inspection's last step: the Incoming Material Inspection Checklist
+    this inspection makes, from the answers so far (nothing is saved)."""
+    row = _box_or_404(box_id)
+    form = request.form
+    num = lambda name: services._to_float(form.get(name))
+    box = dict(row,
+               inspection_no=row.get("inspection_no")
+               or services._next_ref("INS", "receiving_boxes", "inspection_no"),
+               checked_by=current_user().get("name") or "",
+               checked_at=services.today_iso(),
+               checklist=_checklist_from_form(form),
+               visual_description=form.get("visual_description") or "",
+               test_parameter=form.get("test_parameter") or "",
+               test_spec=form.get("test_spec") or "",
+               test_result=form.get("test_result") or "",
+               test_method=form.get("test_method") or "",
+               acceptance_status=form.get("acceptance") or "",
+               nonconformity=form.get("nonconformity") or "",
+               unusable_reason=form.get("unusable_reason") or "",
+               damage_reason=form.get("damage_reason") or "",
+               good_qty=num("usable_qty"), unusable_qty=num("unusable_qty"),
+               damaged_qty=num("damaged_qty"),
+               verified_by_name=profiles.strip_position(form.get("verified_by_name")))
+    # Hold / Rejected: the hold / rejection report this will open, too.
+    ncr = None
+    held = {"Hold": services.BOX_HOLD, "Rejected": services.BOX_REJECTED}.get(box["acceptance_status"])
+    if held:
+        ncr = services.ncr_row(services.raise_ncr(
+            dict(box, status=held), current_user()["id"], form.getlist("nc_types"),
+            form.get("nc_other") or "", save=False))
+    box["photo_names"] = request.form.getlist("photo_names")
+    return render_template("receiving/_inspect_preview.html", box=box, ncr=ncr,
+                           points=services.INSPECTION_POINTS, preview=True,
+                           nc_types=services.NC_TYPES, containment=services.NC_CONTAINMENT,
+                           dispositions=services.NC_DISPOSITIONS)
+
+
+MAX_PHOTOS = 6
+
+
+def _read_photos(files):
+    """Check the inspection photos chosen.  Returns (pictures, error)."""
+    files = [f for f in files if f and f.filename]
+    if len(files) > MAX_PHOTOS:
+        return [], "Choose up to %d photos." % MAX_PHOTOS
+    pictures = []
+    for n, f in enumerate(files, 1):
+        img, err = uploads.read_picture(f)
+        if err:
+            return [], "Photo %d (%s): %s" % (n, f.filename, err)
+        pictures.append(img)
+    return pictures, None
+
+
+def _add_photos(box_id, pictures):
+    """Store inspection photos on a box, after the ones it already has."""
+    box = db.get("receiving_boxes", box_id)
+    names = list(box.get("photos") or [])
+    for img in pictures:
+        names.append(uploads.save_picture("inspections", "box-%d" % box_id, img))
+    db.update("receiving_boxes", box_id, {"photos": names})
+
+
+@receiving_bp.route("/box/<int:box_id>/photos/<int:n>")
+@login_required
+def box_photo(box_id, n):
+    """One of a box's inspection photos — receiving and inspection only."""
+    user = current_user()
+    if not (can(user, "receiving") or can(user, "inspection")):
+        abort(403)
+    photos = (db.get("receiving_boxes", box_id) or {}).get("photos") or []
+    path = uploads.picture_path("inspections", photos[n] if 0 <= n < len(photos) else "")
+    if not path:
+        abort(404)
+    return send_file(path, max_age=3600)
+
+
+@receiving_bp.route("/box/<int:box_id>/photos", methods=["POST"])
+@login_required
+def box_add_photos(box_id):
+    """Add photos to a box after its inspection."""
+    user = current_user()
+    if not (can(user, "receiving") or can(user, "inspection")):
+        abort(403)
+    box = db.get("receiving_boxes", box_id)
+    if not box:
+        abort(404)
+    room = MAX_PHOTOS - len(box.get("photos") or [])
+    files = [f for f in request.files.getlist("photos") if f and f.filename]
+    if not files:
+        flash("Choose the photos to add.", "error")
+    elif len(files) > room:
+        flash("A box keeps up to %d photos — there is room for %d more." % (MAX_PHOTOS, max(room, 0)), "error")
+    else:
+        pictures, err = _read_photos(files)
+        if err:
+            flash(err, "error")
+        else:
+            _add_photos(box_id, pictures)
+            flash("%d photo(s) added to %s." % (len(pictures), box.get("box_code")), "success")
+    return redirect(url_for("receiving.box", box_id=box_id) + "#photos")
 
 
 # --- Nonconforming Material Hold / Rejection Report (AFP-WH-FRM-003) ---------
@@ -527,6 +718,26 @@ def report():
         date_from=date_from, date_to=date_to,
         doc_no=services.RIR_DOC_NO, revision=services.RIR_REVISION,
         effective=services.RIR_EFFECTIVE_DATE)
+
+
+@receiving_bp.route("/report/line")
+def report_line():
+    """One line of the report — an item and lot of a delivery — in detail,
+    as a document: what arrived, how it was inspected, box by box."""
+    user = current_user()
+    if not (can(user, "receiving") or can(user, "inspection")):
+        abort(403)
+    row = services.receiving_report_line(
+        _int(request.args.get("batch")), _int(request.args.get("material")),
+        request.args.get("lot") or "", request.args.get("expiry") or "")
+    if not row:
+        abort(404)
+    g.nav_endpoint = "receiving.report"
+    # Back to the report with the same dates — only ever a report address.
+    back = request.args.get("back") or ""
+    if not back.startswith("/receiving/report?"):
+        back = url_for("receiving.report")
+    return render_template("receiving/report_line.html", r=row, back=back)
 
 
 @receiving_bp.route("/damage")

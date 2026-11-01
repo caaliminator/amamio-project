@@ -59,9 +59,12 @@
 (function () {
   var box = document.getElementById("empFilter");
   if (!box) return;
-  var rows = document.querySelectorAll("#empTable tbody tr");
+  var table = document.getElementById("empTable");
+  var rows = table.querySelectorAll("tbody tr");
   box.addEventListener("input", function () {
     var words = box.value.toLowerCase().split(/\s+/).filter(Boolean), shown = 0;
+    // While searching, every match shows (the 10-per-page paging steps aside).
+    table.classList.toggle("is-filtering", words.length > 0);
     rows.forEach(function (tr) {
       var text = tr.textContent.toLowerCase();
       var hit = words.every(function (w) { return text.indexOf(w) > -1; });

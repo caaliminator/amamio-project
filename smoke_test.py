@@ -116,7 +116,8 @@ NOT_PAGES = {"static", "auth.root", "auth.login", "auth.logout",
              "honey.suggest", "qr.lookup", "qr.image", "qr.go",
              "platforms.export_csv", "platforms.import_file",
              "migration.download", "requests.bom_calc", "production.new",
-             "requests.new_material", "auth.user_image"}
+             "requests.new_material", "auth.user_image", "ledger.proof",
+             "receiving.delivery_proof", "receiving.box_photo"}
 pages = {r.endpoint for r in application.url_map.iter_rules()
          if "GET" in r.methods and r.endpoint not in NOT_PAGES}
 missing = sorted(p for p in pages if not page_notes.for_endpoint(p))

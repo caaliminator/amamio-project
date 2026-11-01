@@ -125,5 +125,24 @@
   </div>
   {% endif %}
 </div>
+
+{# Inspection photos: shown, and more can be added after the inspection. #}
+{% if box.status != 'Awaiting Inspection' %}
+<div class="card mb" id="photos">
+  <div class="card-title">Inspection photos{% if box.photos %} <span class="muted">· {{ box.photos|length }}</span>{% endif %}</div>
+  {% if box.photos %}
+  <div class="photo-grid">
+    {% for _ in box.photos %}<a href="{{ url_for('receiving.box_photo', box_id=box.id, n=loop.index0) }}" target="_blank" rel="noopener"><img src="{{ url_for('receiving.box_photo', box_id=box.id, n=loop.index0) }}" alt="Inspection photo {{ loop.index }}" loading="lazy"></a>{% endfor %}
+  </div>
+  {% else %}<p class="muted small" style="margin:0">No photos were taken at the inspection.</p>{% endif %}
+  {% if box.photos|length < 6 %}
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('receiving.box_add_photos', box_id=box.id) }}" class="flex gap-sm wrap mt" style="align-items:center">
+    <input type="file" name="photos" accept="image/*" multiple required style="max-width:340px">
+    <button class="btn btn-ghost btn-sm" type="submit">Add photos</button>
+    <span class="muted small">Up to {{ 6 - box.photos|length }} more</span>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
 </div>
 {% endblock %}

@@ -693,7 +693,10 @@ a:hover { color: var(--gold-bright); text-decoration: underline; }
 }
 
 /* ---------- Table paging (built by app.js) ---------- */
-.table tr.is-paged-out { display: none; }
+.table tr.is-paged-out, .doc-table tr.is-paged-out { display: none; }
+/* A table being searched shows every match, so its pager steps aside. */
+.table.is-filtering tr.is-paged-out:not([hidden]) { display: table-row; }
+.table-wrap:has(.table.is-filtering) + .pager { display: none; }
 .pager {
   display: flex; align-items: center; justify-content: space-between; gap: 12px 18px;
   flex-wrap: wrap; padding-top: 14px; margin-top: 2px;
@@ -701,8 +704,6 @@ a:hover { color: var(--gold-bright); text-decoration: underline; }
 }
 .pager-info b { color: var(--heading); font-weight: 700; }
 .pager-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.pager-size { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-.pager-size select { width: auto; padding: 5px 28px 5px 10px; font-size: .8rem; border-radius: 8px; }
 .pager-page { font-weight: 600; color: var(--heading); min-width: 86px; text-align: center; white-space: nowrap; }
 .pager-btn {
   border: 1px solid var(--border-strong); background: var(--raise-2); color: var(--text);
@@ -713,7 +714,7 @@ a:hover { color: var(--gold-bright); text-decoration: underline; }
   border-color: var(--gold-line); color: var(--gold-bright); background: var(--hover-gold-bg); transform: translateY(-1px);
 }
 .pager-btn:disabled { opacity: .35; cursor: default; }
-@media print { .table tr.is-paged-out { display: table-row; } }
+@media print { .table tr.is-paged-out, .doc-table tr.is-paged-out { display: table-row; } }
 
 /* ---------- Forms ---------- */
 .form { display: block; }

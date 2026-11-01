@@ -9,7 +9,7 @@
 </div>
 
 {% call doc('Supplier Directory', subtitle='Office · production · packing · as of ' ~ (today|longdate), meta=[('Suppliers', total), ('Categories', groups|length)]) %}
-  <table class="doc-table">
+  <table class="doc-table" data-paginate>
     <thead>
       <tr><th>Supplier</th><th>TIN</th><th>Items</th><th>Contact</th></tr>
     </thead>

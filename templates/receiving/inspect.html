@@ -4,7 +4,7 @@
 <a class="back-link" href="{{ url_for('receiving.inspection') }}">{{ icon('arrow-left', 15) }} Inspection &amp; Cleaning</a>
 
 <form method="post" class="wizard" data-wizard data-wizard-start="{{ start }}"
-      data-submit-label="Save inspection" data-cancel="{{ url_for('receiving.box', box_id=box.id) }}" id="inspectForm">
+      data-submit-label="Save inspection" data-cancel="{{ url_for('receiving.box', box_id=box.id) }}" id="inspectForm" enctype="multipart/form-data">
   <input type="hidden" name="has_losses" id="has_losses" value="0">
 
   <section class="wz-step" data-title="Is this the right box?" data-no-review
@@ -71,7 +71,7 @@
           <div class="form-hint">Bruised, crushed, broken, leaking…</div>
         </div>
       </div>
-      <div data-tally data-total="{{ '%g'|format(box.declared_qty|float) }}" data-unit="{{ box.unit }}"
+      <div data-tally data-no-over data-total="{{ '%g'|format(box.declared_qty|float) }}" data-unit="{{ box.unit }}"
            data-fields="usable_qty,unusable_qty,damaged_qty" class="tally"></div>
     </div>
   </section>
@@ -95,30 +95,61 @@
   <section class="wz-step" data-title="Inspection checklist" id="checklistStep"
            data-hint="Incoming Material Inspection Checklist (AFP-WH-FRM-002). Mark every point Pass, Fail or N/A. Say what failed in the remarks.">
     <div class="wz-body">
-      <div class="form-row">
-        <label class="form-label" for="visual_description">Visual / organoleptic inspection <span class="req">*</span></label>
-        <input type="text" id="visual_description" name="visual_description" maxlength="200" required
-               value="{{ form.visual_description or '' }}" placeholder="e.g. Free from molds, insects, decay and rotten">
-        <div class="form-hint">What you saw, smelled and felt — this goes in the Visual / Organoleptic column of the receiving report.</div>
-      </div>
-      <div class="flex-between mb-sm">
-        <span class="muted small">{{ points|length }} points</span>
-        <button type="button" class="btn btn-ghost btn-sm" id="allPass">{{ icon('check', 14) }} Mark the rest Pass</button>
-      </div>
-      {% for key, point, requirement in points %}
-      <div class="form-row chk-point" data-point="{{ key }}">
-        <div class="form-label">{{ point }} <span class="req">*</span></div>
-        <div class="form-hint" style="margin:-2px 0 6px">{{ requirement }}</div>
-        <div class="chip-choices">
-          {% for r in check_results %}
-          <label class="chip-choice"><input type="radio" name="chk_{{ key }}" value="{{ r }}" required
-                 {{ 'checked' if form.get('chk_' ~ key) == r }}><span>{{ r }}</span></label>
-          {% endfor %}
+      <div class="step-stack">
+        <div class="form-row">
+          <label class="form-label" for="visual_description">Visual / organoleptic inspection <span class="req">*</span></label>
+          <input type="text" id="visual_description" name="visual_description" maxlength="200" required
+                 value="{{ form.visual_description or '' }}" placeholder="e.g. Free from molds, insects, decay and rotten">
+          <div class="form-hint">What you saw, smelled and felt — this goes in the Visual / Organoleptic column of the receiving report.</div>
         </div>
-        <input type="text" name="chk_{{ key }}_remarks" maxlength="200" class="mt-sm chk-remarks"
-               value="{{ form.get('chk_' ~ key ~ '_remarks') or '' }}" placeholder="Remarks">
+
+        {# One row per point: the point, its requirement, Pass | Fail | N/A.
+           The remark opens by itself on Fail (then it's required). #}
+        <div class="chk-head">
+          <div class="chk-progress">
+            <div class="chk-progress-text"><b id="chkDone">0</b> of {{ points|length }} marked
+              <span class="chk-counts" id="chkCounts"></span></div>
+            <div class="chk-bar"><span id="chkBar"></span></div>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" id="allPass">{{ icon('check', 14) }} Mark the rest Pass</button>
+        </div>
+        {# Two columns on wide screens, numbered down each column. #}
+        {% set rows = (points|length + 1) // 2 %}
+        <ol class="chk-list" style="--rows:{{ rows }}">
+          {% for key, point, requirement in points %}
+          {% set picked = form.get('chk_' ~ key) %}
+          {% set remark = form.get('chk_' ~ key ~ '_remarks') or '' %}
+          <li class="chk-point{{ ' has-remark' if remark }}{{ ' is-col-top' if loop.index == rows + 1 }}{{ ' is-left' if loop.index <= rows }}" data-point="{{ key }}">
+            <span class="chk-num">{{ loop.index }}</span>
+            <div class="chk-text">
+              <span class="chk-name">{{ point }}</span>
+              <span class="chk-req">{{ requirement }}</span>
+              <button type="button" class="chk-add-remark">+ Remark</button>
+            </div>
+            <div class="seg" role="radiogroup" aria-label="{{ point }}">
+              {% for r in check_results %}
+              <label class="seg-opt seg-{{ r|lower|replace('/', '') }}"><input type="radio" name="chk_{{ key }}" value="{{ r }}"
+                     {{ 'checked' if picked == r }}><span>{{ r }}</span></label>
+              {% endfor %}
+            </div>
+            <div class="chk-remark">
+              <input type="text" name="chk_{{ key }}_remarks" maxlength="200" class="chk-remarks"
+                     value="{{ remark }}" placeholder="Remarks" aria-label="Remarks for {{ point }}">
+            </div>
+          </li>
+          {% endfor %}
+        </ol>
+
+        <div class="form-row mt">
+          <div class="form-label">Photos <span class="muted small">optional · up to 6</span></div>
+          <label class="dropzone" data-dropzone>
+            <input type="file" name="photos" accept="image/*" multiple data-review-label="Photos">
+            <span class="dropzone-empty">{{ icon('camera', 22) }}<span><b>Add photos of what you found</b>
+              <small>The box, its label, any damage, mold or contamination — JPG or PNG, under 10 MB each{% if form %} · choose them again if the save didn't go through{% endif %}</small></span></span>
+            <span class="dropzone-chosen" hidden><span class="dropzone-thumbs"></span><span><b data-name></b><small>Click to choose different photos</small></span></span>
+          </label>
+        </div>
       </div>
-      {% endfor %}
     </div>
   </section>
 
@@ -188,8 +219,9 @@
     </div>
   </section>
 
-  <section class="wz-step" data-title="Check and save" data-review>
-    <div class="wz-body">
+  <section class="wz-step" id="reviewStep" data-title="Check and save" data-review
+           data-hint="This is the Incoming Material Inspection Checklist for {{ box.box_code }}. Check it, then save — your name goes on it as the inspector.">
+    <div class="wz-body is-bare">
       {% if waiting_count > 1 %}
       <label class="check-row mt"><input type="checkbox" name="then" value="next" checked data-review-skip> Go straight to the next box after saving</label>
       {% endif %}
@@ -214,15 +246,26 @@
     document.getElementById("nonconformity").required = needNc;
     document.getElementById("ncReq").style.display = needNc ? "" : "none";
     document.getElementById("ncTypesRow").style.display = needNc ? "" : "none";
-    // A failed point: its remark is required, and the box can't be accepted.
-    var failed = [];
+    // A failed point: its remark opens and is required, and the box can't
+    // be accepted.  The header counts what has been marked.
+    var failed = [], counts = {Pass: 0, Fail: 0, "N/A": 0}, done = 0;
     form.querySelectorAll(".chk-point").forEach(function (row) {
       var r = (row.querySelector("input[type=radio]:checked") || {}).value;
       var remarks = row.querySelector(".chk-remarks");
       remarks.required = r === "Fail";
       remarks.placeholder = r === "Fail" ? "What failed? (required)" : "Remarks";
+      row.classList.toggle("is-pass", r === "Pass");
+      row.classList.toggle("is-fail", r === "Fail");
+      row.classList.toggle("is-na", r === "N/A");
+      if (r) { row.classList.remove("is-missing"); counts[r] += 1; done += 1; }
       if (r === "Fail") failed.push(row);
     });
+    var total = form.querySelectorAll(".chk-point").length;
+    document.getElementById("chkDone").textContent = done;
+    document.getElementById("chkBar").style.width = (total ? done / total * 100 : 0) + "%";
+    document.getElementById("chkCounts").innerHTML = done ? " · " + counts.Pass + " pass" +
+      (counts.Fail ? ' · <b class="bad">' + counts.Fail + " fail</b>" : "") +
+      (counts["N/A"] ? " · " + counts["N/A"] + " N/A" : "") : "";
     var accept = form.querySelector('[name=acceptance][value=Accepted]');
     accept.disabled = failed.length > 0;
     if (accept.disabled && accept.checked) accept.checked = false;
@@ -250,6 +293,28 @@
     });
   });
 
+  // "+ Remark" opens a point's remark box without failing it.
+  document.getElementById("checklistStep").addEventListener("click", function (e) {
+    var add = e.target.closest(".chk-add-remark");
+    if (!add) return;
+    var row = add.closest(".chk-point");
+    row.classList.add("has-remark");
+    row.querySelector(".chk-remarks").focus();
+  });
+  // Every point needs an answer: name the ones left and mark their rows.
+  document.getElementById("checklistStep").addEventListener("wz:validate", function (e) {
+    var left = [];
+    form.querySelectorAll(".chk-point").forEach(function (row) {
+      var missing = !row.querySelector("input[type=radio]:checked");
+      row.classList.toggle("is-missing", missing);
+      if (missing) left.push(row.querySelector(".chk-name").textContent.trim());
+    });
+    if (!left.length) return;
+    e.preventDefault();
+    e.detail.message = "Mark every point — " + left.length + " left: " + left.join(", ") + ".";
+    form.querySelector(".chk-point.is-missing").scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+
   document.getElementById("allPass").addEventListener("click", function () {
     form.querySelectorAll(".chk-point").forEach(function (row) {
       if (!row.querySelector("input[type=radio]:checked")) {
@@ -259,19 +324,27 @@
     sync();
   });
 
-  // The review shows the checklist as a count, with the failed points named.
-  document.getElementById("checklistStep").reviewHtml = function () {
-    var esc = window.IMS.esc, counts = {Pass: 0, Fail: 0, "N/A": 0}, failedNames = [];
-    form.querySelectorAll(".chk-point").forEach(function (row) {
-      var r = (row.querySelector("input[type=radio]:checked") || {}).value;
-      if (!r) return;
-      counts[r] += 1;
-      if (r === "Fail") failedNames.push(row.querySelector(".form-label").textContent.replace("*", "").trim());
-    });
-    var out = "<dt>Result</dt><dd>" + counts.Pass + " pass · " + counts.Fail + " fail · " + counts["N/A"] + " N/A</dd>";
-    if (failedNames.length) out += "<dt>Failed</dt><dd>" + esc(failedNames.join(", ")) + "</dd>";
-    return out;
-  };
+  // Last step: the Incoming Material Inspection Checklist this inspection
+  // makes, built by the server from the answers (the printed checklist's
+  // own template).
+  var reviewStep = document.getElementById("reviewStep");
+  var previewUrl = {{ url_for('receiving.inspect_preview', box_id=box.id)|tojson }};
+  var seq = 0;
+  reviewStep.addEventListener("wz:enter", function () {
+    var box = reviewStep.querySelector(".review"), mine = ++seq;
+    // The photos themselves aren't sent for the preview — only their names.
+    var data = new FormData(form);
+    var photos = data.getAll("photos");
+    data.delete("photos");
+    photos.forEach(function (f) { if (f && f.name) data.append("photo_names", f.name); });
+    box.innerHTML = '<p class="muted">Preparing the inspection checklist…</p>';
+    fetch(previewUrl, { method: "POST", body: data, headers: { "X-Requested-With": "fetch" } })
+      .then(function (r) { return r.text(); })
+      .then(function (html) { if (mine === seq) box.innerHTML = html; })
+      .catch(function () {
+        if (mine === seq) box.innerHTML = '<div class="doc-error">The preview could not be loaded. Check your connection and open this step again.</div>';
+      });
+  });
   // The nonconformity ticks are checked here (they are left out of the
   // generic review, which would list every unticked box as "No").
   document.getElementById("ncTypesRow").setAttribute("data-review-skip", "");

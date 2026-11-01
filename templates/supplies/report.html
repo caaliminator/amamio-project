@@ -21,7 +21,7 @@
 {% call doc('Month-End Report', subtitle=r.title ~ ' · ' ~ r.period_label|title,
             meta=[('Month', r.period_label|title),
                   ('Physical count', ('by ' ~ r.counted_by ~ ' · ' ~ r.count.counted_at|longdate) if r.count else 'Not counted yet')]) %}
-  <table class="doc-table is-compact">
+  <table class="doc-table is-compact" data-paginate>
     <thead>
       <tr>
         <th class="n">#</th><th>Particulars / Description</th><th>Unit</th>

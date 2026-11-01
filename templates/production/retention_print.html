@@ -6,7 +6,7 @@
 {{ range_filter(url_for('production.retention_print'), date_from, date_to) }}
 
 {% call doc('Retention Record', subtitle=('Production dates ' ~ ((date_from|longdate) or 'start') ~ ' – ' ~ ((date_to|longdate) or 'today')) if (date_from or date_to) else '') %}
-  <table class="doc-table" style="margin-top:20px">
+  <table class="doc-table" data-paginate style="margin-top:20px">
     <thead>
       <tr>
         <th>Batch No.</th><th>Product name &amp; description</th><th>Prod. date</th><th>Exp. date</th>

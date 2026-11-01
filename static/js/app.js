@@ -18,9 +18,9 @@
   });
 
   /* ---- Collapsible sidebar groups ----
-     The group holding the current page is opened by the server.  Any other
-     group remembers whether the user last left it open (per browser). */
-  var GROUP_KEY = "amamio.navGroups";
+     Every group starts open.  A group the user folds away stays folded (per
+     browser), except the one holding the current page. */
+  var GROUP_KEY = "amamio.navFolded";
 
   function readGroups() {
     try { return JSON.parse(window.localStorage.getItem(GROUP_KEY)) || {}; }
@@ -49,7 +49,7 @@
     var state = readGroups();
     document.querySelectorAll(".side-group").forEach(function (group) {
       var name = group.getAttribute("data-group");
-      if (!group.classList.contains("has-active") && state[name]) setGroup(group, true);
+      if (!group.classList.contains("has-active") && state[name]) setGroup(group, false);
     });
     // Enable the open/close animation only after the first paint, so the
     // page doesn't visibly animate groups open on every load.
@@ -65,7 +65,7 @@
     var open = !group.classList.contains("is-open");
     setGroup(group, open);
     var state = readGroups();
-    state[group.getAttribute("data-group")] = open;
+    state[group.getAttribute("data-group")] = !open;
     writeGroups(state);
   });
 
@@ -142,32 +142,20 @@
   }
 
   /* ---- Table paging ----
-     Every .table with more than 15 rows shows 15 at a time, with Previous /
-     Next and a "Rows per page" choice of 15, 30 or 50.  Rows are only hidden,
-     never removed, so forms inside a table still submit every row and
-     printing shows the whole table.  Opt out with data-no-paginate. */
-  var PAGE_SIZES = [15, 30, 50];
-  var SIZE_KEY = "amamio.pageSize";
-
-  function savedSize() {
-    try {
-      var v = parseInt(window.localStorage.getItem(SIZE_KEY), 10);
-      return PAGE_SIZES.indexOf(v) !== -1 ? v : PAGE_SIZES[0];
-    } catch (e) { return PAGE_SIZES[0]; }
-  }
-  function saveSize(v) {
-    try { window.localStorage.setItem(SIZE_KEY, String(v)); } catch (e) { /* optional */ }
-  }
+     Every .table — and every report .doc-table marked data-paginate — with
+     more than 10 rows shows 10 at a time, with Previous / Next and "Page x
+     of y".  Rows are only hidden, never removed, so forms inside a table
+     still submit every row and printing shows the whole table.  Opt out
+     with data-no-paginate. */
+  var PAGE_SIZE = 10;
 
   function paginate(table) {
     if (table.hasAttribute("data-no-paginate") || table.dataset.paged) return;
     var body = table.tBodies[0];
     if (!body) return;
     var rows = Array.prototype.slice.call(body.rows);
-    if (rows.length <= PAGE_SIZES[0]) return;
+    if (rows.length <= PAGE_SIZE) return;
     table.dataset.paged = "1";
-
-    var size = savedSize();
     var page = 0;
 
     var bar = document.createElement("div");
@@ -175,12 +163,6 @@
     bar.innerHTML =
       '<span class="pager-info" aria-live="polite"></span>' +
       '<span class="pager-controls">' +
-        '<label class="pager-size">Rows per page ' +
-          "<select aria-label=\"Rows per page\">" +
-            PAGE_SIZES.map(function (n) {
-              return '<option value="' + n + '">' + n + "</option>";
-            }).join("") +
-          "</select></label>" +
         '<button type="button" class="pager-btn" data-dir="-1" aria-label="Previous page">&lsaquo; Previous</button>' +
         '<span class="pager-page"></span>' +
         '<button type="button" class="pager-btn" data-dir="1" aria-label="Next page">Next &rsaquo;</button>' +
@@ -191,16 +173,14 @@
 
     var info = bar.querySelector(".pager-info");
     var label = bar.querySelector(".pager-page");
-    var select = bar.querySelector("select");
     var prev = bar.querySelector('[data-dir="-1"]');
     var next = bar.querySelector('[data-dir="1"]');
-    select.value = String(size);
 
     function render() {
-      var pages = Math.max(1, Math.ceil(rows.length / size));
+      var pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
       page = Math.min(Math.max(page, 0), pages - 1);
-      var start = page * size;
-      var end = Math.min(start + size, rows.length);
+      var start = page * PAGE_SIZE;
+      var end = Math.min(start + PAGE_SIZE, rows.length);
       rows.forEach(function (row, i) {
         row.classList.toggle("is-paged-out", i < start || i >= end);
       });
@@ -221,18 +201,11 @@
 
     prev.addEventListener("click", function () { go(-1); });
     next.addEventListener("click", function () { go(1); });
-    select.addEventListener("change", function () {
-      var first = page * size;              // keep the first visible row in view
-      size = parseInt(select.value, 10);
-      page = Math.floor(first / size);
-      saveSize(size);
-      render();
-    });
     render();
   }
 
   function paginateAll(root) {
-    (root || document).querySelectorAll("table.table").forEach(paginate);
+    (root || document).querySelectorAll("table.table, table.doc-table[data-paginate]").forEach(paginate);
   }
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () { paginateAll(); });
@@ -301,6 +274,8 @@
       return t ? t.textContent.trim() : el.value;
     }
     if (el.type === "checkbox") return el.checked ? "Yes" : "No";
+    if (el.type === "file") return !el.files || !el.files.length ? ""
+      : el.files.length === 1 ? el.files[0].name : el.files.length + " files";
     var unit = el.closest(".big-field") && el.closest(".big-field").querySelector(".unit");
     return el.value + (unit && el.value !== "" ? " " + unit.textContent.trim() : "");
   }
@@ -533,27 +508,63 @@
   }
 
   /* ---- Live tally: <div data-tally data-total="12" data-fields="a,b,c"> ----
-     Shows how the counted parts add up against the declared total. */
+     Shows how the counted parts add up against the declared total.  With
+     data-no-over the parts can't add up to more than the total: the tally
+     and the fields turn red, a one-click fix takes the extra off the first
+     field (e.g. Usable), and the wizard step won't go on until it fits.
+     Short of the total stays allowed (amber). */
   function initTallies() {
     document.querySelectorAll("[data-tally]").forEach(function (box) {
       var form = box.closest("form");
-      var names = (box.getAttribute("data-fields") || "").split(",");
+      var names = (box.getAttribute("data-fields") || "").split(",").map(function (n) { return n.trim(); });
       var total = parseFloat(box.getAttribute("data-total")) || 0;
       var unit = box.getAttribute("data-unit") || "";
+      var strict = box.hasAttribute("data-no-over");
+      var fields = names.map(function (n) { return form.querySelector('[name="' + n + '"]'); });
+      var labels = names.map(function (n, i) {
+        var lab = fields[i] && form.querySelector('label[for="' + fields[i].id + '"]');
+        return lab ? lab.childNodes[0].textContent.trim() : n;
+      });
+      var round = function (v) { return Math.round(v * 1000) / 1000; };
+      var over = 0;
       function update() {
         var sum = 0;
-        names.forEach(function (n) {
-          var el = form.querySelector('[name="' + n.trim() + '"]');
-          sum += el ? (parseFloat(el.value) || 0) : 0;
-        });
-        sum = Math.round(sum * 1000) / 1000;
-        var diff = Math.round((sum - total) * 1000) / 1000;
+        fields.forEach(function (el) { sum += el ? (parseFloat(el.value) || 0) : 0; });
+        sum = round(sum);
+        var diff = round(sum - total);
+        over = strict && diff > 0 ? diff : 0;
         box.classList.toggle("is-even", diff === 0);
-        box.classList.toggle("is-off", diff !== 0);
+        box.classList.toggle("is-off", diff !== 0 && !over);
+        box.classList.toggle("is-over", !!over);
+        fields.forEach(function (el) {
+          if (el) el.classList.toggle("is-over", !!over && (parseFloat(el.value) || 0) > 0);
+        });
+        var note;
+        if (diff === 0) note = "Matches the label";
+        else if (over) {
+          var first = fields[0] ? parseFloat(fields[0].value) || 0 : 0;
+          note = "<b>" + diff + " " + esc(unit) + "</b> more than the " + total + " " + esc(unit) + " declared" +
+            (first >= diff ? ' <button type="button" class="tally-fix">Take ' + diff + " " + esc(unit) +
+              " off " + esc(labels[0]) + "</button>" : "");
+        } else note = diff > 0 ? "<b>" + diff + "</b> more than declared" : "<b>" + Math.abs(diff) + " " + esc(unit) + "</b> short of declared";
         box.innerHTML = "<span>Counted <b>" + sum + " " + esc(unit) + "</b> of <b>" +
-          total + " " + esc(unit) + "</b> declared</span><span>" +
-          (diff === 0 ? "Matches the label" : (diff > 0 ? "<b>" + diff + "</b> more than declared"
-            : "<b>" + Math.abs(diff) + "</b> short of declared")) + "</span>";
+          total + " " + esc(unit) + "</b> declared</span><span>" + note + "</span>";
+      }
+      box.addEventListener("click", function (e) {
+        if (!e.target.closest(".tally-fix") || !over || !fields[0]) return;
+        fields[0].value = round((parseFloat(fields[0].value) || 0) - over);
+        fields[0].dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      var step = box.closest(".wz-step");
+      if (strict && step) {
+        step.addEventListener("wz:validate", function (e) {
+          update();
+          if (!over) return;
+          e.preventDefault();
+          e.detail.message = labels.join(", ").replace(/, ([^,]*)$/, " and $1") + " add up to " +
+            round(total + over) + " " + unit + " — more than the " + total + " " + unit +
+            " declared. Lower one of them so they fit.";
+        });
       }
       form.addEventListener("input", update);
       update();
@@ -809,6 +820,34 @@
       }
     }, true);
   })();
+
+  /* ---- Photo drop box: <label class="dropzone" data-dropzone> around a file
+     input; shows the chosen picture and its name before the form is saved. */
+  document.addEventListener("change", function (e) {
+    var box = e.target.closest && e.target.closest("[data-dropzone]");
+    if (!box || e.target.type !== "file") return;
+    var files = Array.prototype.slice.call(e.target.files || []);
+    var f = files[0];
+    box.querySelector(".dropzone-empty").hidden = !!f;
+    box.querySelector(".dropzone-chosen").hidden = !f;
+    box.classList.toggle("has-file", !!f);
+    if (!f) return;
+    var thumbs = box.querySelector(".dropzone-thumbs");
+    if (thumbs) {                     // several pictures: a row of thumbnails
+      thumbs.innerHTML = "";
+      files.forEach(function (file) {
+        var img = document.createElement("img");
+        img.src = URL.createObjectURL(file);
+        img.alt = "";
+        thumbs.appendChild(img);
+      });
+      box.querySelector("[data-name]").textContent = files.length === 1 ? f.name
+        : files.length + " photos: " + files.map(function (x) { return x.name; }).join(", ");
+    } else {
+      box.querySelector(".dropzone-chosen img").src = URL.createObjectURL(f);
+      box.querySelector("[data-name]").textContent = f.name;
+    }
+  });
 
   /* Expose a tiny namespace for inline page scripts. */
   window.IMS = {

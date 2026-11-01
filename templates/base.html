@@ -44,8 +44,9 @@
     </a>
   </div>
 
-  {# Each category is a collapsible group.  The group holding the current
-     page is always open; the others remember what the user last chose. #}
+  {# Each category is a group, open by default so every page is in view.
+     The user can fold one away (remembered per browser); the group holding
+     the current page always stays open. #}
   <nav class="sidebar-nav" aria-label="Main">
     {% for section, items in nav_sections %}
       {% set ns = namespace(any=false, active=false, badge=false) %}
@@ -58,10 +59,10 @@
       {% endfor %}
       {% if ns.any %}
         {% set gid = 'grp-' ~ loop.index %}
-        <div class="side-group {{ 'is-open' if ns.active }} {{ 'has-active' if ns.active }}"
+        <div class="side-group is-open {{ 'has-active' if ns.active }}"
              data-group="{{ section }}">
           <button class="side-group-head" type="button"
-                  aria-expanded="{{ 'true' if ns.active else 'false' }}" aria-controls="{{ gid }}">
+                  aria-expanded="true" aria-controls="{{ gid }}">
             <span class="side-group-label">{{ section }}</span>
             {% if ns.badge %}<span class="side-group-dot" aria-label="Unread notifications"></span>{% endif %}
             {{ icon('chevron-down', 15, 'side-chevron') }}

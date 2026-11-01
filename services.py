@@ -167,8 +167,16 @@ def this_month():
 
 
 def fmt_dt(value, length=16):
-    """'2026-10-14T08:30:00+00:00' -> '2026-10-14 08:30' for templates."""
-    return (value or "")[:length].replace("T", " ")
+    """'2026-10-14T08:30:00+00:00' -> '2026-10-14 16:30' for templates.
+    Times are stored in UTC; they are shown in this computer's time zone."""
+    text = str(value or "")
+    try:
+        moment = datetime.fromisoformat(text)
+        if moment.tzinfo is not None:
+            text = moment.astimezone().isoformat()
+    except ValueError:
+        pass
+    return text[:length].replace("T", " ")
 
 
 def fmt_qty(value, unit=""):
@@ -1256,14 +1264,15 @@ def create_receiving_batch(supplier_id, received_date, user_id,
                            supplier_name="", received_time="", delivered_by="",
                            vehicle_plate="", receiving_area="",
                            supplier_contact="", docs_checked=None,
-                           docs_other="", discrepancies=None):
+                           docs_other="", discrepancies=None, save=True):
     """Open a delivery record — the Material Receiving Report (MRR).  Boxes
-    are added to it next."""
+    are added to it next.  With ``save=False`` the record is only built
+    (for the receive form's preview)."""
     supplier = db.get("suppliers", supplier_id) if supplier_id else None
     if supplier and not (supplier_contact or "").strip():
         supplier_contact = " · ".join(p for p in (supplier.get("contact_person"),
                                                   supplier.get("phone")) if p)
-    batch = db.insert("receiving_batches", {
+    batch = {
         "ref_no": _next_ref("MRR", "receiving_batches"),
         "supplier_id": int(supplier_id) if supplier_id else None,
         "supplier_name": supplier.get("name") if supplier
@@ -1298,7 +1307,10 @@ def create_receiving_batch(supplier_id, received_date, user_id,
         "approved_by_name": "",
         "created_at": now_iso(),
         "closed_at": None,
-    })
+    }
+    if not save:
+        return batch
+    batch = db.insert("receiving_batches", batch)
     return batch
 
 
@@ -1423,6 +1435,83 @@ def _po_discrepancies(po, clean):
     return notes
 
 
+def _check_delivery(supplier_id, lines, po_id):
+    """The receive form's checks.  Returns (po, clean lines, error); a clean
+    line is (material or None for a PO item not stocked yet, line, PO line)."""
+    import purchasing_service as pur
+
+    po, po_lines = None, {}
+    if po_id:
+        po = db.get("purchase_orders", po_id)
+        if not po or po.get("status") != pur.PO_APPROVED:
+            return None, None, "That purchase order isn't open for receiving."
+        po_lines = {it["line_no"]: it for it in po.get("items") or []}
+    source_id = supplier_id or (po or {}).get("supplier_id")
+    if source_id:
+        supplier = db.get("suppliers", source_id)
+        if not supplier_approved(supplier):
+            return None, None, ("%s is not on the Approved Supplier List — an Admin "
+                                "must approve the supplier before its deliveries "
+                                "are received." % ((supplier or {}).get("name")
+                                                   or "This supplier"))
+    clean = []
+    for line in lines:
+        if not line.get("material_id"):
+            continue
+        try:
+            po_line = po_lines.get(int(line.get("po_line_no")))
+        except (TypeError, ValueError):
+            po_line = None
+        if line.get("material_id") == "new":
+            if not po_line:
+                return None, None, "Choose the item that arrived."
+            material, name = None, po_line.get("description")
+        else:
+            material = db.get("raw_materials", line.get("material_id"))
+            if not material:
+                return None, None, "One of the items no longer exists."
+            name = material.get("name")
+        if _to_float(line.get("qty_per_box")) <= 0:
+            return None, None, "Enter how much is in each box of %s." % name
+        clean.append((material, line, po_line))
+    if not clean:
+        return None, None, "Add at least one item that arrived."
+    return po, clean, None
+
+
+def preview_delivery(user, supplier_id, received_date, lines, po_no="",
+                     delivery_ref="", remarks="", po_id=None, **mrr):
+    """The Material Receiving Report a delivery would make — nothing saved.
+    Returns (batch, mrr lines, None) or (None, [], message)."""
+    po, clean, err = _check_delivery(supplier_id, lines, po_id)
+    if err:
+        return None, [], err
+    batch = create_receiving_batch(
+        supplier_id or (po or {}).get("supplier_id"), received_date, user["id"],
+        delivery_ref=delivery_ref, remarks=remarks,
+        po_no=(po or {}).get("po_no") or po_no, po_id=po["id"] if po else None,
+        supplier_name=(po or {}).get("supplier_name") or "",
+        discrepancies=_po_discrepancies(po, clean) if po else [], save=False, **mrr)
+    out, po_seen = [], set()
+    for material, line, po_line in clean:
+        no = po_line["line_no"] if po_line else None
+        out.append({
+            "material_name": (material or {}).get("name") or (po_line or {}).get("description"),
+            "unit": (material or {}).get("unit") or (po_line or {}).get("unit") or "",
+            "po_line_no": no,
+            # The ordered quantity, once per PO line (as on the saved MRR).
+            "po_qty": _to_float(po_line.get("qty")) if po_line and no not in po_seen else None,
+            "lot_no": line.get("lot_no") or "", "expiry_date": line.get("expiry_date") or "",
+            "boxes": max(1, int(_to_float(line.get("boxes"), 1))),
+            "actual_qty": round(_line_total(line), 3), "accepted_qty": 0.0,
+            "hold_qty": 0.0, "rejected_qty": 0.0,
+            "status": "Pending inspection",
+        })
+        if no:
+            po_seen.add(no)
+    return batch, out, None
+
+
 def receive_delivery(user_id, supplier_id, received_date, lines, po_no="",
                      delivery_ref="", remarks="", po_id=None, **mrr):
     """Part 1 in one go: the delivery, its boxes, their QR codes, and a
@@ -1439,42 +1528,9 @@ def receive_delivery(user_id, supplier_id, received_date, lines, po_no="",
     Returns ``(batch, boxes, None)`` or ``(None, [], message)``."""
     import purchasing_service as pur
 
-    po, po_lines = None, {}
-    if po_id:
-        po = db.get("purchase_orders", po_id)
-        if not po or po.get("status") != pur.PO_APPROVED:
-            return None, [], "That purchase order isn't open for receiving."
-        po_lines = {it["line_no"]: it for it in po.get("items") or []}
-    source_id = supplier_id or (po or {}).get("supplier_id")
-    if source_id:
-        supplier = db.get("suppliers", source_id)
-        if not supplier_approved(supplier):
-            return None, [], ("%s is not on the Approved Supplier List — an Admin "
-                              "must approve the supplier before its deliveries "
-                              "are received." % ((supplier or {}).get("name")
-                                                 or "This supplier"))
-    clean = []
-    for line in lines:
-        if not line.get("material_id"):
-            continue
-        try:
-            po_line = po_lines.get(int(line.get("po_line_no")))
-        except (TypeError, ValueError):
-            po_line = None
-        if line.get("material_id") == "new":
-            if not po_line:
-                return None, [], "Choose the item that arrived."
-            material, name = None, po_line.get("description")
-        else:
-            material = db.get("raw_materials", line.get("material_id"))
-            if not material:
-                return None, [], "One of the items no longer exists."
-            name = material.get("name")
-        if _to_float(line.get("qty_per_box")) <= 0:
-            return None, [], "Enter how much is in each box of %s." % name
-        clean.append((material, line, po_line))
-    if not clean:
-        return None, [], "Add at least one item that arrived."
+    po, clean, err = _check_delivery(supplier_id, lines, po_id)
+    if err:
+        return None, [], err
 
     # Items ordered that aren't stocked yet join the materials list now.
     clean = [(material or pur.material_for_po_line(po, po_line), line, po_line)
@@ -1665,6 +1721,12 @@ def inspect_receiving_box(box_id, user_id, usable_qty, unusable_qty=0,
         return None, "Quantities cannot be negative."
     if usable + unusable + damaged <= 0:
         return None, "Enter how much is usable, can't be used or damaged."
+    declared = _to_float(box.get("declared_qty"))
+    if declared and usable + unusable + damaged > declared + 0.0005:
+        return None, ("Usable, can't be used and damaged add up to %s — more than "
+                      "the %s declared. Lower one of them so they fit."
+                      % (fmt_qty(usable + unusable + damaged, box.get("unit") or ""),
+                         fmt_qty(declared, box.get("unit") or "")))
     if unusable > 0 and not (unusable_reason or "").strip():
         return None, "Say why part of the box can't be used."
     if damaged > 0 and not (damage_reason or "").strip():
@@ -1921,6 +1983,15 @@ def mrr_lines(batch):
     return lines
 
 
+def receiving_report_line(batch_id, material_id, lot_no="", expiry_date=""):
+    """One line of the Receiving and Inspection Report (an item and lot of a
+    delivery, its boxes added up), or None."""
+    for row in receiving_report_rows("0000-01-01", "9999-12-31"):
+        if (row["batch_id"], row["material_id"], row["lot_key"], row["expiry_key"])                 == (batch_id, material_id, lot_no or "", expiry_date or ""):
+            return row
+    return None
+
+
 def receiving_report_rows(date_from, date_to):
     """The paper Raw Materials Receiving and Inspection Report: one row per
     item and lot of each delivery (its boxes added up), as the client writes
@@ -1952,6 +2023,10 @@ def receiving_report_rows(date_from, date_to):
             word = (x["acceptance_status"] or "Pending").upper()
             statuses[word] = statuses.get(word, 0) + 1
         out.append({
+            # Which line this is (for its detail page) and its boxes.
+            "batch_id": b["batch_id"], "material_id": b["material_id"],
+            "lot_key": b["lot_no"] or "", "expiry_key": b["expiry_date"] or "",
+            "mrr_no": b["batch_ref"], "box_list": items,
             "received_date": b["received_date"],
             "supplier_name": b["supplier_name"],
             "po_dr": " / ".join(p for p in (b["po_no"], b["delivery_ref"]) if p),
@@ -2022,8 +2097,9 @@ def fefo_first(box):
 # area records the containment (tag, segregate, block, notify supplier); QA
 # or an authorized approver records the disposition, which is what finally
 # releases a held box to stock or rejects it; then the report is closed.
-def raise_ncr(box, user_id, nc_types=None, nc_other=""):
-    """Open the hold / rejection report for a box (one per box)."""
+def raise_ncr(box, user_id, nc_types=None, nc_other="", save=True):
+    """Open the hold / rejection report for a box (one per box).  With
+    ``save=False`` it is only built (for the inspection's preview)."""
     existing = db.query("nonconformance_reports", box_id=box["id"])
     if existing:
         return existing[0]
@@ -2038,7 +2114,7 @@ def raise_ncr(box, user_id, nc_types=None, nc_other=""):
     findings = "; ".join(p for p in (
         (box.get("nonconformity") or "").strip(),
         "; ".join("%s: %s" % fp for fp in failed_points(box))) if p)
-    return db.insert("nonconformance_reports", {
+    record = {
         "report_no": _next_ref("NCR", "nonconformance_reports", "report_no"),
         "box_id": box["id"],
         "box_code": box.get("box_code"),
@@ -2080,7 +2156,10 @@ def raise_ncr(box, user_id, nc_types=None, nc_other=""):
         "closed_at": None,
         "status": NCR_OPEN,
         "created_at": now_iso(),
-    })
+    }
+    if not save:
+        return record
+    return db.insert("nonconformance_reports", record)
 
 
 def backfill_ncrs():
@@ -2329,6 +2408,7 @@ def receiving_box_rows(batch_id=None, status=None, limit=None):
             "visual_description": b.get("visual_description") or "",
             "inspection_no": b.get("inspection_no") or "",
             "checklist": b.get("checklist") or {},
+            "photos": b.get("photos") or [],
             "test_parameter": b.get("test_parameter") or "",
             "test_spec": b.get("test_spec") or "",
             "test_result": b.get("test_result") or "",

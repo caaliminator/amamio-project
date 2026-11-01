@@ -21,7 +21,7 @@
   <div class="card-title">Ledger</div>
   {% if entries %}
   <div class="table-wrap">
-    <table class="table" data-no-paginate>
+    <table class="table">
       <thead><tr><th>Date</th><th>Reference</th><th>Particulars</th>
         <th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th></tr></thead>
       <tbody>
@@ -29,7 +29,9 @@
         <tr>
           <td class="nowrap">{{ e.date or '—' }}</td>
           <td class="nowrap">{% if e.po_id and e.credit %}<a href="{{ url_for('purchasing.detail', po_id=e.po_id) }}">{{ e.ref }}</a>{% else %}{{ e.ref }}{% endif %}</td>
-          <td>{{ e.particulars }}{% if e.recorded_by %}<div class="muted small">recorded by {{ e.recorded_by }}</div>{% endif %}</td>
+          <td>{{ e.particulars }}{% if e.recorded_by %}<div class="muted small">recorded by {{ e.recorded_by }}</div>{% endif %}
+            {% if e.proof %}<a class="proof-link" href="{{ url_for('ledger.proof', payment_id=e.payment_id) }}" target="_blank" rel="noopener">
+              <img src="{{ url_for('ledger.proof', payment_id=e.payment_id) }}" alt="Proof of payment" loading="lazy"><span>Proof of payment</span></a>{% endif %}</td>
           <td class="num">{{ e.debit|peso if e.debit else '' }}</td>
           <td class="num">{{ e.credit|peso if e.credit else '' }}</td>
           <td class="num"><b>{{ e.balance|peso }}</b></td>
@@ -59,7 +61,7 @@
 </div>
 {% endif %}
 
-<form class="card" id="pay" method="post" action="{{ url_for('ledger.pay', supplier_id=supplier.id) }}">
+<form class="card" id="pay" method="post" enctype="multipart/form-data" action="{{ url_for('ledger.pay', supplier_id=supplier.id) }}">
   <div class="card-title">Record a payment</div>
   <div class="form-grid cols-2">
     <div class="form-row">
@@ -104,6 +106,15 @@
   <div class="form-row">
     <label class="form-label" for="notes">Notes</label>
     <input type="text" id="notes" name="notes" maxlength="200" placeholder="Optional">
+  </div>
+  <div class="form-row">
+    <div class="form-label">Proof of payment <span class="muted small">optional</span></div>
+    <label class="dropzone" data-dropzone>
+      <input type="file" name="proof" accept="image/*">
+      <span class="dropzone-empty">{{ icon('camera', 22) }}<span><b>Add a photo or screenshot of the receipt</b>
+        <small>Receipt, deposit slip, check or transfer confirmation · JPG or PNG, under 10 MB</small></span></span>
+      <span class="dropzone-chosen" hidden><img alt=""><span><b data-name></b><small>Click to choose a different picture</small></span></span>
+    </label>
   </div>
   <button class="btn btn-primary" type="submit">Record payment</button>
 </form>

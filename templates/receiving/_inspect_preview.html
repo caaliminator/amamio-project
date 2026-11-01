@@ -1,0 +1,11 @@
+{# The inspection's last step: the checklist, and — when the box goes on Hold
+   or is Rejected — the Hold / Rejection Report that opens with it. #}
+{% include "receiving/_checklist_document.html" %}
+{% if ncr %}
+<div class="doc-between no-print">
+  {{ icon('info', 16) }}
+  <span>Because the box is {{ 'put on hold' if ncr.raised_as == 'Hold' else 'rejected' }}, this <b>Hold / Rejection Report</b> opens when you save.
+    Containment, disposition and closure are recorded on it afterwards.</span>
+</div>
+{% include "receiving/_ncr_document.html" %}
+{% endif %}

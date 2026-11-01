@@ -139,6 +139,7 @@ SCHEMA = {
             "received_date": DATE, "received_time": SHORT,
             "delivered_by": STR, "vehicle_plate": SHORT,
             "receiving_area": STR, "docs_checked": TEXT, "docs_other": STR,
+            "proof": STR,               # picture of the delivery receipt (uploads.py)
             "received_by": FK, "status": SHORT,
             "remarks": TEXT, "discrepancies": TEXT,
             "box_count": "INT NULL", "total_declared": NUM, "total_good": NUM,
@@ -176,6 +177,7 @@ SCHEMA = {
             "visual_description": TEXT,
             "test_parameter": STR, "test_spec": STR, "test_result": STR,
             "test_method": STR,
+            "photos": TEXT,             # inspection photos (uploads.py), a list
             # Where the box is on the floor
             "status": SHORT, "stage": SHORT, "location": STR,
             "released_to": SHORT, "released_at": TS,
@@ -184,7 +186,7 @@ SCHEMA = {
         "foreign_keys": {"batch_id": "receiving_batches",
                          "material_id": "raw_materials", "checked_by": "users",
                          "received_by": "users", "po_id": "purchase_orders"},
-        "json_fields": ["checklist"],
+        "json_fields": ["checklist", "photos"],
     },
     # Nonconforming Material Hold / Rejection Report (AFP-WH-FRM-003): one per
     # box put on HOLD or REJECTED — containment, disposition, closure.
@@ -622,6 +624,7 @@ SCHEMA = {
             "amount": MONEY, "paid_on": DATE, "kind": SHORT, "method": SHORT,
             "reference": STR, "notes": TEXT, "recorded_by": FK,
             "recorded_by_name": STR, "created_at": TS,
+            "proof": STR,               # picture of the receipt (uploads.py)
         },
         "foreign_keys": {"supplier_id": "suppliers", "po_id": "purchase_orders",
                          "recorded_by": "users"},

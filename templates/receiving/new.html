@@ -8,7 +8,7 @@
 {% for l in lines if l.po_line_no %}{% set _ = submitted.update({l.po_line_no|string: l}) %}{% endfor %}
 {% set extra_lines = lines | rejectattr('po_line_no') | list %}
 
-<form method="post" class="wizard" data-wizard data-wizard-start="{{ start }}"
+<form method="post" class="wizard" id="receiveForm" data-wizard data-wizard-start="{{ start }}" enctype="multipart/form-data"
       data-submit-label="Save &amp; print QR labels" data-cancel="{{ url_for('receiving.index') }}">
 
   <section class="wz-step" data-title="Who delivered it?"
@@ -63,35 +63,54 @@
 
   <section class="wz-step" data-title="Delivery documents"
            data-hint="Get the approved PO, the delivery receipt and any COA or other required documents. Tick what you checked and copy the reference numbers.">
+    {# One column of short sections (not the wide-screen side-by-side grid). #}
     <div class="wz-body">
-      <div class="form-row">
-        <div class="form-label">Documents checked</div>
-        {% set ticked = form.getlist('docs_checked') if form else [] %}
-        {% for d in docs %}
-        <label class="check-row"><input type="checkbox" name="docs_checked" value="{{ d }}" data-review-label="{{ d }}"
-          {{ 'checked' if d in ticked or (d == 'Approved PO' and po and not form) }}> {{ d }}{% if d == 'Certificate of Analysis' %} <span class="muted small">(if required)</span>{% endif %}</label>
-        {% endfor %}
-        <input type="text" name="docs_other" maxlength="80" value="{{ form.docs_other or '' }}"
-               placeholder="Other document, if any" class="mt-sm" data-review-label="Other document">
-      </div>
-      <div class="form-grid cols-2">
-        <div class="form-row">
-          <label class="form-label" for="po_no">PO no.</label>
-          {% if po %}
-          <input type="text" id="po_no" name="po_no" value="{{ po.po_no }}" readonly class="locked-field">
-          {% else %}
-          <input type="text" id="po_no" name="po_no" maxlength="40" value="{{ form.po_no or '' }}" placeholder="If the paperwork shows one">
-          {% endif %}
+      <div class="step-stack">
+        <div class="step-block">
+          <div class="form-label">Documents checked</div>
+          {% set ticked = form.getlist('docs_checked') if form else [] %}
+          <div class="chip-choices">
+            {% for d in docs %}
+            <label class="chip-choice"><input type="checkbox" name="docs_checked" value="{{ d }}" data-review-label="{{ d }}"
+              {{ 'checked' if d in ticked or (d == 'Approved PO' and po and not form) }}><span>{{ icon('check', 14) }} {{ d }}{% if d == 'Certificate of Analysis' %} <small>if required</small>{% endif %}</span></label>
+            {% endfor %}
+          </div>
+          <input type="text" name="docs_other" maxlength="80" value="{{ form.docs_other or '' }}"
+                 placeholder="Other document, if any" class="mt-sm step-narrow" data-review-label="Other document">
         </div>
-        <div class="form-row">
-          <label class="form-label" for="delivery_ref">DR / delivery receipt no.</label>
-          <input type="text" id="delivery_ref" name="delivery_ref" maxlength="40" value="{{ form.delivery_ref or '' }}" placeholder="e.g. DR-88412">
+
+        <div class="step-block">
+          <div class="form-grid cols-2">
+            <div class="form-row">
+              <label class="form-label" for="po_no">PO no.</label>
+              {% if po %}
+              <input type="text" id="po_no" name="po_no" value="{{ po.po_no }}" readonly class="locked-field">
+              {% else %}
+              <input type="text" id="po_no" name="po_no" maxlength="40" value="{{ form.po_no or '' }}" placeholder="If the paperwork shows one">
+              {% endif %}
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="delivery_ref">DR / delivery receipt no.</label>
+              <input type="text" id="delivery_ref" name="delivery_ref" maxlength="40" value="{{ form.delivery_ref or '' }}" placeholder="e.g. DR-88412">
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="form-row">
-        <label class="form-label" for="remarks">Receiving remarks / discrepancies</label>
-        <textarea id="remarks" name="remarks" rows="2" placeholder="Wrong items, damaged cartons, missing documents…">{{ form.remarks or '' }}</textarea>
-        {% if po %}<div class="form-hint">Shortages and overages against the PO are noted on the receiving report by themselves.</div>{% endif %}
+
+        <div class="step-block">
+          <div class="form-label">Picture of the delivery receipt / DR <span class="muted small">optional</span></div>
+          <label class="dropzone" data-dropzone>
+            <input type="file" name="proof" accept="image/*" data-review-label="Receipt picture">
+            <span class="dropzone-empty">{{ icon('camera', 22) }}<span><b>Add a photo of the receipt</b>
+              <small>JPG or PNG, under 10 MB · on a phone you can take the photo directly{% if form %} · choose it again if the save didn't go through{% endif %}</small></span></span>
+            <span class="dropzone-chosen" hidden><img alt=""><span><b data-name></b><small>Click to choose a different picture</small></span></span>
+          </label>
+        </div>
+
+        <div class="step-block">
+          <label class="form-label" for="remarks">Receiving remarks / discrepancies</label>
+          <textarea id="remarks" name="remarks" rows="3" placeholder="Wrong items, damaged cartons, missing documents…">{{ form.remarks or '' }}</textarea>
+          {% if po %}<div class="form-hint">Shortages and overages against the PO are noted on the receiving report by themselves.</div>{% endif %}
+        </div>
       </div>
     </div>
   </section>
@@ -130,9 +149,9 @@
     <button type="button" class="add-line mt-sm" id="addLine">{{ icon('plus', 15) }} {{ 'Add an item that isn’t on the PO' if po_lines else 'Add another item' }}</button>
   </section>
 
-  <section class="wz-step" data-title="Check and save" data-review
-           data-hint="Make sure this matches the delivery. After saving you'll print one QR label per box.">
-    <div class="wz-body"></div>
+  <section class="wz-step" id="reviewStep" data-title="Check and save" data-review
+           data-hint="This is the Material Receiving Report for this delivery{{ ' against PO ' ~ po.po_no if po }}. Check it matches what arrived — after saving you'll print one QR label per box.">
+    <div class="wz-body is-bare"></div>
   </section>
 </form>
 
@@ -188,25 +207,26 @@
   });
   renumber();
 
-  // The review shows one line per item: "Ginger — 12 kg × 3 boxes = 36 kg".
-  step.reviewHtml = function () {
-    var esc = window.IMS.esc, out = [], boxes = 0;
-    cards.querySelectorAll("[data-item]:not(.is-skipped)").forEach(function (c) {
-      var sel = c.querySelector("select[name=material_id]");
-      var opt = sel.options[sel.selectedIndex];
-      if (!sel.value) return;
-      var unit = opt.getAttribute("data-unit") || "";
-      var per = parseFloat(c.querySelector("[name=qty_per_box]").value) || 0;
-      var n = parseInt(c.querySelector("[name=boxes]").value, 10) || 1;
-      var lot = c.querySelector("[name=lot_no]").value;
-      boxes += n;
-      out.push("<dt>" + esc(opt.textContent.trim()) + "</dt><dd>" + per + " " + esc(unit) +
-        " × " + n + " box" + (n > 1 ? "es" : "") + " = " + (Math.round(per * n * 1000) / 1000) +
-        " " + esc(unit) + (lot ? " · Lot " + esc(lot) : "") + "</dd>");
-    });
-    out.push("<dt>QR labels to print</dt><dd>" + boxes + "</dd>");
-    return out.join("");
-  };
+  // Last step: the Material Receiving Report this delivery makes, built by
+  // the server from the fields so far (the same template as the saved MRR).
+  // The photo itself isn't sent for the preview — only its name.
+  var reviewStep = document.getElementById("reviewStep");
+  var previewUrl = {{ url_for('receiving.new_preview', po=po.id if po else 'none')|tojson }};
+  var seq = 0;
+  reviewStep.addEventListener("wz:enter", function () {
+    var box = reviewStep.querySelector(".review"), mine = ++seq;
+    var data = new FormData(document.getElementById("receiveForm"));
+    var photo = data.get("proof");
+    data.delete("proof");
+    if (photo && photo.name) data.append("proof_name", photo.name);
+    box.innerHTML = '<p class="muted">Preparing the receiving report…</p>';
+    fetch(previewUrl, { method: "POST", body: data, headers: { "X-Requested-With": "fetch" } })
+      .then(function (r) { return r.text(); })
+      .then(function (html) { if (mine === seq) box.innerHTML = html; })
+      .catch(function () {
+        if (mine === seq) box.innerHTML = '<div class="doc-error">The preview could not be loaded. Check your connection and open this step again.</div>';
+      });
+  });
 })();
 </script>
 {% endblock %}

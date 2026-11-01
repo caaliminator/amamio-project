@@ -1,0 +1,58 @@
+{# The Incoming Material Inspection Checklist (AFP-WH-FRM-002) as a document —
+   the printed checklist, and the preview on the inspection's last step
+   (``preview``: built from the answers, not saved; each part links back). #}
+{% from "_paper.html" import doc, doc_fields, doc_checks, doc_signs %}
+{% set pv = preview is defined and preview %}
+{% macro edit(step) %}{% if pv %}<a href="#" class="doc-edit no-print" data-wz-goto="{{ step }}">Edit</a>{% endif %}{% endmacro %}
+{% macro head(title, step) %}<div class="doc-section-head"><h3>{{ title }}</h3>{{ edit(step) }}</div>{% endmacro %}
+
+{% call doc('Incoming Material Inspection Checklist', no=box.inspection_no,
+            status=('Preview · not saved yet' if pv else box.acceptance_status), mark=('Preview' if pv else ''),
+            doc_no='AFP-WH-FRM-002', revision='00',
+            meta=[('Inspection date', box.checked_at|longdate), ('MRR No.', box.batch_ref),
+                  ('Lot / batch', box.lot_no), ('Quantity', box.declared_qty|qty(box.unit))]) %}
+  {{ doc_fields([('Supplier', box.supplier_name), ('Material / item', box.material_name ~ ' · ' ~ box.box_code),
+                 ('Inspector', box.checked_by)]
+                + ([('Visual / organoleptic description', box.visual_description, 'wide')] if box.visual_description else [])) }}
+
+  {{ head('A. Inspection checklist', 4) }}
+  <table class="doc-table">
+    <thead><tr><th>Inspection point</th><th>Acceptable requirement / check</th><th class="c">Pass</th><th class="c">Fail</th><th class="c">N/A</th><th>Remarks</th></tr></thead>
+    <tbody>
+      {% for key, point, requirement in points %}
+      {% set entry = box.checklist.get(key) or {} %}
+      <tr>
+        <td class="doc-item">{{ point }}</td>
+        <td>{{ requirement }}</td>
+        {% for r in ('Pass', 'Fail', 'N/A') %}<td class="c"><span class="doc-box{{ ' is-on' if entry.result == r }}">{{ icon('check', 11) if entry.result == r }}</span></td>{% endfor %}
+        <td>{{ entry.remarks or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not box.checklist %}<p class="doc-note">Inspected before the checklist was introduced — results: visual {{ box.visual_inspection or '—' }}, COA {{ box.coa_check or '—' }}, sampling {{ box.sampling_test or '—' }}.</p>{% endif %}
+
+  {{ head('B. Test results (if applicable)', 5) }}
+  {{ doc_fields([('Parameter', box.test_parameter), ('Specification', box.test_spec),
+                 ('Actual result', box.test_result), ('Instrument / method', box.test_method)], cols=4) }}
+
+  {{ head('C. Inspection decision', 6) }}
+  {{ doc_checks([('Accepted — meets requirements', box.acceptance_status == 'Accepted'),
+                 ('Hold / quarantine — pending evaluation', box.acceptance_status == 'Hold'),
+                 ('Rejected — does not meet requirements', box.acceptance_status == 'Rejected')]) }}
+  {{ doc_fields([('Reason / findings', [box.nonconformity, box.unusable_reason and ("can't be used: " ~ box.unusable_reason), box.damage_reason and ("damaged: " ~ box.damage_reason)]|select|join('; '), 'wide'),
+                 ('Usable', box.good_qty|qty(box.unit)), ("Can't be used", box.unusable_qty|qty(box.unit)), ('Damaged', box.damaged_qty|qty(box.unit))]) }}
+
+  {% if pv and box.photo_names %}
+  {{ head('Photos', 4) }}
+  <p class="doc-note">{{ box.photo_names|length }} photo{{ 's' if box.photo_names|length != 1 }} attached: {{ box.photo_names|join(', ') }} — saved with the inspection.</p>
+  {% elif not pv and box.photos %}
+  <div class="doc-section-head"><h3>Photos</h3></div>
+  <div class="doc-photos">
+    {% for _ in box.photos %}<a href="{{ url_for('receiving.box_photo', box_id=box.id, n=loop.index0) }}" target="_blank" rel="noopener"><img src="{{ url_for('receiving.box_photo', box_id=box.id, n=loop.index0) }}" alt="Inspection photo {{ loop.index }}" loading="lazy"></a>{% endfor %}
+  </div>
+  {% endif %}
+
+  {{ doc_signs([('Inspector', box.checked_by, none, box.checked_at),
+                ('QA / authorized disposition', box.verified_by_name, none, box.checked_at if box.verified_by_name else '')]) }}
+{% endcall %}

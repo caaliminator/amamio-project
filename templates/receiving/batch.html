@@ -22,6 +22,21 @@
   </div>
 </div>
 
+{# The picture of the delivery receipt: shown, or added / replaced here. #}
+<div class="card mb proof-card">
+  <div class="card-title">Delivery receipt picture</div>
+  {% if batch.proof %}
+  <a class="proof-link" href="{{ url_for('receiving.delivery_proof', batch_id=batch.id) }}" target="_blank" rel="noopener">
+    <img src="{{ url_for('receiving.delivery_proof', batch_id=batch.id) }}" alt="Delivery receipt" loading="lazy" class="proof-large"><span>Open full size</span></a>
+  {% else %}<p class="muted small" style="margin:0 0 8px">No picture of the receipt yet.</p>{% endif %}
+  {% if can('receiving') %}
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('receiving.delivery_proof', batch_id=batch.id) }}" class="flex gap-sm wrap mt-sm" style="align-items:center">
+    <input type="file" name="proof" accept="image/*" required style="max-width:320px">
+    <button class="btn btn-ghost btn-sm" type="submit">{{ 'Replace picture' if batch.proof else 'Add picture' }}</button>
+  </form>
+  {% endif %}
+</div>
+
 {% if batch.status == 'For Closing' %}
 <div class="next-action">
   <div class="next-action-text">

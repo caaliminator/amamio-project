@@ -10,7 +10,7 @@
 
 {% call doc('Inventory of Assets', subtitle='As of ' ~ (today|longdate),
             meta=[('Categories', groups|length), ('Units in total', total_units|qty)]) %}
-  <table class="doc-table">
+  <table class="doc-table" data-paginate>
     <thead>
       <tr>
         <th>Item No.</th><th>Description</th><th class="num">Cost per item</th><th class="num">Qty</th>

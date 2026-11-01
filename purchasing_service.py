@@ -34,6 +34,7 @@ from datetime import date
 import db
 import profiles
 import security
+import uploads
 import services
 from services import _to_float, now_iso, today_iso
 
@@ -967,7 +968,8 @@ def ledger_entries(supplier_id):
             "particulars": " · ".join(b for b in bits if b)
                            + (" — %s" % pay["notes"] if pay.get("notes") else ""),
             "debit": _to_float(pay.get("amount")), "credit": 0.0,
-            "recorded_by": pay.get("recorded_by_name") or ""})
+            "recorded_by": pay.get("recorded_by_name") or "",
+            "payment_id": pay["id"], "proof": pay.get("proof") or ""})
     entries.sort(key=lambda e: (e["date"] or "", e["order"]))
     balance = 0.0
     for e in entries:
@@ -1020,11 +1022,12 @@ def payable_orders(supplier_id):
     return rows
 
 
-def record_payment(supplier_id, user, form):
+def record_payment(supplier_id, user, form, proof=None):
     """Record a payment to a supplier.  Returns (payment, error).
 
-    form: {po_id (optional), amount, paid_on, kind, method, reference, notes}.
-    A payment against a PO can't be more than what is still owed on it."""
+    form: {po_id (optional), amount, paid_on, kind, method, reference, notes};
+    ``proof``: an optional uploaded picture of the receipt.  A payment against
+    a PO can't be more than what is still owed on it."""
     supplier = db.get("suppliers", supplier_id)
     if not supplier:
         return None, "Supplier not found."
@@ -1048,11 +1051,17 @@ def record_payment(supplier_id, user, form):
         if amount > po["balance"] + 0.005:
             return None, ("PO %s only has %s left to pay."
                           % (po["po_no"], services.fmt_peso(po["balance"])))
+    picture, err = uploads.read_picture(proof)
+    if err:
+        return None, "Proof of payment: " + err
     payment = db.insert("supplier_payments", {
         "supplier_id": supplier["id"], "supplier_name": supplier.get("name") or "",
         "po_id": po_id, "amount": amount, "paid_on": paid_on, "kind": kind,
         "method": method, "reference": (form.get("reference") or "").strip(),
         "notes": (form.get("notes") or "").strip(),
         "recorded_by": user["id"], "recorded_by_name": user.get("name") or "",
-        "created_at": now_iso()})
+        "created_at": now_iso(), "proof": ""})
+    if picture:
+        payment = db.update("supplier_payments", payment["id"], {
+            "proof": uploads.save_picture("payments", "payment-%d" % payment["id"], picture)})
     return payment, None

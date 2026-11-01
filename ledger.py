@@ -6,11 +6,12 @@ full — are recorded here, optionally against one PO.  The rules live in
 purchasing_service.py (ledger_entries, record_payment).
 """
 from flask import (Blueprint, abort, flash, redirect, render_template,
-                   request, url_for)
+                   request, send_file, url_for)
 
 import db
 import purchasing_service as pur
 import services
+import uploads
 from security import current_user, module_required
 
 ledger_bp = Blueprint("ledger", __name__)
@@ -65,7 +66,8 @@ def supplier(supplier_id):
 @ledger_bp.route("/<int:supplier_id>/pay", methods=["POST"])
 @module_required("ledger")
 def pay(supplier_id):
-    payment, err = pur.record_payment(supplier_id, current_user(), request.form)
+    payment, err = pur.record_payment(supplier_id, current_user(), request.form,
+                                      proof=request.files.get("proof"))
     if err:
         flash(err, "error")
         return redirect(url_for("ledger.supplier", supplier_id=supplier_id,
@@ -73,3 +75,14 @@ def pay(supplier_id):
     flash("Payment of %s to %s recorded." % (services.fmt_peso(payment["amount"]),
                                             payment["supplier_name"]), "success")
     return redirect(url_for("ledger.supplier", supplier_id=supplier_id))
+
+
+@ledger_bp.route("/payments/<int:payment_id>/proof")
+@module_required("ledger")
+def proof(payment_id):
+    """The picture of a payment's receipt — ledger users only."""
+    payment = db.get("supplier_payments", payment_id)
+    path = uploads.picture_path("payments", (payment or {}).get("proof"))
+    if not path:
+        abort(404)
+    return send_file(path, max_age=3600)

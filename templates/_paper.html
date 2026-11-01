@@ -84,7 +84,7 @@
 {# Tick boxes as on the paper form: [(label, ticked), …]. #}
 {% macro doc_checks(items) %}
 <ul class="doc-checks">
-  {% for label, on in items %}<li class="{{ 'is-on' if on }}"><span class="doc-box">{{ '✓' if on }}</span>{{ label }}</li>{% endfor %}
+  {% for label, on in items %}<li class="{{ 'is-on' if on }}"><span class="doc-box">{{ icon('check', 11) if on }}</span><span>{{ label }}</span></li>{% endfor %}
 </ul>
 {% endmacro %}
 

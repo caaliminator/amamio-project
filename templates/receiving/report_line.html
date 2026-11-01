@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% from "_paper.html" import doc, doc_h, doc_fields, doc_lines, doc_signs %}
+{% block title %}{{ r.material_name }} · {{ r.mrr_no }}{% endblock %}
+{% block content %}
+<div class="toolbar no-print">
+  <a class="back-link" style="margin:0" href="{{ back }}">{{ icon('arrow-left', 15) }} Receiving &amp; Inspection Report</a>
+  <div class="flex gap-sm wrap">
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.batch', batch_id=r.batch_id) }}">Delivery {{ r.mrr_no }}</a>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.mrr', batch_id=r.batch_id) }}">Receiving report (MRR)</a>
+    <button class="btn btn-primary" type="button" onclick="window.print()">{{ icon('printer', 15) }} Print</button>
+  </div>
+</div>
+
+{% call doc('Receiving and Inspection Record', no=r.mrr_no, status=r.acceptance,
+            subtitle=r.material_name ~ ((' · lot ' ~ r.lot_no) if r.lot_no else ''),
+            meta=[('Date received', r.received_date|longdate), ('Supplier', r.supplier_name),
+                  ('PO / DR No.', r.po_dr), ('Quantity received', r.qty|qty(r.unit) ~ ' · ' ~ r.boxes ~ ' box' ~ ('es' if r.boxes != 1 else ''))]) %}
+
+  {{ doc_h('A. Material received') }}
+  {{ doc_fields([('Raw material', r.material_name), ('Lot / batch No.', r.lot_no), ('Expiry / best before', r.expiry_date|longdate),
+                 ('Packaging condition', r.packaging_condition), ('Temperature (°C)', r.temperature), ('MRR No.', r.mrr_no)]) }}
+
+  {{ doc_h('B. Inspection') }}
+  {{ doc_fields([('Visual / organoleptic inspection', (r.visual ~ ('; cleaned' if r.cleaned else '')) if (r.visual or r.cleaned) else '', 'wide'),
+                 ('COA / document check', r.coa), ('Sampling / test', r.sampling), ('Acceptance status', r.acceptance)]) }}
+
+  <div class="doc-section-head"><h3>C. Result</h3></div>
+  <div class="doc-meta" style="--cols:4;margin-top:10px">
+    <div><span>Usable (accepted)</span><b>{{ r.good_qty|qty(r.unit) }}</b></div>
+    <div><span>Can't be used</span><b>{{ r.unusable_qty|qty(r.unit) }}</b></div>
+    <div><span>Damaged</span><b>{{ r.damaged_qty|qty(r.unit) }}</b></div>
+    <div><span>Not inspected yet</span><b>{{ r.pending }} box{{ 'es' if r.pending != 1 }}</b></div>
+  </div>
+
+  {{ doc_h('D. Box by box') }}
+  <table class="doc-table">
+    <thead><tr>
+      <th>Box</th><th class="num">Qty</th><th>Status</th><th class="num">Usable</th><th class="num">Can't use</th>
+      <th class="num">Damaged</th><th>Inspected by</th><th>Inspection No.</th>
+    </tr></thead>
+    <tbody>
+      {% for b in r.box_list %}
+      <tr>
+        <td class="nowrap"><a href="{{ url_for('receiving.box', box_id=b.id) }}">{{ b.box_code }}</a></td>
+        <td class="num">{{ b.declared_qty|qty(b.unit) }}</td>
+        <td><b>{{ b.acceptance_status or b.status }}</b>{% if b.ncr_no %}<span class="sub-line">{{ b.ncr_no }} · {{ b.ncr_status }}</span>{% endif %}</td>
+        <td class="num">{{ b.good_qty|qty if b.checked_at else '' }}</td>
+        <td class="num">{{ b.unusable_qty|qty if b.checked_at and b.unusable_qty else '' }}</td>
+        <td class="num">{{ b.damaged_qty|qty if b.checked_at and b.damaged_qty else '' }}</td>
+        <td>{{ b.checked_by if b.checked_at else '' }}{% if b.checked_at %}<span class="sub-line">{{ b.checked_at|longdate }}</span>{% endif %}</td>
+        <td class="nowrap">{% if b.inspection_no %}<a href="{{ url_for('receiving.checklist', box_id=b.id) }}">{{ b.inspection_no }}</a>{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="doc-note no-print">Open a box, or its inspection number for the full Incoming Material Inspection Checklist.</p>
+
+  {{ doc_h('E. Nonconformity / remarks') }}
+  {{ doc_lines([r.remarks], min=1) }}
+  {{ doc_h('F. Action taken') }}
+  {{ doc_lines([r.action], min=1) }}
+
+  {{ doc_signs([('Inspected by', r.inspected_by, none, (r.box_list|selectattr('checked_at')|map(attribute='checked_at')|list|last) if r.inspected_by else ''),
+                ('Verified by', r.verified_by, none, '')]) }}
+{% endcall %}
+{% endblock %}

@@ -45,10 +45,10 @@
 </div>
 {% endif %}
 
-{% if stage %}
-{# Waiting for the Admin's check or the Super Admin's approval: show the PO
-   exactly as it prints, so it reads like the paper being signed. #}
+{# The PO itself, always shown as the document — exactly as it prints. #}
 {% include "purchasing/_document.html" %}
+
+{% if stage %}
 {% if can_approve %}
 <div class="next-action">
   <div class="next-action-text"><b>{{ 'Checked everything?' if stage == 'initial' else 'Ready to approve?' }}</b>
@@ -59,66 +59,29 @@
 </div>
 {% endif %}
 {% else %}
+{# Once issued: what has arrived against it, and what has been paid. #}
+{% if po.status in ('Approved', 'Delivered') %}
 <div class="card mb">
-  <div class="card-title">Items</div>
+  <div class="card-title">Received against this PO</div>
   <div class="table-wrap">
     <table class="table" data-no-paginate>
-      <thead><tr><th>Item</th><th>Description / specification</th><th class="num">Qty</th>
-        <th class="num">Unit price</th><th class="num">Amount</th><th>Requested delivery</th><th>Received</th></tr></thead>
+      <thead><tr><th>Item</th><th>Description</th><th class="num">Ordered</th><th class="num">Received &amp; accepted</th><th>Being inspected</th></tr></thead>
       <tbody>
         {% for it in lines %}
         <tr>
           <td>{{ it.line_no }}</td>
-          <td>{{ it.description }}
-            {% set sub = [it.brand_model, ('VAT/tax: ' ~ it.vat) if it.vat else '', it.remarks] | select | join(' · ') %}
-            {% if sub %}<div class="muted small">{{ sub }}</div>{% endif %}</td>
+          <td>{{ it.description }}</td>
           <td class="num nowrap">{{ it.qty|qty(it.unit) }}</td>
-          <td class="num">{{ it.unit_price|peso }}</td><td class="num">{{ it.amount|peso }}</td>
-          <td>{{ it.requested_delivery or '—' }}</td>
-          <td class="nowrap">
-            {% if it.received or it.pending %}
-              <span class="{{ 'gold' if it.received >= it.qty else '' }}">{{ it.received|qty }} of {{ it.qty|qty(it.unit) }}</span>
-              {% if it.pending %}<div class="muted small">{{ it.pending|qty }} being inspected</div>{% endif %}
-            {% else %}<span class="muted">—</span>{% endif %}
-          </td>
+          <td class="num nowrap"><span class="{{ 'gold' if it.received >= it.qty else '' }}">{{ it.received|qty }} of {{ it.qty|qty(it.unit) }}</span></td>
+          <td>{{ it.pending|qty(it.unit) if it.pending else '—' }}</td>
         </tr>
         {% endfor %}
       </tbody>
-      <tfoot>
-        <tr><td colspan="4">Subtotal</td><td class="num">{{ po.subtotal|peso }}</td><td colspan="2"></td></tr>
-        {% if po.discount %}<tr><td colspan="4">Discount</td><td class="num">−{{ po.discount|peso }}</td><td colspan="2"></td></tr>{% endif %}
-        {% if po.freight %}<tr><td colspan="4">Delivery / freight</td><td class="num">{{ po.freight|peso }}</td><td colspan="2"></td></tr>{% endif %}
-        {% if po.labor %}<tr><td colspan="4">Labor cost</td><td class="num">{{ po.labor|peso }}</td><td colspan="2"></td></tr>{% endif %}
-        {% if po.tax %}<tr><td colspan="4">VAT{{ (' (%g%%)'|format(po.vat_rate|float)) if po.vat_rate else ' / other tax' }}</td><td class="num">{{ po.tax|peso }}</td><td colspan="2"></td></tr>{% endif %}
-        <tr><td colspan="4"><b>Grand total</b></td><td class="num"><b>{{ po.grand_total|peso }}</b></td><td colspan="2"></td></tr>
-      </tfoot>
     </table>
   </div>
+  {% if po.delivered_at %}<p class="muted small mt">Delivered {{ po.delivered_at|longdate }}.</p>{% endif %}
 </div>
-
-<div class="grid grid-2 mb">
-  <div class="card">
-    <div class="card-title">Supplier</div>
-    <dl class="review-list">
-      <dt>Name</dt><dd>{{ po.supplier_name }}</dd>
-      <dt>Address</dt><dd>{{ po.supplier_address or '—' }}</dd>
-      <dt>Contact no. / email</dt><dd>{{ po.supplier_contact or '—' }}</dd>
-      <dt>TIN</dt><dd>{{ po.supplier_tin or '—' }}</dd>
-      <dt>Contact person</dt><dd>{{ po.supplier_contact_person or '—' }}</dd>
-      <dt>Supplier reference</dt><dd>{{ po.supplier_reference or '—' }}</dd>
-    </dl>
-  </div>
-  <div class="card">
-    <div class="card-title">Delivery</div>
-    <dl class="review-list">
-      <dt>Deliver to</dt><dd>{{ po.deliver_to }}</dd>
-      <dt>Address</dt><dd>{{ po.delivery_address }}</dd>
-      <dt>Instructions</dt><dd>{{ po.delivery_instructions or '—' }}</dd>
-      <dt>Contact</dt><dd>{{ po.delivery_contact or '—' }}</dd>
-      {% if po.delivered_at %}<dt>Delivered</dt><dd>{{ po.delivered_at }}</dd>{% endif %}
-    </dl>
-  </div>
-</div>
+{% endif %}
 
 {% if deliveries %}
 <div class="section-label">Deliveries received against this PO</div>
@@ -148,10 +111,11 @@
   {% if payments %}
   <div class="table-wrap mt">
     <table class="table" data-no-paginate>
-      <thead><tr><th>Date</th><th>Payment</th><th>Reference</th><th class="num">Amount</th></tr></thead>
+      <thead><tr><th>Date</th><th>Payment</th><th>Reference</th><th class="num">Amount</th><th>Proof</th></tr></thead>
       <tbody>
         {% for p in payments %}
-        <tr><td>{{ p.paid_on }}</td><td>{{ p.kind }} · {{ p.method }}</td><td>{{ p.reference or '—' }}</td><td class="num">{{ p.amount|peso }}</td></tr>
+        <tr><td>{{ p.paid_on }}</td><td>{{ p.kind }} · {{ p.method }}</td><td>{{ p.reference or '—' }}</td><td class="num">{{ p.amount|peso }}</td>
+          <td>{% if p.proof %}<a class="proof-link" href="{{ url_for('ledger.proof', payment_id=p.id) }}" target="_blank" rel="noopener"><img src="{{ url_for('ledger.proof', payment_id=p.id) }}" alt="Proof of payment" loading="lazy"><span>View</span></a>{% else %}<span class="muted">—</span>{% endif %}</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -163,16 +127,6 @@
     <a class="btn btn-ghost btn-sm" href="{{ url_for('ledger.supplier', supplier_id=supplier_id) }}">{{ icon('ledger', 14) }} Supplier ledger</a>
   </div>
   {% endif %}
-</div>
-
-<div class="card mb">
-  <div class="card-title">Sign-offs</div>
-  <dl class="review-list">
-    <dt>Prepared by</dt><dd>{{ po.prepared_by_name or '—' }}{% if po.prepared_at %} · {{ po.prepared_at }}{% endif %}</dd>
-    <dt>Checked by</dt><dd>{{ po.checked_by_name or '—' }}{% if po.checked_at %} · {{ po.checked_at }}{% endif %}</dd>
-    <dt>Approved by</dt><dd>{{ po.approved_by_name or '—' }}{% if po.approved_at %} · {{ po.approved_at }}{% endif %}</dd>
-  </dl>
-  {% if po.terms %}<div class="form-label mt">Terms / special instructions</div><p class="muted small">{{ po.terms }}</p>{% endif %}
 </div>
 {% endif %}
 

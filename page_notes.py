@@ -169,6 +169,13 @@ NOTES = {
         "flow": "A box that fails any point can't be accepted. Accepted: only the usable quantity joins stock and the box moves to the Storage Area; the rest goes to the damage report with its reason. Hold or Rejected: a hold / rejection report opens, QA and Purchasing are notified, and nothing joins stock until QA releases it.",
         "form": "Incoming Material Inspection Checklist (AFP-WH-FRM-002)",
     },
+    "receiving.report_line": {
+        "title": "Receiving & inspection record",
+        "what": "One line of the Receiving & Inspection Report in detail — an item and lot of a delivery: what arrived, how it was inspected, and the result box by box.",
+        "who": "Receiving Team Head · Production Team Head · " + ADMINS,
+        "flow": "Open a box or its inspection number for the full checklist. Print it as its own record.",
+        "form": "Raw Materials Receiving and Inspection Report",
+    },
     "receiving.report": {
         "title": "Receiving & Inspection Report",
         "what": "The client's paper report, filled in automatically from the deliveries and inspections in the chosen date range.",
@@ -716,7 +723,7 @@ NOTES = {
         "title": "One supplier's ledger",
         "what": "The supplier's ledger line by line — each issued PO as a credit, each payment as a debit, with the running balance — and the POs still to be paid.",
         "who": ADMINS,
-        "flow": "Record advance, partial or full payments, against a PO or on account. A payment can't be more than what is left on its PO.",
+        "flow": "Record advance, partial or full payments, against a PO or on account, with a picture of the receipt if you have one. A payment can't be more than what is left on its PO.",
     },
     "reports.index": {
         "title": "Reports",
