@@ -8,6 +8,7 @@
   </div>
 </div>
 
+{% if can('purchasing') %}
 <div class="figures mb">
   <div class="figure {{ 'is-bad' if counts.awaiting_po }}"><div class="figure-label">Approved PRs waiting for a PO</div><div class="figure-value">{{ counts.awaiting_po }}</div></div>
   <div class="figure"><div class="figure-label">POs to check (Admin)</div><div class="figure-value">{{ counts.prepared }}</div></div>
@@ -34,6 +35,7 @@
   <div class="empty-title">Nothing waiting</div>
   <p class="muted">Approve a purchase request under <a href="{{ url_for('approvals.index') }}">Approvals</a> and it shows up here.</p>
 </div></div>
+{% endif %}
 {% endif %}
 
 <div class="toolbar">

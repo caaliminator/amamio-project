@@ -1,0 +1,45 @@
+{# The add / change form of a cash, bank or e-wallet account.  ``values`` is
+   the account, or what was typed (a failed save), or empty. #}
+{% macro account_form(action, values, kinds, today, submit) %}
+{% set v = values or {} %}
+{% set opening = v.get('opening_balance') %}
+<form method="post" action="{{ action }}" class="mt">
+  <div class="form-grid cols-2">
+    <div class="form-row">
+      <label class="form-label">Account name <span class="req">*</span></label>
+      <input type="text" name="name" maxlength="80" required value="{{ v.get('name') or '' }}" placeholder="e.g. BDO Savings, Cash on hand, GCash">
+    </div>
+    <div class="form-row">
+      <div class="form-label">Type</div>
+      <div class="chip-choices">
+        {% for k in kinds %}
+        <label class="chip-choice"><input type="radio" name="kind" value="{{ k }}" {{ 'checked' if (v.get('kind') or kinds[0]) == k }}><span>{{ k }}</span></label>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Bank / provider</label>
+      <input type="text" name="bank" maxlength="80" value="{{ v.get('bank') or '' }}" placeholder="e.g. BDO, Landbank, GCash · not for cash">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Account no.</label>
+      <input type="text" name="account_no" maxlength="40" value="{{ v.get('account_no') or '' }}" placeholder="Optional · not for cash">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Opening balance (₱)</label>
+      <input type="number" name="opening_balance" min="0" step="0.01" inputmode="decimal"
+             value="{{ '%.2f'|format(opening|float) if opening not in (none, '') else '0.00' }}">
+      <div class="form-hint">What was in it on the date below, before anything recorded here.</div>
+    </div>
+    <div class="form-row">
+      <label class="form-label">As of</label>
+      <input type="date" name="opening_date" max="{{ today }}" value="{{ v.get('opening_date') or today }}">
+    </div>
+  </div>
+  <div class="form-row">
+    <label class="form-label">Notes</label>
+    <input type="text" name="notes" maxlength="200" value="{{ v.get('notes') or '' }}" placeholder="Optional, e.g. who holds the cash box">
+  </div>
+  <button class="btn btn-primary" type="submit">{{ submit }}</button>
+</form>
+{% endmacro %}

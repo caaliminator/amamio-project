@@ -147,5 +147,23 @@
     "last_name": "Mercado",
     "suffix": "",
     "position": "Assets Maintenance Head"
+  },
+  {
+    "name": "Theresa Lim Villareal",
+    "username": "finance",
+    "password_hash": "scrypt:32768:8:1$avVvndxwshRGwl5h$aac297ae5f5964375e4adca339e070f8fe38e0c60b2e481f759c1e936ea1e55f5f38f11fbea0ace5e39016c4c167f40f2e1b78e9537903f5c5e04739c0c008b9",
+    "role": "finance_admin",
+    "email": "finance@amamio.ph",
+    "phone": "",
+    "team": "Finance Admin",
+    "active": true,
+    "last_login": null,
+    "created_at": "2026-11-01T15:27:06.972439+00:00",
+    "id": 9,
+    "first_name": "Theresa",
+    "middle_name": "Lim",
+    "last_name": "Villareal",
+    "suffix": "",
+    "position": "Finance Officer"
   }
 ]

@@ -22,7 +22,7 @@ LINE_KEYS = ("pr_item_id", "include", "brand_model", "qty",
 
 
 @purchasing_bp.route("/")
-@module_required("purchasing")
+@module_required("po_view")
 def index():
     show = request.args.get("show") or "open"
     orders = db.read("purchase_orders")
@@ -159,11 +159,16 @@ def new():
         directory = db.get("suppliers", prev.get("supplier_id")) if prev.get("supplier_id") else None
         if directory and services.supplier_approved(directory):
             suggested = directory
+    cards = [pur.supplier_card(s) for s in suppliers]
     return render_template(
         "purchasing/new.html", req=req, pr_no=pur.pr_number(req), items=items, edits=edits,
         prev_po=prev, start_from=start_from, prev_lines=prev_lines,
         form=form, me=user, today=services.today_iso(),
-        suppliers=[pur.supplier_card(s) for s in suppliers],
+        suppliers=cards, supplier_options=[
+            {"v": c["id"], "l": c["name"], "s": c["contact_person"] or c["address"],
+             "d": {"address": c["address"], "contact": c["contact"],
+                   "tin": c["tin"], "person": c["contact_person"]}}
+            for c in cards if c["approved"]],
         suggested=pur.supplier_card(suggested) if suggested else None,
         payment_terms=pur.PAYMENT_TERMS, upfront_terms=pur.UPFRONT_TERMS,
         units=pur.units_for(catalog),
@@ -180,7 +185,7 @@ def _po_or_404(po_id):
 
 
 @purchasing_bp.route("/<int:po_id>")
-@module_required("purchasing")
+@module_required("po_view")
 def detail(po_id):
     po = _po_or_404(po_id)
     req = db.get("purchase_requests", po.get("purchase_request_id")) or {}
@@ -236,6 +241,6 @@ def cancel(po_id):
 
 
 @purchasing_bp.route("/<int:po_id>/print")
-@module_required("purchasing")
+@module_required("po_view")
 def print_po(po_id):
     return render_template("purchasing/print.html", po=_po_or_404(po_id))

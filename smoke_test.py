@@ -70,7 +70,7 @@ def inspect(c, box_id, **fields):
 ACCOUNTS = [("superadmin", "super123"), ("admin", "admin123"),
             ("receiving", "recv123"), ("production", "prod123"),
             ("packing", "pack123"), ("packer1", "member123"),
-            ("assets", "assets123")]
+            ("assets", "assets123"), ("finance", "finance123")]
 
 # 1) every demo account logs in and gets a home screen with its tasks
 for u, p in ACCOUNTS:
@@ -86,10 +86,18 @@ with application.test_client() as c:
     page = c.get("/approvals/").data.decode("utf-8")
     nav = page.split('class="sidebar-nav"', 1)[1].split("</nav>", 1)[0]
     order = [nav.find(x) for x in ("Purchase Requests", "Approvals",
-                                   "Purchase Orders", "Supplier Ledger")]
+                                   "Purchase Orders", "Finance", "Supplier Ledger",
+                                   "Payments Due", "Cash &amp; Bank Accounts")]
     check(all(i > 0 for i in order) and order == sorted(order)
           and "Receiving Area" not in nav and "Packing" not in nav,
-          "the sidebar shows only Purchase Requests, Approvals, POs, Ledger")
+          "the sidebar shows the purchasing flow, then Finance")
+with application.test_client() as c:
+    login(c, "finance", "finance123")
+    page = c.get("/finance/due").data.decode("utf-8")
+    nav = page.split('class="sidebar-nav"', 1)[1].split("</nav>", 1)[0]
+    check("Supplier Ledger" in nav and "Payments Due" in nav and "Purchase Orders" in nav
+          and "Purchase Requests" not in nav and "Approvals" not in nav,
+          "the Finance Admin's sidebar is the Finance section and read-only POs")
 
 # 1b) each user picks light, dark or "match my device"; it is remembered
 with application.test_client() as c:
@@ -156,6 +164,15 @@ GUARDS = [
     ("admin", "admin123", "/purchasing/", 200),
     ("admin", "admin123", "/ledger/", 200),
     ("production", "prod123", "/ledger/", 403),
+    ("production", "prod123", "/finance/accounts", 403),
+    ("finance", "finance123", "/ledger/", 200),
+    ("finance", "finance123", "/finance/due", 200),
+    ("finance", "finance123", "/finance/accounts", 200),
+    ("finance", "finance123", "/purchasing/", 200),
+    ("finance", "finance123", "/purchasing/new", 403),
+    ("finance", "finance123", "/approvals/", 403),
+    ("finance", "finance123", "/requests/", 403),
+    ("finance", "finance123", "/receiving/", 403),
     ("production", "prod123", "/receiving/new", 403),
     ("production", "prod123", "/receiving/inspection", 200),
     ("receiving", "recv123", "/receiving/new", 200),
@@ -688,8 +705,10 @@ with application.test_client() as c:
 trimix = db.query("suppliers", name="Trimix Butuan")[0]
 with application.test_client() as c:
     login(c, "admin", "admin123")
-    check(c.get("/purchasing/new?request_id=%d" % pr["id"]).status_code == 200,
-          "PO form opens for the approved PR")
+    page = c.get("/purchasing/new?request_id=%d" % pr["id"]).data.decode("utf-8")
+    check('id="supplierOptions"' in page and "Trimix Butuan" in page
+          and '<select id="supplier_id"' not in page,
+          "PO form opens for the approved PR, with a supplier search box")
     pos_before = len(db.read("purchase_orders"))
     c.post("/purchasing/new?request_id=%d" % pr["id"], data={
         "request_id": pr["id"], "supplier_name": "Typed Supplier",
@@ -776,8 +795,73 @@ with application.test_client() as c:
     row = [r for r in pur_svc.ledger_summary() if r["id"] == trimix["id"]][0]
     check(abs(row["balance"] - entries[-1]["balance"]) < 0.01,
           "the ledger list shows the same balance as the supplier's ledger")
-    for route in ("/ledger/", "/ledger/?show=all", "/ledger/%d" % trimix["id"]):
+    for route in ("/ledger/", "/ledger/?show=all", "/ledger/%d" % trimix["id"],
+                  "/ledger/print", "/ledger/print?show=all"):
         check(c.get(route).status_code == 200, "%s renders" % route)
+    page = c.get("/ledger/%d/print" % trimix["id"]).data.decode("utf-8")
+    check("Supplier Ledger" in page and po["po_no"] in page and "GC-1001" in page,
+          "the supplier's ledger prints with its POs and payments")
+    page = c.get("/ledger/%d/print?from=2999-01-01" % trimix["id"]).data.decode("utf-8")
+    check("Balance brought forward" in page and "GC-1001" not in page,
+          "a printed ledger from a date brings the earlier balance forward")
+
+# 7c) Finance: payments due, cash & bank accounts, payments from an account
+import finance_service as fin_svc  # noqa: E402
+with application.test_client() as c:
+    login(c, "finance", "finance123")
+    due = [r for r in fin_svc.payments_due() if r["id"] == po["id"]]
+    check(due and abs(due[0]["balance"] - 370) < 0.01,
+          "the issued PO is on Payments Due with its balance")
+    page = c.get("/finance/due").data.decode("utf-8")
+    check(po["po_no"] in page, "Payments Due lists the PO")
+    page = c.get("/purchasing/%d" % po["id"]).data.decode("utf-8")
+    check(po["po_no"] in page and "Cancel PO" not in page,
+          "Finance sees a PO read-only")
+    c.post("/finance/accounts", data={"name": "Cash on hand", "kind": "Cash on hand",
+                                      "opening_balance": "10000"})
+    c.post("/finance/accounts", data={"name": "BDO Savings", "kind": "Bank",
+                                      "bank": "BDO", "account_no": "0012-3456",
+                                      "opening_balance": "50000"})
+    c.post("/finance/accounts", data={"name": "cash on hand", "kind": "Cash on hand"})
+    accs = {a["name"]: a for a in db.read("money_accounts")}
+    check(set(accs) == {"Cash on hand", "BDO Savings"},
+          "Finance adds its own accounts; a duplicate name is refused")
+    cash, bdo = accs["Cash on hand"], accs["BDO Savings"]
+    c.post("/finance/accounts/%d/entry" % cash["id"], data={
+        "direction": "in", "kind": "Deposit / cash in", "amount": "500"})
+    c.post("/finance/accounts/%d/entry" % bdo["id"], data={
+        "direction": "Transfer", "to_account_id": str(cash["id"]), "amount": "2000"})
+    check(abs(fin_svc.account_balance(db.get("money_accounts", cash["id"])) - 12500) < 0.01
+          and abs(fin_svc.account_balance(db.get("money_accounts", bdo["id"])) - 48000) < 0.01,
+          "money in and a transfer move the account balances")
+    paid_before = pur_svc.po_paid(po["id"])
+    c.post("/ledger/%d/pay" % trimix["id"], data={
+        "po_id": str(po["id"]), "amount": "100", "kind": "Partial payment", "method": "Cash"})
+    check(pur_svc.po_paid(po["id"]) == paid_before,
+          "once accounts exist, a payment must say which account it came from")
+    page = c.get("/ledger/%d?po=%d" % (trimix["id"], po["id"])).data.decode("utf-8")
+    check('name="account_id"' in page and "BDO Savings" in page,
+          "the payment form offers the accounts")
+    c.post("/ledger/%d/pay" % trimix["id"], data={
+        "po_id": str(po["id"]), "amount": "100", "kind": "Partial payment",
+        "method": "Bank transfer", "account_id": str(bdo["id"])})
+    check(abs(pur_svc.po_paid(po["id"]) - paid_before - 100) < 0.01
+          and abs(fin_svc.account_balance(db.get("money_accounts", bdo["id"])) - 47900) < 0.01,
+          "a supplier payment comes out of the account it was paid from")
+    page = c.get("/finance/accounts/%d" % bdo["id"]).data.decode("utf-8")
+    check("Paid Trimix Butuan" in page and "Transfer to Cash on hand" in page,
+          "the account statement shows the supplier payment and the transfer")
+    check(c.get("/finance/accounts/%d/print" % bdo["id"]).status_code == 200,
+          "the account statement prints")
+    c.post("/finance/accounts/%d/active" % cash["id"])
+    check(not db.get("money_accounts", cash["id"])["active"]
+          and all(a["id"] != cash["id"] for a in fin_svc.active_accounts()),
+          "a closed account can't be paid from")
+    c.post("/finance/accounts/%d/active" % cash["id"])
+    r = c.get("/dashboard")
+    check(b"Payments due" in r.data, "Finance's home shows Payments due")
+    c.get("/logout")
+    login(c, "admin", "admin123")     # the checks below carry on as the Admin
     c.post("/purchasing/%d/delivered" % po["id"])
     check(db.get("purchase_orders", po["id"])["status"] == "Delivered",
           "PO marked delivered")
@@ -1075,8 +1159,15 @@ n = len(demo_po["items"])
 with application.test_client() as c:
     login(c, "receiving", "recv123")
     page = c.get("/receiving/new?po=%d" % demo_po["id"]).data.decode("utf-8")
-    check("as a new stock item" in page,
+    check("Timer switch" in page and "can't be changed here" in page
+          and 'name="material_id" value="new"' in page,
           "an ordered item not on the materials list can be added on receipt")
+    check('name="lot_no"' not in page and 'name="temperature_c"' not in page,
+          "the receive form has no optional lot / expiry / condition fields")
+    # Only the "add an item that isn't on the PO" template still has a picker.
+    check(page.count('<select name="material_id"') == 1
+          and page.count("can't be changed here") == n,
+          "a PO line's item can't be changed when receiving")
     c.post("/receiving/new?po=%d" % demo_po["id"], data={
         "supplier_id": "", "received_date": services.today_iso(),
         "po_line_no": [str(i["line_no"]) for i in demo_po["items"]],

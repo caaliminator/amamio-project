@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Payments Due{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Payments Due</h1>
+    <p class="page-sub">Every issued purchase order with something left to pay. Up-front payments and delivered orders come first; record the payment on the supplier's ledger.</p>
+  </div>
+</div>
+
+<div class="figures mb">
+  <div class="figure {{ 'is-bad' if due_now > 0.005 }}"><div class="figure-label">Due now</div><div class="figure-value">{{ due_now|peso }}</div></div>
+  <div class="figure"><div class="figure-label">Total still to pay · {{ rows|length }} PO(s)</div><div class="figure-value">{{ total|peso }}</div></div>
+  {% for b in aging %}
+  <div class="figure {{ 'is-bad' if loop.last and b.amount > 0.005 }}"><div class="figure-label">Issued {{ b.label }} ago · {{ b.count }}</div><div class="figure-value">{{ b.amount|peso }}</div></div>
+  {% endfor %}
+</div>
+
+{% if rows %}
+<div class="card">
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>PO</th><th>Supplier</th><th>Issued</th><th>Terms</th><th class="num">PO total</th>
+        <th class="num">Paid</th><th class="num">Balance</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td class="nowrap"><a href="{{ url_for('purchasing.detail', po_id=r.id) }}">{{ r.po_no }}</a></td>
+          <td>{{ r.supplier }}</td>
+          <td class="nowrap">{{ r.approved_at }}<div class="muted small">{{ r.age }} day(s) ago</div></td>
+          <td>{{ r.payment_terms or '—' }}</td>
+          <td class="num">{{ r.grand_total|peso }}</td>
+          <td class="num">{{ r.paid|peso }}</td>
+          <td class="num"><b>{{ r.balance|peso }}</b>{% if r.advance_due > 0.005 %}<div class="muted small">{{ r.advance_due|peso }} up front</div>{% endif %}</td>
+          <td><span class="badge {{ 'badge-warn' if r.due_now else 'badge-muted' }}">{{ r.why }}</span></td>
+          <td>{% if r.supplier_id %}<a class="btn btn-primary btn-sm" href="{{ url_for('ledger.supplier', supplier_id=r.supplier_id, po=r.id) }}#pay">Pay</a>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card"><div class="empty">
+  <div class="empty-icon">{{ icon('calendar', 30) }}</div>
+  <div class="empty-title">Nothing to pay</div>
+  <p class="muted">Every issued purchase order is paid in full. New ones appear here once the Super Admin approves them.</p>
+</div></div>
+{% endif %}
+{% endblock %}

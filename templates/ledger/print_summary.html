@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "_paper.html" import doc, doc_signoff %}
+{% block title %}Supplier Ledger summary{% endblock %}
+{% block content %}
+<a class="back-link no-print" href="{{ url_for('ledger.index', show=show) }}">{{ icon('arrow-left', 15) }} Supplier Ledger</a>
+<div class="filter-bar no-print">
+  <div class="seg" style="flex:1">
+    <a href="{{ url_for('ledger.print_summary', show='active') }}" class="{{ 'is-active' if show == 'active' }}">With purchases</a>
+    <a href="{{ url_for('ledger.print_summary', show='all') }}" class="{{ 'is-active' if show != 'active' }}">Every supplier</a>
+  </div>
+  <button class="btn btn-primary" type="button" onclick="window.print()">{{ icon('printer', 15) }} Print</button>
+</div>
+
+{% call doc('Supplier Ledger Summary', subtitle='As of ' ~ (today|longdate),
+            meta=[('Suppliers', rows|length), ('Purchases (credit)', totals.purchases|peso),
+                  ('Paid (debit)', totals.payments|peso), ('Balance owed', totals.balance|peso)]) %}
+  <table class="doc-table">
+    <thead>
+      <tr><th class="n">#</th><th>Supplier</th><th>Category</th><th class="num">Purchases (credit)</th>
+        <th class="num">Paid (debit)</th><th class="num">Balance</th><th>Last activity</th></tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td class="n">{{ loop.index }}</td>
+        <td>{{ r.name }}</td>
+        <td>{{ r.category }}</td>
+        <td class="num">{{ r.purchases|peso }}</td>
+        <td class="num">{{ r.payments|peso }}</td>
+        <td class="num"><b>{{ r.balance|peso }}</b></td>
+        <td class="nowrap">{{ r.last|longdate if r.last else '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="muted">No purchases posted yet.</td></tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr><td colspan="3">Totals</td><td class="num">{{ totals.purchases|peso }}</td><td class="num">{{ totals.payments|peso }}</td><td class="num"><b>{{ totals.balance|peso }}</b></td><td></td></tr>
+    </tfoot>
+  </table>
+  {{ doc_signoff(['Prepared by', 'Checked by', 'Approved by']) }}
+{% endcall %}
+{% endblock %}

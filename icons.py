@@ -91,6 +91,8 @@ ICONS = {
             'c-2.8 0-4.5-.9-5.9-2.4L3.3 16.8a2 2 0 0 1 2.8-2.8L8 16"/>',
     "upload": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/>'
               '<line x1="12" y1="3" x2="12" y2="15"/>',
+    "wallet": '<path d="M20 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-2"/>'
+              '<path d="M22 11h-6a2 2 0 0 0 0 4h6z"/><circle cx="16.5" cy="13" r=".5"/>',
     "calendar": '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>'
                 '<line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
     "clipboard": '<rect x="8" y="2" width="8" height="4" rx="1"/>'

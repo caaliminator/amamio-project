@@ -9,6 +9,7 @@ from flask import (Blueprint, abort, flash, redirect, render_template,
                    request, send_file, url_for)
 
 import db
+import finance_service as fin
 import purchasing_service as pur
 import services
 import uploads
@@ -60,7 +61,43 @@ def supplier(supplier_id):
         payments=round(sum(e["debit"] for e in entries), 2),
         balance=entries[-1]["balance"] if entries else 0.0,
         kinds=pur.PAYMENT_KINDS, methods=pur.PAYMENT_METHODS,
-        today=services.today_iso())
+        accounts=fin.active_accounts(), today=services.today_iso())
+
+
+@ledger_bp.route("/print")
+@module_required("ledger")
+def print_summary():
+    """Every supplier's balance on one page, for printing."""
+    show = request.args.get("show") or "active"
+    rows = pur.ledger_summary()
+    if show == "active":
+        rows = [r for r in rows if r["active"]]
+    totals = {k: round(sum(r[k] for r in rows), 2)
+              for k in ("purchases", "payments", "balance")}
+    return render_template("ledger/print_summary.html", rows=rows,
+                           totals=totals, show=show, today=services.today_iso())
+
+
+@ledger_bp.route("/<int:supplier_id>/print")
+@module_required("ledger")
+def print_statement(supplier_id):
+    """A supplier's ledger as a printable statement.  With a date range, the
+    balance before it is brought forward."""
+    sup = db.get("suppliers", supplier_id)
+    if not sup:
+        abort(404)
+    date_from = request.args.get("from") or ""
+    date_to = request.args.get("to") or services.today_iso()
+    entries = pur.ledger_entries(supplier_id)
+    before = [e for e in entries if date_from and (e["date"] or "")[:10] < date_from]
+    shown = [e for e in entries if e not in before and (e["date"] or "")[:10] <= date_to]
+    opening = before[-1]["balance"] if before else 0.0
+    return render_template(
+        "ledger/print.html", supplier=sup, entries=shown, opening=opening,
+        date_from=date_from, date_to=date_to,
+        purchases=round(sum(e["credit"] for e in shown), 2),
+        payments=round(sum(e["debit"] for e in shown), 2),
+        balance=shown[-1]["balance"] if shown else opening)
 
 
 @ledger_bp.route("/<int:supplier_id>/pay", methods=["POST"])

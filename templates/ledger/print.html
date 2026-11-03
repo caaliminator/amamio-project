@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "_paper.html" import doc, doc_fields, doc_signoff, range_filter %}
+{% block title %}Ledger · {{ supplier.name }}{% endblock %}
+{% block content %}
+<a class="back-link no-print" href="{{ url_for('ledger.supplier', supplier_id=supplier.id) }}">{{ icon('arrow-left', 15) }} {{ supplier.name }}</a>
+{{ range_filter(url_for('ledger.print_statement', supplier_id=supplier.id), date_from, date_to) }}
+
+{% call doc('Supplier Ledger', subtitle=((date_from|longdate ~ ' – ') if date_from else 'Up to ') ~ (date_to|longdate),
+            meta=[('Supplier', supplier.name), ('Purchases (credit)', purchases|peso),
+                  ('Paid (debit)', payments|peso), ('Balance owed', balance|peso)]) %}
+  {{ doc_fields([('TIN', supplier.tin), ('Contact person', supplier.contact_person),
+                 ('Contact', [supplier.phone, supplier.email]|select|join(', ')),
+                 ('Address', supplier.address, 'wide')]) }}
+
+  <div class="doc-section-head"><h3>Purchases and payments</h3></div>
+  <table class="doc-table">
+    <thead>
+      <tr><th>Date</th><th>Reference</th><th>Particulars</th>
+        <th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th></tr>
+    </thead>
+    <tbody>
+      {% if date_from %}
+      <tr><td class="nowrap">{{ date_from|longdate }}</td><td></td><td>Balance brought forward</td>
+        <td></td><td></td><td class="num">{{ opening|peso }}</td></tr>
+      {% endif %}
+      {% for e in entries %}
+      <tr>
+        <td class="nowrap">{{ e.date|longdate if e.date else '—' }}</td>
+        <td class="nowrap">{{ e.ref }}</td>
+        <td>{{ e.particulars }}{% if e.recorded_by %}<span class="sub-line">recorded by {{ e.recorded_by }}</span>{% endif %}</td>
+        <td class="num">{{ e.debit|peso if e.debit else '' }}</td>
+        <td class="num">{{ e.credit|peso if e.credit else '' }}</td>
+        <td class="num">{{ e.balance|peso }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">Nothing posted in this period.</td></tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr><td colspan="3">Totals</td><td class="num">{{ payments|peso }}</td><td class="num">{{ purchases|peso }}</td><td class="num"><b>{{ balance|peso }}</b></td></tr>
+    </tfoot>
+  </table>
+  <p class="small">Credit = a purchase order issued to the supplier (what is owed). Debit = a payment, or a cancelled PO reversed.</p>
+  {{ doc_signoff(['Prepared by', 'Checked by', 'Approved by']) }}
+{% endcall %}
+{% endblock %}

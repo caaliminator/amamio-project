@@ -1462,6 +1462,9 @@ def _check_delivery(supplier_id, lines, po_id):
             po_line = po_lines.get(int(line.get("po_line_no")))
         except (TypeError, ValueError):
             po_line = None
+        if po_line:
+            # A PO line is received as the item ordered, whatever was sent.
+            line = dict(line, material_id=po_line.get("material_id") or "new")
         if line.get("material_id") == "new":
             if not po_line:
                 return None, None, "Choose the item that arrived."

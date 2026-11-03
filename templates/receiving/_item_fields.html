@@ -1,10 +1,16 @@
-{# One item that arrived: which item, how much per box, how many boxes, and
-   the optional lot / expiry / condition details from the paper report.
-   `line` is a dict of submitted values (or empty).  `new_item` (a PO line's
-   description) offers adding an ordered item that isn't stocked yet. #}
-{% macro item_fields(line, materials, categories, category_of, track_labels, conditions, new_item=none, new_unit='') %}
+{# One item that arrived: which item, how much per box and how many boxes.
+   `line` is a dict of submitted values (or empty).  A PO line passes
+   `locked` ({name, unit}): its item is the one ordered and can't be changed,
+   and the quantity is counted in the PO's unit.  Otherwise the item is
+   picked from the list; `new_item` offers adding an item not stocked yet. #}
+{% macro item_fields(line, materials, categories, category_of, track_labels, conditions, new_item=none, new_unit='', locked=none) %}
 <div class="form-row">
   <label class="form-label">Item <span class="req">*</span></label>
+  {% if locked %}
+  <input type="text" value="{{ locked.name }}" readonly tabindex="-1" class="locked-field" data-review-label="Item">
+  <input type="hidden" name="material_id" value="{{ line.material_id if line and line.material_id else 'new' }}">
+  <div class="form-hint">The item ordered on the PO — it can't be changed here.</div>
+  {% else %}
   <select name="material_id" required data-review-label="Item" class="js-material">
     <option value="">Choose the item that arrived…</option>
     {% if new_item %}
@@ -21,6 +27,7 @@
     {% endfor %}
   </select>
   <div class="form-hint js-mode">Counted the way it arrives — kilos for ginger, pieces for lemon, units for bottles.</div>
+  {% endif %}
 </div>
 <div class="form-grid cols-2">
   <div class="form-row">
@@ -29,7 +36,7 @@
       <input type="number" name="qty_per_box" step="0.001" min="0.001" required
              inputmode="decimal" placeholder="0" value="{{ line.qty_per_box if line else '' }}"
              data-review-label="Per box">
-      <span class="unit js-unit">unit</span>
+      <span class="unit{{ '' if locked else ' js-unit' }}">{{ locked.unit if locked and locked.unit else 'unit' }}</span>
     </div>
   </div>
   <div class="form-row">
@@ -42,30 +49,6 @@
     </div>
   </div>
 </div>
-<details class="mb" {{ 'open' if line and (line.lot_no or line.expiry_date or line.packaging_condition or line.temperature_c) }}>
-  <summary class="small gold" style="cursor:pointer;margin-bottom:12px">Lot, expiry, condition &amp; temperature (optional)</summary>
-  <div class="form-grid cols-2">
-    <div class="form-row">
-      <label class="form-label">Lot / batch no.</label>
-      <input type="text" name="lot_no" maxlength="40" value="{{ line.lot_no if line else '' }}">
-    </div>
-    <div class="form-row">
-      <label class="form-label">Expiry / best before</label>
-      <input type="date" name="expiry_date" value="{{ line.expiry_date if line else '' }}">
-    </div>
-    <div class="form-row">
-      <label class="form-label">Packaging condition</label>
-      <select name="packaging_condition">
-        <option value="">—</option>
-        {% for c in conditions %}<option {{ 'selected' if line and line.packaging_condition == c }}>{{ c }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="form-row">
-      <label class="form-label">Temperature (°C)</label>
-      <input type="number" name="temperature_c" step="0.1" value="{{ line.temperature_c if line else '' }}">
-    </div>
-  </div>
-</details>
 {% endmacro %}
 
 {# Keeps the unit label next to the quantity in step with the chosen item. #}

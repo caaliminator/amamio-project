@@ -11,6 +11,7 @@ Edit the wording here; nothing else needs to change.
 """
 
 ADMINS = "Super Admin, Admin"
+FINANCE = "Finance Admin, Super Admin, Admin"
 
 NOTES = {
     # --- Start ------------------------------------------------------------
@@ -716,14 +717,53 @@ NOTES = {
     "ledger.index": {
         "title": "Supplier Ledger",
         "what": "Every supplier's purchases (issued POs), payments and the balance still owed.",
-        "who": ADMINS,
+        "who": FINANCE,
         "flow": "A PO is posted here once the Super Admin approves it. Open a supplier to see its ledger and record a payment.",
     },
     "ledger.supplier": {
         "title": "One supplier's ledger",
         "what": "The supplier's ledger line by line — each issued PO as a credit, each payment as a debit, with the running balance — and the POs still to be paid.",
-        "who": ADMINS,
+        "who": FINANCE,
         "flow": "Record advance, partial or full payments, against a PO or on account, with a picture of the receipt if you have one. A payment can't be more than what is left on its PO.",
+    },
+    "ledger.print_statement": {
+        "title": "Supplier ledger (print)",
+        "what": "The supplier's ledger as a statement: each issued PO, payment and cancellation with the running balance.",
+        "who": FINANCE,
+        "flow": "Pick the dates and print. With a start date, the balance before it is brought forward.",
+        "form": "Supplier Ledger",
+    },
+    "ledger.print_summary": {
+        "title": "Supplier ledger summary (print)",
+        "what": "Every supplier's purchases, payments and balance owed on one page.",
+        "who": FINANCE,
+        "flow": "Choose suppliers with purchases or every supplier, then print.",
+        "form": "Supplier Ledger Summary",
+    },
+    "finance.due": {
+        "title": "Payments Due",
+        "what": "Every issued purchase order with a balance: when it was issued, its terms, what is paid and what is left, oldest first, with the balances grouped by age.",
+        "who": FINANCE,
+        "flow": "Up-front (advance / partial) payments and delivered POs are due now and come first. Press Pay to record the payment on the supplier's ledger.",
+    },
+    "finance.accounts": {
+        "title": "Cash & Bank Accounts",
+        "what": "Finance's own list of where money is kept — cash on hand, bank accounts, e-wallets — each with its balance.",
+        "who": FINANCE,
+        "flow": "Add each account with its opening balance. Supplier payments then name the account they were paid from, and its balance goes down.",
+    },
+    "finance.account": {
+        "title": "One account",
+        "what": "The account's statement: opening balance, money in, money out (including supplier payments made from it) and the running balance.",
+        "who": FINANCE,
+        "flow": "Record deposits, withdrawals and transfers to another account here. Close an account you no longer use; its history stays.",
+    },
+    "finance.print_account": {
+        "title": "Account statement (print)",
+        "what": "The account's statement on one printable page.",
+        "who": FINANCE,
+        "flow": "Print it for checking and signing.",
+        "form": "Account Statement",
     },
     "reports.index": {
         "title": "Reports",

@@ -6,6 +6,7 @@
     <h1 class="page-title">Supplier Ledger</h1>
     <p class="page-sub">Every supplier's purchases and payments. A purchase order is posted once the Super Admin approves it; the balance is what is still owed.</p>
   </div>
+  <a class="btn btn-ghost" href="{{ url_for('ledger.print_summary', show=show) }}">{{ icon('printer', 15) }} Print</a>
 </div>
 
 <div class="figures mb">

@@ -132,7 +132,7 @@
         <input type="hidden" name="po_line_no" value="{{ l.line_no }}">
         {{ item_fields(sent or {'material_id': l.material_id or 'new', 'qty_per_box': '%g'|format(l.remaining), 'boxes': 1},
                        materials, categories, category_of, track_labels, conditions,
-                       new_item=none if l.material_id else l.description, new_unit=l.unit) }}
+                       locked={'name': l.description, 'unit': l.unit or (materials|selectattr('id', 'equalto', l.material_id)|map(attribute='unit')|first)}) }}
       </div>
       {% endfor %}
       {% for line in (extra_lines or ([] if po_lines else [none])) %}

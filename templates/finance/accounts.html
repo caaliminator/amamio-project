@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "finance/_account_fields.html" import account_form %}
+{% block title %}Cash &amp; Bank Accounts{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Cash &amp; Bank Accounts</h1>
+    <p class="page-sub">Where the money is kept — cash on hand, each bank account and e-wallet. Supplier payments come out of the account they were paid from.</p>
+  </div>
+</div>
+
+{% if rows %}
+<div class="figures mb">
+  <div class="figure"><div class="figure-label">Total in open accounts</div><div class="figure-value">{{ total|peso }}</div></div>
+  {% for a in rows if a.active %}
+  <div class="figure {{ 'is-bad' if a.balance < 0 }}"><div class="figure-label">{{ a.name }}</div><div class="figure-value">{{ a.balance|peso }}</div></div>
+  {% endfor %}
+</div>
+
+<div class="queue mb">
+  {% for a in rows %}
+  <a class="queue-item" href="{{ url_for('finance.account', account_id=a.id) }}" {% if not a.active %}style="opacity:.6"{% endif %}>
+    <span class="queue-main"><span class="queue-title">{{ a.name }}</span>
+      <span class="queue-sub">{{ [a.kind, a.bank, a.account_no]|select|join(' · ') }}</span></span>
+    <b class="nowrap {{ 'is-bad' if a.balance < 0 }}">{{ a.balance|peso }}</b>
+    {% if not a.active %}<span class="badge badge-muted">Closed</span>{% endif %}
+    <span class="queue-go">Open {{ icon('arrow-right', 14) }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<details class="card" {{ 'open' if adding }}>
+  <summary class="card-title" style="cursor:pointer">{{ icon('plus', 15) }} Add an account</summary>
+  {% if not rows %}<p class="muted">No accounts yet. Add each place money is kept, e.g. <b>Cash on hand</b>, <b>BDO Savings</b>, <b>GCash</b>.</p>{% endif %}
+  {{ account_form(url_for('finance.accounts'), form, kinds, today, 'Add account') }}
+</details>
+{% endblock %}

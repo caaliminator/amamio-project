@@ -40,6 +40,8 @@ ROLES = [
      "Records what was packed, disbursed and handed to the courier"),
     ("assets_head", "Assets Maintenance Head",
      "Equipment, supplies in/out, maintenance, cleaning and pest control"),
+    ("finance_admin", "Finance Admin",
+     "Supplier payments and ledgers, payments due, cash and bank accounts"),
 ]
 ROLE_KEYS = [r[0] for r in ROLES]
 ROLE_LABELS = {r[0]: r[1] for r in ROLES}
@@ -62,7 +64,7 @@ LEGACY_ROLE_MAP = {
 # module_key -> set of roles allowed.  super_admin/admin are allowed everywhere
 # except where a module is explicitly restricted below.
 _ALL = set(ROLE_KEYS)
-_HEADS = _ALL - {"packing_member"}
+_HEADS = _ALL - {"packing_member", "finance_admin"}   # the team heads
 PERMISSIONS = {
     "dashboard":     _ALL,
     "inventory":     _ALL,                       # everyone can view stock
@@ -72,8 +74,11 @@ PERMISSIONS = {
     "requests":      _HEADS,                     # every head can raise requests
     "analytics":     ADMIN_ROLES,
     "approvals":     ADMIN_ROLES,
-    "purchasing":    ADMIN_ROLES,                # purchase orders
-    "ledger":        ADMIN_ROLES,                # supplier ledger / payments
+    "purchasing":    ADMIN_ROLES,                # preparing / approving POs
+    # Finance — supplier payments, what is due, and the money accounts.
+    "ledger":        ADMIN_ROLES | {"finance_admin"},
+    "accounts":      ADMIN_ROLES | {"finance_admin"},
+    "po_view":       ADMIN_ROLES | {"finance_admin"},   # read-only POs
     "reports":       ADMIN_ROLES,
     "users":         ADMIN_ROLES,
     "migration":     {"super_admin"},
@@ -124,15 +129,19 @@ PACKER_ROLES = ("packing_head", "packing_member")
 #
 # For now the sidebar shows only the purchasing flow, in the order the work
 # happens: Purchase Request → Admin check → Super Admin approval → Purchase
-# Order → Supplier Ledger.  The other menus are parked in NAV_HIDDEN while the
-# flow is reworked; their pages still open by URL.  Move a group back into NAV
-# to show it again.
+# Order, then Finance (supplier ledger, payments due, cash & bank accounts).
+# The other menus are parked in NAV_HIDDEN while the flow is reworked; their
+# pages still open by URL.  Move a group back into NAV to show it again.
 NAV = [
     ("Purchasing", [
         ("requests",   "Purchase Requests", "requests", "requests.index"),
         ("approvals",  "Approvals",         "approvals", "approvals.index"),
         ("purchasing", "Purchase Orders",   "orders", "purchasing.index"),
-        ("ledger",     "Supplier Ledger",   "ledger", "ledger.index"),
+    ]),
+    ("Finance", [
+        ("ledger",   "Supplier Ledger",       "ledger", "ledger.index"),
+        ("ledger",   "Payments Due",          "calendar", "finance.due"),
+        ("accounts", "Cash & Bank Accounts",  "wallet", "finance.accounts"),
     ]),
     ("Stock", [
         ("product_moves", "Products In / Out", "swap", "product_moves.index"),
@@ -216,7 +225,21 @@ ROLE_NAV = {
         ]),
     ],
 }
-ROLE_NAV_SUBTITLE = {"receiving_head": "Receiving"}
+ROLE_NAV["finance_admin"] = [
+    ("Finance", [
+        ("dashboard", "Finance Home",         "dashboard", "auth.dashboard"),
+        ("ledger",    "Payments Due",         "calendar", "finance.due"),
+        ("ledger",    "Supplier Ledger",      "ledger", "ledger.index"),
+        ("accounts",  "Cash & Bank Accounts", "wallet", "finance.accounts"),
+    ]),
+    ("Purchasing", [
+        ("po_view",   "Purchase Orders",      "orders", "purchasing.index"),
+    ]),
+    ("General", [
+        ("notifications", "Notifications", "notifications", "notifications.index"),
+    ]),
+]
+ROLE_NAV_SUBTITLE = {"receiving_head": "Receiving", "finance_admin": "Finance"}
 
 
 def nav_for(user):

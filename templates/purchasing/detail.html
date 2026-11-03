@@ -8,7 +8,7 @@
     <div class="record-code">PO No. {{ po.po_no }}</div>
     <h1 class="record-title">{{ po.supplier_name }} — {{ po.grand_total|peso }}</h1>
     <div class="muted small">PO date {{ po.po_date }}{% if po.expected_delivery %} · expected {{ po.expected_delivery }}{% endif %}{% if po.payment_terms %} · {{ po.payment_terms }}{% endif %}
-      · from <a href="{{ url_for('requests.detail', id=po.purchase_request_id) }}">PR {{ po.pr_no or ('#' ~ po.purchase_request_id) }}</a></div>
+      · from {% if can('requests') %}<a href="{{ url_for('requests.detail', id=po.purchase_request_id) }}">PR {{ po.pr_no or ('#' ~ po.purchase_request_id) }}</a>{% else %}PR {{ po.pr_no or ('#' ~ po.purchase_request_id) }}{% endif %}</div>
   </div>
   <span class="badge {{ badge }}">{{ po.status }}</span>
 </div>
@@ -36,7 +36,7 @@
 {% set waiting = lines | selectattr('pending') | list %}
 <div class="next-action">
   <div class="next-action-text"><b>Waiting for the delivery</b><span>The Receiving Team Head receives it against this PO. Once everything ordered passes inspection, the PO is marked delivered by itself. If the supplier sent less and nothing more is coming, close it here.</span></div>
-  {% if not waiting %}
+  {% if not waiting and can('purchasing') %}
   <form method="post" action="{{ url_for('purchasing.delivered', po_id=po.id) }}"
         data-confirm="Close PO {{ po.po_no }} as delivered with what has been received so far?">
     <button class="btn btn-ghost" type="submit">Close as delivered</button>
@@ -87,7 +87,7 @@
 <div class="section-label">Deliveries received against this PO</div>
 <div class="queue mb">
   {% for b in deliveries %}
-  <a class="queue-item" href="{{ url_for('receiving.batch', batch_id=b.id) }}">
+  <a class="queue-item" {% if can('receiving') %}href="{{ url_for('receiving.batch', batch_id=b.id) }}"{% endif %}>
     <span class="code" style="min-width:72px">{{ b.ref_no }}</span>
     <span class="queue-main"><span class="queue-title">{{ b.received_date }} · {{ b.box_count or 0 }} box(es)</span>
       <span class="queue-sub">{% if b.delivery_ref %}DR {{ b.delivery_ref }} · {% endif %}{{ b.total_good|qty }} accepted so far</span></span>
@@ -132,7 +132,7 @@
 
 <div class="flex gap-sm wrap">
   <a class="btn btn-ghost btn-sm" href="{{ url_for('purchasing.print_po', po_id=po.id) }}">{{ icon('printer', 14) }} Print Purchase Order</a>
-  {% if po.status in ('Prepared', 'For Final Approval', 'Approved') %}
+  {% if po.status in ('Prepared', 'For Final Approval', 'Approved') and can('purchasing') %}
   <form method="post" action="{{ url_for('purchasing.cancel', po_id=po.id) }}"
         data-confirm="Cancel PO {{ po.po_no }}? Its items can be put on a new PO.">
     <button class="btn btn-ghost btn-sm" type="submit">Cancel PO</button>

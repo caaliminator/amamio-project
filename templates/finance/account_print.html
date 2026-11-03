@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "_paper.html" import doc, doc_signoff %}
+{% block title %}{{ account.name }} · statement{% endblock %}
+{% block content %}
+<a class="back-link no-print" href="{{ url_for('finance.account', account_id=account.id) }}">{{ icon('arrow-left', 15) }} {{ account.name }}</a>
+<div class="filter-bar no-print">
+  <span class="muted small" style="flex:1">{{ entries|length - 1 }} entry(ies) since the opening balance.</span>
+  <button class="btn btn-primary" type="button" onclick="window.print()">{{ icon('printer', 15) }} Print</button>
+</div>
+
+{% call doc('Account Statement', subtitle='As of ' ~ (today|longdate),
+            meta=[('Account', account.name), ('Type', account.kind),
+                  ('Bank / account no.', [account.bank, account.account_no]|select|join(' · ')),
+                  ('Balance', balance|peso)]) %}
+  <table class="doc-table">
+    <thead>
+      <tr><th>Date</th><th>Reference</th><th>Particulars</th>
+        <th class="num">Money in</th><th class="num">Money out</th><th class="num">Balance</th></tr>
+    </thead>
+    <tbody>
+      {% for e in entries %}
+      <tr>
+        <td class="nowrap">{{ e.date|longdate if e.date else '—' }}</td>
+        <td class="nowrap">{{ e.ref or '' }}</td>
+        <td>{{ e.particulars }}{% if e.recorded_by %}<span class="sub-line">recorded by {{ e.recorded_by }}</span>{% endif %}</td>
+        <td class="num">{{ e.money_in|peso if e.money_in else '' }}</td>
+        <td class="num">{{ e.money_out|peso if e.money_out else '' }}</td>
+        <td class="num">{{ e.balance|peso }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr><td colspan="3">Totals since the opening balance</td>
+        <td class="num">{{ entries[1:]|sum(attribute='money_in')|peso }}</td>
+        <td class="num">{{ entries[1:]|sum(attribute='money_out')|peso }}</td>
+        <td class="num"><b>{{ balance|peso }}</b></td></tr>
+    </tfoot>
+  </table>
+  {{ doc_signoff(['Prepared by', 'Checked by', 'Approved by']) }}
+{% endcall %}
+{% endblock %}

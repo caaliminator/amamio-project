@@ -44,6 +44,8 @@ DEMO_USERS = [
      "packer2", "member123", "packing_member"),
     (("Ronaldo", "Garcia", "Mercado"), "Assets Maintenance Head",
      "assets", "assets123", "assets_head"),
+    (("Theresa", "Lim", "Villareal"), "Finance Officer",
+     "finance", "finance123", "finance_admin"),
 ]
 
 # Staff without an account (Super Admin → Employees): placeholder names,

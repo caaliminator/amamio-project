@@ -625,9 +625,33 @@ SCHEMA = {
             "reference": STR, "notes": TEXT, "recorded_by": FK,
             "recorded_by_name": STR, "created_at": TS,
             "proof": STR,               # picture of the receipt (uploads.py)
+            "account_id": FK,           # the cash / bank account it came from
+            "account_name": STR,
         },
         "foreign_keys": {"supplier_id": "suppliers", "po_id": "purchase_orders",
-                         "recorded_by": "users"},
+                         "recorded_by": "users", "account_id": "money_accounts"},
+    },
+    # Finance's cash, bank and e-wallet accounts — added by Finance, not fixed
+    # (finance_service.py).  Balance = opening balance + money in − money out,
+    # where supplier payments are money out of the account they came from.
+    "money_accounts": {
+        "columns": {
+            "id": ID, "name": STR, "kind": SHORT, "bank": STR,
+            "account_no": SHORT, "opening_balance": MONEY, "opening_date": DATE,
+            "notes": TEXT, "active": BOOL, "created_by": FK, "created_at": TS,
+        },
+        "foreign_keys": {"created_by": "users"},
+    },
+    # Deposits, withdrawals and transfers between accounts (a transfer is a
+    # money-out and a money-in sharing one transfer_ref).
+    "money_entries": {
+        "columns": {
+            "id": ID, "account_id": FK, "entry_date": DATE, "direction": SHORT,
+            "kind": SHORT, "amount": MONEY, "reference": STR, "notes": TEXT,
+            "transfer_ref": SHORT, "recorded_by": FK, "recorded_by_name": STR,
+            "created_at": TS,
+        },
+        "foreign_keys": {"account_id": "money_accounts", "recorded_by": "users"},
     },
 
     # --- Ledgers & system ---------------------------------------------------

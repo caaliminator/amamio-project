@@ -22,20 +22,19 @@
       data-submit-label="Prepare purchase order" data-cancel="{{ url_for('requests.detail', id=req.id) }}">
   <input type="hidden" name="request_id" value="{{ req.id }}">
 
-  <section class="wz-step" data-title="Who is the supplier?"
-           data-hint="PO No. {{ po_no }} · from PR {{ pr_no }}. Pick the supplier from the Supplier Directory; its details fill in by themselves.">
+  <section class="wz-step" id="supplierStep" data-title="Who is the supplier?"
+           data-hint="PO No. {{ po_no }} · from PR {{ pr_no }}. Type to search the Supplier Directory; its details fill in by themselves.">
     <div class="wz-body">
+      {% set picked = suppliers | selectattr('approved') | selectattr('id', 'equalto', chosen|int(0)) | first %}
       <div class="form-row">
-        <label class="form-label" for="supplier_id">Supplier <span class="req">*</span></label>
-        <select id="supplier_id" name="supplier_id" required>
-          <option value="">— Choose from the Supplier Directory —</option>
-          {% for s in suppliers %}
-          <option value="{{ s.id }}" {{ 'selected' if chosen|string == s.id|string and s.approved }}
-                  {{ 'disabled' if not s.approved }}
-                  data-name="{{ s.name }}" data-address="{{ s.address }}" data-contact="{{ s.contact }}"
-                  data-tin="{{ s.tin }}" data-person="{{ s.contact_person }}">{{ s.name }}{{ '' if s.approved else ' (not approved)' }}</option>
-          {% endfor %}
-        </select>
+        <label class="form-label" for="supplier_search">Supplier <span class="req">*</span></label>
+        <div class="combo" data-combo="supplierOptions" id="supplierCombo"
+             data-combo-new="“%s” isn't on the Approved Supplier List">
+          <input type="text" id="supplier_search" class="combo-input" maxlength="120" data-review-label="Supplier"
+                 autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false"
+                 value="{{ picked.name if picked else '' }}" placeholder="Type to search, e.g. packaging, farm">
+          <input type="hidden" id="supplier_id" name="supplier_id" class="combo-value" value="{{ picked.id if picked else '' }}">
+        </div>
         <p class="muted small">Only suppliers on the Approved Supplier List can be ordered from. Not listed? Add it to the <a href="{{ url_for('suppliers.index') }}">Supplier Directory</a> and approve it first, so its ledger can track the payments.</p>
       </div>
       <div class="form-grid cols-2">
@@ -266,16 +265,23 @@
     <div class="wz-body is-bare"></div>
   </section>
 </form>
+<script type="application/json" id="supplierOptions">{{ supplier_options|tojson }}</script>
 
 <script>
 (function () {
   var cards = document.getElementById("lineCards");
-  var sel = document.getElementById("supplier_id");
+  // Picking a supplier fills in its details; only a supplier from the list
+  // (approved ones) can be ordered from.
   var fields = { address: "supplier_address", contact: "supplier_contact",
                  tin: "supplier_tin", person: "supplier_contact_person" };
-  sel.addEventListener("change", function () {
-    var o = sel.options[sel.selectedIndex];
-    Object.keys(fields).forEach(function (k) { document.getElementById(fields[k]).value = o.getAttribute("data-" + k) || ""; });
+  document.getElementById("supplierCombo").addEventListener("combo:pick", function (e) {
+    var d = e.detail.d || {};
+    Object.keys(fields).forEach(function (k) { document.getElementById(fields[k]).value = d[k] || ""; });
+  });
+  document.getElementById("supplierStep").addEventListener("wz:validate", function (e) {
+    if (document.getElementById("supplier_id").value) return;
+    e.preventDefault();
+    e.detail.message = "Choose the supplier from the list — type part of its name and pick it.";
   });
 
   // Advance / partial payment asks how much is paid up front.

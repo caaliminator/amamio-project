@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% from "finance/_account_fields.html" import account_form %}
+{% block title %}{{ account.name }}{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('finance.accounts') }}">{{ icon('arrow-left', 15) }} Cash &amp; Bank Accounts</a>
+
+<div class="record-head">
+  <div>
+    <div class="record-code">{{ account.kind }}</div>
+    <h1 class="record-title">{{ account.name }}</h1>
+    <div class="muted small">{{ [account.bank, account.account_no and ('Acct. ' ~ account.account_no), account.notes]|select|join(' · ') or 'Cash and bank account' }}</div>
+  </div>
+  <div class="flex gap-sm wrap" style="align-items:center">
+    {% if not account.active %}<span class="badge badge-muted">Closed</span>{% endif %}
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('finance.print_account', account_id=account.id) }}">{{ icon('printer', 14) }} Print</a>
+  </div>
+</div>
+
+<div class="figures mb">
+  <div class="figure"><div class="figure-label">Opening balance · {{ entries[0].date }}</div><div class="figure-value">{{ entries[0].balance|peso }}</div></div>
+  <div class="figure"><div class="figure-label">Money in</div><div class="figure-value">{{ entries[1:]|sum(attribute='money_in')|peso }}</div></div>
+  <div class="figure"><div class="figure-label">Money out</div><div class="figure-value">{{ entries[1:]|sum(attribute='money_out')|peso }}</div></div>
+  <div class="figure {{ 'is-bad' if balance < 0 }}"><div class="figure-label">Balance</div><div class="figure-value">{{ balance|peso }}</div></div>
+</div>
+
+<div class="card mb">
+  <div class="card-title">Statement</div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Date</th><th>Reference</th><th>Particulars</th>
+        <th class="num">Money in</th><th class="num">Money out</th><th class="num">Balance</th></tr></thead>
+      <tbody>
+        {% for e in entries %}
+        <tr>
+          <td class="nowrap">{{ e.date or '—' }}</td>
+          <td class="nowrap">{{ e.ref or '' }}</td>
+          <td>{% if e.supplier_id and can('ledger') %}<a href="{{ url_for('ledger.supplier', supplier_id=e.supplier_id) }}">{{ e.particulars }}</a>{% else %}{{ e.particulars }}{% endif %}
+            {% if e.recorded_by %}<div class="muted small">recorded by {{ e.recorded_by }}</div>{% endif %}</td>
+          <td class="num">{{ e.money_in|peso if e.money_in else '' }}</td>
+          <td class="num">{{ e.money_out|peso if e.money_out else '' }}</td>
+          <td class="num"><b>{{ e.balance|peso }}</b></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted small mt">Supplier payments recorded on the Supplier Ledger come out of this account when it is chosen as "Paid from".</p>
+</div>
+
+{% if account.active %}
+<form class="card mb" method="post" action="{{ url_for('finance.entry', account_id=account.id) }}" id="entryForm">
+  <div class="card-title">Record money in / out</div>
+  <div class="form-row">
+    <div class="form-label">What happened?</div>
+    <div class="chip-choices">
+      <label class="chip-choice"><input type="radio" name="direction" value="in" checked><span>Money in</span></label>
+      <label class="chip-choice"><input type="radio" name="direction" value="out"><span>Money out</span></label>
+      {% if others %}<label class="chip-choice"><input type="radio" name="direction" value="{{ transfer }}"><span>Transfer to another account</span></label>{% endif %}
+    </div>
+  </div>
+  <div class="form-grid cols-2">
+    <div class="form-row" data-for="in">
+      <label class="form-label">Kind</label>
+      <select name="kind" data-kinds="in">{% for k in entry_kinds['in'] %}<option>{{ k }}</option>{% endfor %}</select>
+    </div>
+    <div class="form-row" data-for="out" hidden>
+      <label class="form-label">Kind</label>
+      <select name="kind" data-kinds="out" disabled>{% for k in entry_kinds['out'] %}<option>{{ k }}</option>{% endfor %}</select>
+    </div>
+    <div class="form-row" data-for="{{ transfer }}" hidden>
+      <label class="form-label">To account <span class="req">*</span></label>
+      <select name="to_account_id" disabled>
+        {% for a in others %}<option value="{{ a.id }}">{{ a.name }} · {{ a.balance|peso }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Amount (₱) <span class="req">*</span></label>
+      <input type="number" name="amount" min="0.01" step="0.01" inputmode="decimal" required placeholder="0.00">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Date</label>
+      <input type="date" name="entry_date" max="{{ today }}" value="{{ today }}">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Reference</label>
+      <input type="text" name="reference" maxlength="80" placeholder="Deposit slip, OR no., etc. · optional">
+    </div>
+  </div>
+  <div class="form-row">
+    <label class="form-label">Notes</label>
+    <input type="text" name="notes" maxlength="200" placeholder="Optional">
+  </div>
+  <button class="btn btn-primary" type="submit">Record</button>
+</form>
+<script>
+(function () {
+  var form = document.getElementById("entryForm");
+  function sync() {
+    var dir = form.querySelector("[name=direction]:checked").value;
+    form.querySelectorAll("[data-for]").forEach(function (row) {
+      var on = row.getAttribute("data-for") === dir;
+      row.hidden = !on;
+      row.querySelectorAll("select").forEach(function (s) { s.disabled = !on; });
+    });
+  }
+  form.querySelectorAll("[name=direction]").forEach(function (r) { r.addEventListener("change", sync); });
+  sync();
+})();
+</script>
+{% endif %}
+
+<details class="card mb">
+  <summary class="card-title" style="cursor:pointer">Change account details</summary>
+  {{ account_form(url_for('finance.edit_account', account_id=account.id), account, kinds, today, 'Save changes') }}
+</details>
+
+<form method="post" action="{{ url_for('finance.toggle_account', account_id=account.id) }}"
+      {% if account.active %}data-confirm="Close {{ account.name }}? It stays on record, but payments can't be made from it."{% endif %}>
+  <button class="btn btn-ghost btn-sm" type="submit">{{ 'Close this account' if account.active else 'Reopen this account' }}</button>
+</form>
+{% endblock %}

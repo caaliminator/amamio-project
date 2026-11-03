@@ -40,5 +40,11 @@
     "name": "Assets Maintenance Head",
     "description": "Equipment, supplies in/out, maintenance, cleaning and pest control",
     "id": 7
+  },
+  {
+    "key": "finance_admin",
+    "name": "Finance Admin",
+    "description": "Supplier payments and ledgers, payments due, cash and bank accounts",
+    "id": 8
   }
 ]

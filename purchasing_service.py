@@ -50,7 +50,7 @@ ROLE_DEPARTMENT = {"production_head": "Production",
 BUDGET_CATEGORIES = ["Raw materials", "Packaging", "Production supplies",
                      "Office supplies", "Equipment / repair", "Other"]
 UNITS = ["pc", "set", "box", "pack", "kg", "g", "L", "mL", "roll", "ream",
-         "gal", "bottle", "bag"]
+         "gal", "bottle", "bag", "container"]
 ADVANCE_PAYMENT = "Advance payment"
 PARTIAL_PAYMENT = "Partial payment"
 PAYMENT_TERMS = ["Cash on delivery", "Cash before delivery", ADVANCE_PAYMENT,
@@ -602,6 +602,11 @@ def approve_purchase_order(po_id, user):
     services.notify(po.get("created_by"),
                     "PO %s to %s is approved — print it and send it to the supplier."
                     % (po["po_no"], po["supplier_name"]), link=link)
+    _notify_role("finance_admin", "PO %s to %s is issued — %s%s. It is on the "
+                 "supplier's ledger." % (po["po_no"], po["supplier_name"],
+                                         services.fmt_peso(po.get("grand_total")),
+                                         ", %s" % po["payment_terms"] if po.get("payment_terms") else ""),
+                 "/finance/due")
     _notify_role("receiving_head", "PO %s from %s is approved — expect the delivery%s."
                  % (po["po_no"], po["supplier_name"],
                     " on %s" % po["expected_delivery"] if po.get("expected_delivery") else ""),
@@ -960,6 +965,8 @@ def ledger_entries(supplier_id):
     po_nos = {p["id"]: p.get("po_no") for p in db.read("purchase_orders")}
     for pay in db.query("supplier_payments", supplier_id=supplier_id):
         bits = [pay.get("kind"), pay.get("method")]
+        if pay.get("account_name"):
+            bits.append("from %s" % pay["account_name"])
         if pay.get("po_id"):
             bits.append("PO %s" % po_nos.get(pay["po_id"], pay["po_id"]))
         entries.append({
@@ -1025,9 +1032,10 @@ def payable_orders(supplier_id):
 def record_payment(supplier_id, user, form, proof=None):
     """Record a payment to a supplier.  Returns (payment, error).
 
-    form: {po_id (optional), amount, paid_on, kind, method, reference, notes};
-    ``proof``: an optional uploaded picture of the receipt.  A payment against
-    a PO can't be more than what is still owed on it."""
+    form: {po_id (optional), amount, paid_on, kind, method, reference, notes,
+    account_id}; ``proof``: an optional uploaded picture of the receipt.  A
+    payment against a PO can't be more than what is still owed on it.  Once
+    Finance has set up its accounts, the account it was paid from is needed."""
     supplier = db.get("suppliers", supplier_id)
     if not supplier:
         return None, "Supplier not found."
@@ -1051,6 +1059,16 @@ def record_payment(supplier_id, user, form, proof=None):
         if amount > po["balance"] + 0.005:
             return None, ("PO %s only has %s left to pay."
                           % (po["po_no"], services.fmt_peso(po["balance"])))
+    account = None
+    if form.get("account_id"):
+        try:
+            account = db.get("money_accounts", int(form.get("account_id")))
+        except (TypeError, ValueError):
+            account = None
+        if not account or not account.get("active", True):
+            return None, "Choose the account it was paid from."
+    elif any(a.get("active", True) for a in db.read("money_accounts")):
+        return None, "Choose the account it was paid from."
     picture, err = uploads.read_picture(proof)
     if err:
         return None, "Proof of payment: " + err
@@ -1060,7 +1078,9 @@ def record_payment(supplier_id, user, form, proof=None):
         "method": method, "reference": (form.get("reference") or "").strip(),
         "notes": (form.get("notes") or "").strip(),
         "recorded_by": user["id"], "recorded_by_name": user.get("name") or "",
-        "created_at": now_iso(), "proof": ""})
+        "created_at": now_iso(), "proof": "",
+        "account_id": account["id"] if account else None,
+        "account_name": account.get("name") if account else ""})
     if picture:
         payment = db.update("supplier_payments", payment["id"], {
             "proof": uploads.save_picture("payments", "payment-%d" % payment["id"], picture)})

@@ -11,6 +11,7 @@ from flask import url_for
 import assets_service
 import db
 import facility_service
+import finance_service
 import platform_service as ps
 import purchasing_service as pur
 import services
@@ -125,6 +126,19 @@ def tasks_for(user, c):
                   "sparkle", "facility.sanitation", count=c["sanitation_open"]),
             _task("Pest control", "Monthly inspection of every area",
                   "shield", "facility.pest", count=1 if c["pest_missing"] else 0),
+        ]
+    elif role == "finance_admin":
+        due = finance_service.payments_due()
+        t += [
+            _task("Payments due", "Up-front payments and delivered POs to pay",
+                  "calendar", "finance.due", count=sum(1 for r in due if r["due_now"]),
+                  primary=True),
+            _task("Supplier ledger", "Purchases, payments and balance per supplier",
+                  "ledger", "ledger.index"),
+            _task("Cash & bank accounts", "Balances, money in / out and transfers",
+                  "wallet", "finance.accounts"),
+            _task("Purchase orders", "Issued POs and their payment terms",
+                  "orders", "purchasing.index"),
         ]
     else:   # admins
         t += [
