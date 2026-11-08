@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Inspect {{ box.box_code }}{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('receiving.inspection') }}">{{ icon('arrow-left', 15) }} Inspection &amp; Cleaning</a>
+<a class="back-link" href="{{ url_for(lane.endpoint) }}">{{ icon('arrow-left', 15) }} {{ lane.label }}</a>
 
 <form method="post" class="wizard" data-wizard data-wizard-start="{{ start }}"
       data-submit-label="Save inspection" data-cancel="{{ url_for('receiving.box', box_id=box.id) }}" id="inspectForm" enctype="multipart/form-data">
@@ -18,7 +18,7 @@
           <div class="muted small">
             {{ box.declared_qty|qty(box.unit) }} on the label · {{ box.supplier_name }}<br>
             {{ box.batch_ref }} · received {{ box.received_date }}
-            {% if box.lot_no %} · Lot {{ box.lot_no }}{% endif %}
+            {% if box.lot_no %} · Batch {{ box.lot_no }}{% endif %}
             {% if box.expiry_date %} · Exp {{ box.expiry_date }}{% endif %}
           </div>
         </div>
@@ -27,6 +27,10 @@
     </div>
   </section>
 
+  {% if lane_key == 'supplies' %}
+  {# Packaging & supplies: no cleaning step. #}
+  <input type="hidden" name="cleaned" value="0">
+  {% else %}
   <section class="wz-step" data-title="Clean the content"
            data-hint="Wash or wipe the content as your procedure requires, then confirm.">
     <div class="choice-grid cols-2" data-review-label="Cleaning">
@@ -35,11 +39,12 @@
         <span><span class="choice-title">Cleaned</span><span class="choice-sub">Washed / wiped and ready to count</span></span></span></label>
       <label class="choice"><input type="radio" name="cleaned" value="0" data-autonext {{ 'checked' if form.cleaned == '0' }}>
         <span class="choice-card"><span class="choice-icon">{{ icon('check', 20) }}</span>
-        <span><span class="choice-title">No cleaning needed</span><span class="choice-sub">e.g. sealed bottles or jars</span></span></span></label>
+        <span><span class="choice-title">No cleaning needed</span><span class="choice-sub">e.g. already cleaned at the source</span></span></span></label>
     </div>
   </section>
+  {% endif %}
 
-  <section class="wz-step" data-title="Count what you found"
+  <section class="wz-step" id="countStep" data-title="Count what you found"
            data-hint="Split the content of the box into three: usable, can't be used, and damaged.">
     <div class="wz-body">
       <div class="count-grid cols-3">
@@ -59,7 +64,7 @@
                    value="{{ form.unusable_qty or 0 }}">
             <span class="unit">{{ box.unit }}</span>
           </div>
-          <div class="form-hint">Not damaged, but not fit (wrong size, overripe…).</div>
+          <div class="form-hint">{{ 'Not damaged, but not fit (wrong size, overripe…).' if lane_key == 'raw' else 'Not damaged, but not fit (wrong size or print, wrong item…).' }}</div>
         </div>
         <div class="form-row">
           <label class="form-label" for="damaged_qty">Damaged</label>
@@ -68,7 +73,7 @@
                    value="{{ form.damaged_qty or 0 }}">
             <span class="unit">{{ box.unit }}</span>
           </div>
-          <div class="form-hint">Bruised, crushed, broken, leaking…</div>
+          <div class="form-hint">{{ 'Bruised, crushed, broken, leaking…' if lane_key == 'raw' else 'Cracked, chipped, broken, leaking…' }}</div>
         </div>
       </div>
       <div data-tally data-no-over data-total="{{ '%g'|format(box.declared_qty|float) }}" data-unit="{{ box.unit }}"
@@ -93,13 +98,13 @@
   </section>
 
   <section class="wz-step" data-title="Inspection checklist" id="checklistStep"
-           data-hint="Incoming Material Inspection Checklist (AFP-WH-FRM-002). Mark every point Pass, Fail or N/A. Say what failed in the remarks.">
+           data-hint="{{ lane.form }}{{ ' (AFP-WH-FRM-002)' if lane_key == 'raw' else ' (based on AFP-WH-FRM-002)' }}. Mark every point Pass, Fail or N/A. Say what failed in the remarks.">
     <div class="wz-body">
       <div class="step-stack">
         <div class="form-row">
-          <label class="form-label" for="visual_description">Visual / organoleptic inspection <span class="req">*</span></label>
+          <label class="form-label" for="visual_description">{{ 'Visual / organoleptic inspection' if lane_key == 'raw' else 'Visual inspection' }} <span class="req">*</span></label>
           <input type="text" id="visual_description" name="visual_description" maxlength="200" required
-                 value="{{ form.visual_description or '' }}" placeholder="e.g. Free from molds, insects, decay and rotten">
+                 value="{{ form.visual_description or '' }}" placeholder="{{ 'e.g. Free from molds, insects, decay and rotten' if lane_key == 'raw' else 'e.g. Clean, no cracks or chips, caps fit' }}">
           <div class="form-hint">What you saw, smelled and felt — this goes in the Visual / Organoleptic column of the receiving report.</div>
         </div>
 
@@ -124,6 +129,17 @@
             <div class="chk-text">
               <span class="chk-name">{{ point }}</span>
               <span class="chk-req">{{ requirement }}</span>
+              {% if key == 'lot' and box.lot_no %}
+              <span class="chk-batch">{{ icon('qr', 13) }} Batch no. <b>{{ box.lot_no }}</b> — given by the system, on the QR label{% if box.supplier_lot %} · supplier lot {{ box.supplier_lot }}{% endif %}</span>
+              {% endif %}
+              {% if key == 'dates' %}
+              <span class="chk-dates">
+                <label><span>Manufactured</span>
+                  <input type="date" name="mfg_date" value="{{ form.mfg_date or batch_dates[0] }}" data-review-label="Manufactured"></label>
+                <label><span>Expiry / best before</span>
+                  <input type="date" name="expiry_date" value="{{ form.expiry_date or batch_dates[1] }}" data-review-label="Expiry / best before"></label>
+              </span>
+              {% endif %}
               <button type="button" class="chk-add-remark">+ Remark</button>
             </div>
             <div class="seg" role="radiogroup" aria-label="{{ point }}">
@@ -153,6 +169,7 @@
     </div>
   </section>
 
+  {% if lane_key == 'raw' %}
   <section class="wz-step" data-title="Test results (if applicable)"
            data-hint="Fill this in when a test was done — e.g. moisture. Leave it blank if no test was needed.">
     <div class="wz-body">
@@ -176,6 +193,7 @@
       </div>
     </div>
   </section>
+  {% endif %}
 
   <section class="wz-step" data-title="Inspection decision" id="decisionStep"
            data-hint="ACCEPTED = meets requirements · HOLD / QUARANTINE = pending evaluation · REJECTED = does not meet requirements. Only material that passes every point can be accepted.">
@@ -220,7 +238,7 @@
   </section>
 
   <section class="wz-step" id="reviewStep" data-title="Check and save" data-review
-           data-hint="This is the Incoming Material Inspection Checklist for {{ box.box_code }}. Check it, then save — your name goes on it as the inspector.">
+           data-hint="This is the {{ lane.form }} for {{ box.box_code }}. Check it, then save — your name goes on it as the inspector.">
     <div class="wz-body is-bare">
       {% if waiting_count > 1 %}
       <label class="check-row mt"><input type="checkbox" name="then" value="next" checked data-review-skip> Go straight to the next box after saving</label>
@@ -309,7 +327,17 @@
       row.classList.toggle("is-missing", missing);
       if (missing) left.push(row.querySelector(".chk-name").textContent.trim());
     });
-    if (!left.length) return;
+    if (!left.length) {
+      // Date marking "Pass" means the dates were checked: the expiry is needed.
+      var dates = form.querySelector('[name=chk_dates]:checked');
+      var exp = form.querySelector('[name=expiry_date]');
+      if (dates && dates.value === "Pass" && exp && !exp.value) {
+        e.preventDefault();
+        e.detail.message = "Date marking is Pass — pick the expiry / best-before date on the calendar, or mark it N/A.";
+        exp.focus();
+      }
+      return;
+    }
     e.preventDefault();
     e.detail.message = "Mark every point — " + left.length + " left: " + left.join(", ") + ".";
     form.querySelector(".chk-point.is-missing").scrollIntoView({ behavior: "smooth", block: "center" });
@@ -358,7 +386,7 @@
     }
   });
   // Counting nothing at all is never right.
-  form.querySelectorAll(".wz-step")[2].addEventListener("wz:validate", function (e) {
+  document.getElementById("countStep").addEventListener("wz:validate", function (e) {
     if (num("usable_qty") + num("unusable_qty") + num("damaged_qty") <= 0) {
       e.preventDefault();
       e.detail.message = "Enter how much is usable, can't be used or damaged.";

@@ -66,6 +66,7 @@ def create_app():
     from product_moves import product_moves_bp
     from facility import facility_bp
     from employees import employees_bp
+    from additions import additions_bp
     from purchasing import purchasing_bp
     from ledger import ledger_bp
     from finance import finance_bp
@@ -99,6 +100,7 @@ def create_app():
     app.register_blueprint(product_moves_bp, url_prefix="/products-in-out")
     app.register_blueprint(facility_bp, url_prefix="/facility")
     app.register_blueprint(employees_bp, url_prefix="/employees")
+    app.register_blueprint(additions_bp, url_prefix="/additions")
 
     app.jinja_env.globals["icon"] = icons.icon
     # Printed forms: the e-signature and position of whoever signed.
@@ -135,7 +137,7 @@ def create_app():
         user = current_user()
         from auth import theme_of
         return {
-            "theme_pref": theme_of(user) if user else "dark",
+            "theme_pref": theme_of(user),     # light when signed out / not chosen
             # "About this page" note (page_notes.py), unless the user hid them.
             "show_notes": bool(user) and not user.get("hide_notes"),
             "page_note": page_notes.for_endpoint(request.endpoint) if user else None,

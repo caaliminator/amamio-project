@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Payment to {{ p.supplier_name }}{% endblock %}
+{% block content %}
+<style>
+  .att-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+  .att { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--line-2); border-radius: 10px; text-decoration: none; color: var(--text); }
+  .att:hover { border-color: var(--gold-line); }
+  .att-thumb { height: 110px; border-radius: 6px; background: var(--raise-3); display: flex; align-items: center; justify-content: center; overflow: hidden; color: var(--muted); }
+  .att-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .att-name { font-size: .8rem; font-weight: 600; word-break: break-all; }
+  .att-sub { font-size: .72rem; color: var(--muted); }
+</style>
+<div class="focus">
+<a class="back-link" href="{{ url_for('ledger.supplier', supplier_id=p.supplier_id) }}">{{ icon('arrow-left', 15) }} {{ p.supplier_name }} ledger</a>
+
+<div class="record-head">
+  <div>
+    <div class="record-code">PAYMENT · {{ p.paid_on }}{% if po %} · PO {{ po.po_no }}{% else %} · ON ACCOUNT{% endif %}</div>
+    <h1 class="record-title">{{ p.amount|peso }} to {{ p.supplier_name }}</h1>
+    <div class="muted small">{{ p.kind }} · {{ p.method }}{% if p.account_name %} · from {{ p.account_name }}{% endif %}{% if p.recorded_by_name %} · recorded by {{ p.recorded_by_name }}{% endif %}</div>
+  </div>
+</div>
+
+<div class="card mb">
+  <div class="card-title">Details</div>
+  <dl class="review-list">
+    <dt>Against</dt><dd>{% if po %}<a href="{{ url_for('purchasing.detail', po_id=po.id) }}">PO {{ po.po_no }}</a>{% else %}Not for one PO (on account){% endif %}</dd>
+    <dt>Reference</dt><dd>{{ p.reference or '—' }}</dd>
+    {% if p.notes %}<dt>Notes</dt><dd>{{ p.notes }}</dd>{% endif %}
+    <dt>Proof of payment</dt><dd>{% if p.proof %}<a class="proof-link" href="{{ url_for('ledger.proof', payment_id=p.id) }}" target="_blank" rel="noopener"><img class="proof-large" src="{{ url_for('ledger.proof', payment_id=p.id) }}" alt="Proof of payment" loading="lazy"></a>{% else %}<span class="muted">None</span>{% endif %}</dd>
+  </dl>
+</div>
+
+<div class="card mb">
+  <div class="card-title">Attachments · {{ attachments|length }}</div>
+  {% if attachments %}
+  <div class="att-list">
+    {% for a in attachments %}
+    <a class="att" href="{{ url_for('ledger.attachment', payment_id=p.id, n=a.n) }}" target="_blank" rel="noopener">
+      <span class="att-thumb">{% if a.kind == 'image' %}<img src="{{ url_for('ledger.attachment', payment_id=p.id, n=a.n) }}" alt="" loading="lazy">{% else %}{{ icon('reports', 34) }}{% endif %}</span>
+      <span class="att-name">{{ a.label or a.name }}</span>
+      <span class="att-sub">{{ 'PDF' if a.kind == 'pdf' else 'Picture' }}{% if a.label %} · {{ a.name }}{% endif %}<br>{{ (a.added_at or '')[:10] }}{% if a.added_by_name %} · {{ a.added_by_name }}{% endif %}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted" style="margin:0">No attachments yet.</p>
+  {% endif %}
+</div>
+
+{% if attachments|length < max_attachments %}
+<form class="card" method="post" enctype="multipart/form-data" action="{{ url_for('ledger.add_attachments', payment_id=p.id) }}">
+  <div class="card-title">Attach more files</div>
+  <label class="dropzone" data-dropzone>
+    <input type="file" name="attachments" accept="image/*,application/pdf,.pdf" multiple required>
+    <span class="dropzone-empty">{{ icon('paperclip', 22) }}<span><b>Choose the files</b>
+      <small>Official receipt, invoice, deposit slip, check copy, statement · JPG, PNG or PDF, under 10 MB each · up to {{ max_attachments }} per payment</small></span></span>
+    <span class="dropzone-chosen" hidden><span class="dropzone-thumbs"></span><span><b data-name></b><small>Click to choose different files</small></span></span>
+  </label>
+  <div class="form-row mt">
+    <label class="form-label" for="attachments_label">What are these?</label>
+    <input type="text" id="attachments_label" name="attachments_label" maxlength="80" placeholder="e.g. Official receipt (optional)">
+  </div>
+  <button class="btn btn-primary" type="submit">{{ icon('paperclip', 15) }} Attach</button>
+</form>
+{% endif %}
+</div>
+{% endblock %}

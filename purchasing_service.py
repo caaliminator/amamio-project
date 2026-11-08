@@ -15,7 +15,8 @@ TIN, contact person, supplier reference); delivery information (deliver to,
 address, instructions, contact); lines of description / specification,
 brand / model, qty, unit, unit price, amount, requested delivery, remarks
 (the description is the item as approved on the PR); subtotal, discount,
-delivery / freight, labor, VAT (a percentage of the items after the
+delivery / freight, labor, other / misc. fees, VAT or NON VAT (VAT is a
+percentage of the items after the
 discount), grand total; terms / special instructions; Prepared by, Checked by, Approved by,
 Supplier acknowledgment.
 
@@ -34,6 +35,7 @@ from datetime import date
 import db
 import profiles
 import security
+import supplier_service as sups
 import uploads
 import services
 from services import _to_float, now_iso, today_iso
@@ -117,8 +119,9 @@ def item_choices():
         rows = [{"id": m["id"], "name": m.get("name") or "",
                  "unit": m.get("unit") or "pc",
                  "cost": _to_float(m.get("unit_cost")),
-                 "supplier": suppliers.get(m.get("supplier_id"), "")}
-                for m in services.stocked_materials([key])]
+                 "supplier": suppliers.get(m.get("supplier_id"), ""),
+                 "supplier_id": m.get("supplier_id")}
+                for m in services.purchasable_materials([key])]
         if rows:
             groups.append((label, rows))
     return groups
@@ -167,13 +170,35 @@ def _match_material(name):
     if not wanted:
         return None
     for m in db.read("raw_materials"):
-        if (m.get("name") or "").strip().lower() == wanted:
+        if (m.get("name") or "").strip().lower() == wanted and services.is_purchasable(m):
             return m["id"]
     return None
 
 
+def _preferred_supplier(raw, material_id, by_material):
+    """(supplier id, name to print, problem) for a PR line's preferred
+    supplier: picked from the Supplier Directory (approved, and linked to
+    the item when the item has linked suppliers) or left blank."""
+    picked = (str(raw.get("preferred_supplier_id") or "")).strip()
+    typed = (raw.get("preferred_supplier") or "").strip()
+    if not picked:
+        if typed:
+            return None, "", ("“%s” isn't in the Supplier Directory — pick a "
+                              "supplier from the list, or leave it blank." % typed)
+        return None, "", None
+    try:
+        supplier = db.get("suppliers", int(picked))
+    except (TypeError, ValueError):
+        supplier = None
+    problem = sups.pr_supplier_problem(supplier, material_id, by_material)
+    if problem:
+        return None, "", problem
+    return supplier["id"], sups.display_name(supplier), None
+
+
 def _clean_lines(lines):
     items, problems = [], []
+    by_material = sups.links_by_material(sups.approved_links())
     for raw in lines:
         # An item picked from the dropdown carries its material id; "Other"
         # carries only the typed name.
@@ -184,6 +209,10 @@ def _clean_lines(lines):
         material = db.get("raw_materials", material_id) if material_id else None
         if not material:
             material_id = None
+        elif not services.is_purchasable(material):
+            problems.append("%s is made in the plant, not bought — it can't be requested."
+                            % material.get("name"))
+            continue
         desc = ((raw.get("description") or "").strip()
                 or (material or {}).get("name", ""))
         qty = _to_float(raw.get("qty"))
@@ -196,6 +225,12 @@ def _clean_lines(lines):
             problems.append("Enter a quantity for %s." % desc)
             continue
         cost = max(0.0, _to_float(raw.get("est_unit_cost")))
+        material_id = material_id or _match_material(desc)
+        supplier_id, supplier_name, problem = _preferred_supplier(
+            raw, material_id, by_material)
+        if problem:
+            problems.append(problem)
+            continue
         items.append({
             "item_id": len(items) + 1,
             "name": desc,
@@ -204,10 +239,11 @@ def _clean_lines(lines):
             "requested_qty": qty,
             "est_unit_cost": round(cost, 2),
             "est_total": round(cost * qty, 2),
-            "preferred_supplier": (raw.get("preferred_supplier") or "").strip(),
+            "preferred_supplier": supplier_name,
+            "preferred_supplier_id": supplier_id,
             "budget_category": (raw.get("budget_category") or "").strip(),
             "remark": (raw.get("remark") or "").strip(),
-            "material_id": material_id or _match_material(desc),
+            "material_id": material_id,
             "category": "",
             "description": "",
             "approved_qty": None,
@@ -402,36 +438,59 @@ def next_po_no(req):
     return "%s-%d" % (base, len(taken) + 1)
 
 
-def _totals(items, discount, freight, vat_rate, labor=0):
+VAT, NON_VAT = "VAT", "NON VAT"
+
+
+def _totals(items, discount, freight, vat_rate, labor=0, other_fees=0,
+            vat_type=VAT):
     """Subtotal, adjustments and grand total.  VAT is a percentage of the
-    items after the discount (``tax`` keeps the peso amount)."""
+    items after the discount (``tax`` keeps the peso amount).  A PO marked
+    NON VAT — or with a VAT rate of 0 — is recorded as NON VAT."""
     subtotal = round(sum(i["amount"] for i in items), 2)
-    discount, freight, labor = (round(max(0.0, _to_float(v)), 2)
-                                for v in (discount, freight, labor))
+    discount, freight, labor, other = (round(max(0.0, _to_float(v)), 2)
+                                       for v in (discount, freight, labor, other_fees))
     rate = round(min(100.0, max(0.0, _to_float(vat_rate))), 2)
+    if vat_type == NON_VAT or not rate:
+        vat_type, rate = NON_VAT, 0.0
+    else:
+        vat_type = VAT
     tax = round(max(0.0, subtotal - discount) * rate / 100, 2)
     return {"subtotal": subtotal, "discount": discount, "freight": freight,
-            "labor": labor, "vat_rate": rate, "tax": tax,
-            "grand_total": round(subtotal - discount + freight + labor + tax, 2)}
+            "labor": labor, "other_fees": other, "vat_type": vat_type,
+            "vat_rate": rate, "tax": tax,
+            "grand_total": round(subtotal - discount + freight + labor + other + tax, 2)}
+
+
+# The PO's supplier fields that come from the Supplier Directory, as
+# (key in the supplier dict / supplier_card, PO field).
+LOCKABLE = [("address", "supplier_address"), ("contact", "supplier_contact"),
+            ("tin", "supplier_tin"), ("contact_person", "supplier_contact_person"),
+            ("type", "supplier_type")]
 
 
 def create_purchase_order(request_id, user, header, supplier, delivery, lines,
-                          totals, signoffs=None, save=True):
+                          totals, signoffs=None, save=True,
+                          save_to_directory=False):
     """Prepare a PO from an approved PR.  Returns (po, error).
 
     With ``save=False`` nothing is stored or sent: the PO is only built and
     checked, for the preview on the form's last step.
 
     supplier: {id (from the Supplier Directory, required), address, contact,
-               tin, contact_person, reference} — the name always comes from
-               the directory, the other details can be corrected for this PO.
+               tin, contact_person, type, reference} — the name and every
+               detail the directory has come from the directory (what was
+               typed for them is ignored); details the directory has blank
+               are taken as typed, for this PO only — or also written to
+               the directory with ``save_to_directory``.  ``reference`` is
+               the supplier's quotation / invoice no.
     header:   {po_date, expected_delivery, payment_terms, advance_amount} —
               the amount is required for advance / partial payment terms.
     lines: [{pr_item_id, brand_model, qty, unit, unit_price,
              requested_delivery, remarks}] — only approved PR lines that
     are not on another PO yet.  The description is always the item as
     approved on the PR.
-    totals: {discount, freight, labor, vat_rate (%), terms}.
+    totals: {discount, freight, labor, other_fees, other_fees_note,
+             vat_type ("VAT" / "NON VAT"), vat_rate (%), terms}.
     Prepared by is the person signed in; Checked by and Approved by are
     filled in by the two approvals."""
     req = db.get("purchase_requests", request_id)
@@ -449,12 +508,17 @@ def create_purchase_order(request_id, user, header, supplier, delivery, lines,
     if not services.supplier_approved(directory):
         return None, ("%s is not on the Approved Supplier List — approve it in "
                       "the Supplier Directory first." % directory.get("name"))
-    supplier_name = directory.get("name") or ""
+    supplier_name = sups.display_name(directory)
     card = supplier_card(directory)
 
-    def sup(key, card_key=None):
-        value = supplier.get(key)
-        return (value if value is not None else card.get(card_key or key) or "").strip()
+    def sup(key):
+        """The directory's value when it has one, else what was typed."""
+        if card.get(key):
+            return card[key]
+        value = (supplier.get(key) or "").strip()
+        if key == "type":
+            return sups.clean_type(value)
+        return value[:255]
 
     items = []
     for raw in lines:
@@ -488,15 +552,23 @@ def create_purchase_order(request_id, user, header, supplier, delivery, lines,
         })
     if not items:
         return None, "Choose at least one approved item to order."
+    problem = sups.po_supplier_problem(directory, [i["material_id"] for i in items])
+    if problem:
+        return None, problem
     po_date = (header.get("po_date") or today_iso()).strip()
     expected = (header.get("expected_delivery") or "").strip()
     if expected and expected < po_date:
         return None, "The expected delivery date can't be before the PO date."
-    rate = _to_float(totals.get("vat_rate"))
+    vat_type = NON_VAT if (totals.get("vat_type") or "").strip().upper() == NON_VAT else VAT
+    rate = _to_float(totals.get("vat_rate")) if vat_type == VAT else 0.0
     if rate < 0 or rate > 100:
         return None, "VAT is a percentage between 0 and 100."
+    if _to_float(totals.get("other_fees")) < 0:
+        return None, "Other / misc. fees can't be negative."
     money = _totals(items, totals.get("discount"), totals.get("freight"),
-                    rate, totals.get("labor"))
+                    rate, totals.get("labor"), totals.get("other_fees"), vat_type)
+    money["other_fees_note"] = (" ".join((totals.get("other_fees_note") or "").split())[:120]
+                                if money["other_fees"] else "")
     terms = (header.get("payment_terms") or "").strip()
     advance = 0.0
     if terms in UPFRONT_TERMS:
@@ -521,7 +593,8 @@ def create_purchase_order(request_id, user, header, supplier, delivery, lines,
         supplier_contact=sup("contact"),
         supplier_tin=sup("tin"),
         supplier_contact_person=sup("contact_person"),
-        supplier_reference=(supplier.get("reference") or "").strip(),
+        supplier_type=sup("type"),
+        supplier_reference=(supplier.get("reference") or "").strip()[:80],
         deliver_to=(delivery.get("deliver_to") or COMPANY_NAME).strip(),
         delivery_address=(delivery.get("address") or COMPANY_ADDRESS).strip(),
         delivery_instructions=(delivery.get("instructions") or "").strip(),
@@ -546,6 +619,8 @@ def create_purchase_order(request_id, user, header, supplier, delivery, lines,
     if not save:
         return po, None
     po = db.insert("purchase_orders", po)
+    if save_to_directory:
+        _save_blanks_to_directory(directory, card, po)
     # The PR lines now point at their PO; the PR's Purchasing / Procurement
     # sign-off is whoever prepared it.
     ordered = {i["pr_item_id"] for i in items}
@@ -742,6 +817,7 @@ def material_for_po_line(po, line):
             "unit_cost": _to_float(line.get("unit_price")),
             "created_at": now_iso(),
         })
+        sups.ensure_link(po.get("supplier_id"), material["id"])
     # Remember the link on the PO line and the PR line it came from.
     for it in po.get("items") or []:
         if it["line_no"] == line["line_no"]:
@@ -806,14 +882,38 @@ def po_track(po):
 
 
 def supplier_card(supplier):
-    """What the PO's supplier block shows, from the Supplier Directory."""
+    """What the PO's supplier block shows, from the Supplier Directory.  A
+    field the directory has is locked on the PO; a blank one is typed."""
     contact = ", ".join(p for p in (supplier.get("phone"), supplier.get("email")) if p)
     return {"id": supplier["id"], "name": supplier.get("name") or "",
+            "label": sups.display_name(supplier),
             "address": supplier.get("address") or "",
             "contact": contact or supplier.get("buy_from") or "",
             "tin": supplier.get("tin") or "",
             "contact_person": supplier.get("contact_person") or "",
+            "type": supplier.get("supplier_type") or "",
             "approved": services.supplier_approved(supplier)}
+
+
+def _save_blanks_to_directory(directory, card, po):
+    """"Also save to the Supplier Directory": details typed on the PO for
+    fields the directory had blank.  Never overwrites what it has."""
+    changes = {}
+    for key, field, target in (("address", "supplier_address", "address"),
+                               ("tin", "supplier_tin", "tin"),
+                               ("contact_person", "supplier_contact_person", "contact_person"),
+                               ("type", "supplier_type", "supplier_type")):
+        if not card.get(key) and po.get(field):
+            changes[target] = po[field]
+    contact = po.get("supplier_contact") or ""
+    if not card.get("contact") and contact:
+        for part in [p.strip() for p in contact.replace(";", ",").split(",") if p.strip()]:
+            if "@" in part and not directory.get("email"):
+                changes["email"] = part[:120]
+            elif "@" not in part and not directory.get("phone"):
+                changes["phone"] = sups.clean_phone(part)[:120]
+    if changes:
+        db.update("suppliers", directory["id"], changes)
 
 
 def purchasing_counts():
@@ -824,61 +924,6 @@ def purchasing_counts():
         "for_final": sum(1 for p in orders if p.get("status") == PO_FOR_FINAL),
         "approved": sum(1 for p in orders if p.get("status") == PO_APPROVED),
     }
-
-
-def seed_demo(users, suppliers):
-    """The client's own example: PR 2026-09-017 (machine accessories for the
-    dehydrator), approved, and PO 2026-09-017 to Trimix Butuan."""
-    production = users.get("production_head")
-    admin = users.get("admin")
-    if not production or not admin:
-        return
-    req, err = create_purchase_request(
-        production, "Production", "Machine accessories", "2026-09-22",
-        [{"description": "Momentary push button switch", "purpose_use": "Heater switch",
-          "qty": 1, "unit": "pc", "est_unit_cost": 250,
-          "preferred_supplier": "Trimix Butuan", "budget_category": "Equipment / repair"},
-         {"description": "Timer switch", "purpose_use": "Dehydrator", "qty": 1,
-          "unit": "pc", "est_unit_cost": 700, "preferred_supplier": "Trimix Butuan",
-          "budget_category": "Equipment / repair"},
-         {"description": "Center switch", "purpose_use": "Dehydrator", "qty": 1,
-          "unit": "pc", "est_unit_cost": 150, "preferred_supplier": "Trimix Butuan",
-          "budget_category": "Equipment / repair"}],
-        notes="Melted momentary push button switch and damaged timer switch",
-        pr_no="2026-09-017", date_requested="2026-09-21")
-    if err:
-        return
-    # Checked by the Admin, approved by the Super Admin (names as signed).
-    services.apply_decision(req["id"], {}, "Approved for repair of the dehydrator.",
-                            "approve", decider_id=admin["id"])
-    record_signoff(req["id"], "Jefrey S. Pabillore", {"name": "Bernadith M. Frianeza"})
-    trimix = next((s for s in suppliers.values() if s.get("name") == "Trimix Butuan"), None)
-    if not trimix:
-        return
-    supplier = supplier_card(trimix)
-    req = db.get("purchase_requests", req["id"])
-    po, err = create_purchase_order(
-        req["id"], admin,
-        {"po_date": "2026-09-21", "expected_delivery": "2026-09-21",
-         "payment_terms": "Cash on delivery"},
-        supplier,
-        {"deliver_to": COMPANY_NAME, "address": COMPANY_ADDRESS,
-         "instructions": "Door to door", "contact": "Aldren"},
-        [{"pr_item_id": it["item_id"], "description": it["name"], "qty": it["approved_qty"],
-          "unit": it["unit"], "unit_price": it["est_unit_cost"]}
-         for it in req["items"]],
-        {"terms": DEFAULT_TERMS},
-        {"prepared_by": "Bernadith Frianeza"})
-    if po:
-        db.update("purchase_orders", po["id"], {
-            "status": PO_APPROVED, "prepared_at": "2026-09-21",
-            "checked_by_name": "Fe Amor Eballar", "checked_at": "2026-09-21",
-            "approved_by_name": "Janice Nilda A. Mira", "approved_at": "2026-09-21"})
-    # As written on the paper form: requested and handled by Aldren Ocate.
-    db.update("purchase_requests", req["id"], {
-        "requested_by_name": "Aldren Ocate", "purchasing_by_name": "Aldren Ocate",
-        "purchasing_date": "2026-09-21", "decided_at": "2026-09-21T10:00:00",
-        "created_at": "2026-09-21T08:00:00"})
 
 
 def summary_line(req):
@@ -976,7 +1021,8 @@ def ledger_entries(supplier_id):
                            + (" — %s" % pay["notes"] if pay.get("notes") else ""),
             "debit": _to_float(pay.get("amount")), "credit": 0.0,
             "recorded_by": pay.get("recorded_by_name") or "",
-            "payment_id": pay["id"], "proof": pay.get("proof") or ""})
+            "payment_id": pay["id"], "proof": pay.get("proof") or "",
+            "attachments": len(pay.get("attachments") or [])})
     entries.sort(key=lambda e: (e["date"] or "", e["order"]))
     balance = 0.0
     for e in entries:
@@ -1029,13 +1075,60 @@ def payable_orders(supplier_id):
     return rows
 
 
-def record_payment(supplier_id, user, form, proof=None):
+MAX_ATTACHMENTS = 10          # per payment
+
+
+def _read_attachments(files):
+    """Uploaded files -> (attachments, error).  Empty file inputs are skipped."""
+    out = []
+    for f in files or []:
+        att, err = uploads.read_attachment(f)
+        if err:
+            return None, err
+        if att:
+            out.append(att)
+    return out, None
+
+
+def _store_attachments(payment, attachments, user, label=""):
+    """Save attachments onto a payment (after any it already has)."""
+    rows = list(payment.get("attachments") or [])
+    n = max([a.get("n") or 0 for a in rows] or [0])
+    label = " ".join((label or "").split())[:80]
+    for att in attachments:
+        n += 1
+        rows.append({
+            "n": n, "kind": att["kind"], "name": att["name"], "label": label,
+            "file": uploads.save_attachment("payments", "payment-%d-%d" % (payment["id"], n), att),
+            "added_by_name": (user or {}).get("name") or "", "added_at": now_iso()})
+    return db.update("supplier_payments", payment["id"], {"attachments": rows})
+
+
+def add_payment_attachments(payment_id, user, files, label=""):
+    """Attach more files to a payment already recorded (e.g. the official
+    receipt that came later).  Returns (payment, error)."""
+    payment = db.get("supplier_payments", payment_id)
+    if not payment:
+        return None, "Payment not found."
+    attachments, err = _read_attachments(files)
+    if err:
+        return None, err
+    if not attachments:
+        return None, "Choose the file(s) to attach."
+    if len(payment.get("attachments") or []) + len(attachments) > MAX_ATTACHMENTS:
+        return None, "A payment can have up to %d attachments." % MAX_ATTACHMENTS
+    return _store_attachments(payment, attachments, user, label), None
+
+
+def record_payment(supplier_id, user, form, proof=None, attachments=None):
     """Record a payment to a supplier.  Returns (payment, error).
 
     form: {po_id (optional), amount, paid_on, kind, method, reference, notes,
-    account_id}; ``proof``: an optional uploaded picture of the receipt.  A
-    payment against a PO can't be more than what is still owed on it.  Once
-    Finance has set up its accounts, the account it was paid from is needed."""
+    account_id, attachments_label}; ``proof``: an optional uploaded picture of
+    the receipt; ``attachments``: more uploaded files — pictures or PDFs
+    (official receipt, invoice, deposit slip, check …).  A payment against a
+    PO can't be more than what is still owed on it.  Once Finance has set up
+    its accounts, the account it was paid from is needed."""
     supplier = db.get("suppliers", supplier_id)
     if not supplier:
         return None, "Supplier not found."
@@ -1072,16 +1165,23 @@ def record_payment(supplier_id, user, form, proof=None):
     picture, err = uploads.read_picture(proof)
     if err:
         return None, "Proof of payment: " + err
+    extra, err = _read_attachments(attachments)
+    if err:
+        return None, "Attachments: " + err
+    if len(extra) > MAX_ATTACHMENTS:
+        return None, "A payment can have up to %d attachments." % MAX_ATTACHMENTS
     payment = db.insert("supplier_payments", {
         "supplier_id": supplier["id"], "supplier_name": supplier.get("name") or "",
         "po_id": po_id, "amount": amount, "paid_on": paid_on, "kind": kind,
         "method": method, "reference": (form.get("reference") or "").strip(),
         "notes": (form.get("notes") or "").strip(),
         "recorded_by": user["id"], "recorded_by_name": user.get("name") or "",
-        "created_at": now_iso(), "proof": "",
+        "created_at": now_iso(), "proof": "", "attachments": [],
         "account_id": account["id"] if account else None,
         "account_name": account.get("name") if account else ""})
     if picture:
         payment = db.update("supplier_payments", payment["id"], {
             "proof": uploads.save_picture("payments", "payment-%d" % payment["id"], picture)})
+    if extra:
+        payment = _store_attachments(payment, extra, user, form.get("attachments_label"))
     return payment, None

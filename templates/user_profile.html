@@ -77,7 +77,7 @@
         </div>
         <div class="form-row">
           <label class="form-label" for="phone">Mobile no.</label>
-          <input type="text" id="phone" name="phone" maxlength="30" value="{{ v.phone or '' }}" placeholder="09xx xxx xxxx">
+          <input type="tel" inputmode="tel" data-chars="phone" id="phone" name="phone" maxlength="30" value="{{ v.phone or '' }}" placeholder="09xx xxx xxxx">
         </div>
         <div class="form-row">
           <label class="form-label" for="email">Email</label>

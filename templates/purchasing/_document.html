@@ -45,7 +45,8 @@
         {% if po.supplier_contact_person %}<dt>Contact person</dt><dd>{{ po.supplier_contact_person }}</dd>{% endif %}
         {% if po.supplier_contact %}<dt>Contact</dt><dd>{{ po.supplier_contact }}</dd>{% endif %}
         {% if po.supplier_tin %}<dt>TIN</dt><dd>{{ po.supplier_tin }}</dd>{% endif %}
-        {% if po.supplier_reference %}<dt>Reference</dt><dd>{{ po.supplier_reference }}</dd>{% endif %}
+        <dt>Supplier type</dt><dd>{{ po.supplier_type or '—' }}</dd>
+        <dt>Quotation / invoice no.</dt><dd>{{ po.supplier_reference or '—' }}</dd>
       </dl>
     </section>
     <section>
@@ -96,7 +97,9 @@
       {% if po.discount %}<tr><th>Discount</th><td>− {{ po.discount|peso }}</td></tr>{% endif %}
       {% if po.freight %}<tr><th>Delivery / freight</th><td>{{ po.freight|peso }}</td></tr>{% endif %}
       {% if po.labor %}<tr><th>Labor cost</th><td>{{ po.labor|peso }}</td></tr>{% endif %}
-      {% if po.vat_rate or po.tax %}<tr><th>VAT{{ ' (' ~ pct(po.vat_rate) ~ ')' if po.vat_rate }}</th><td>{{ po.tax|peso }}</td></tr>{% endif %}
+      {% if po.other_fees %}<tr><th>Other / misc. fees{{ ' (' ~ po.other_fees_note ~ ')' if po.other_fees_note }}</th><td>{{ po.other_fees|peso }}</td></tr>{% endif %}
+      {% if po.vat_type == 'NON VAT' or not (po.vat_rate or po.tax) %}<tr><th>VAT</th><td>NON VAT</td></tr>
+      {% else %}<tr><th>VAT{{ ' (' ~ pct(po.vat_rate) ~ ')' if po.vat_rate }}</th><td>{{ po.tax|peso }}</td></tr>{% endif %}
       <tr class="grand"><td colspan="2"><div class="doc-grand"><span>Grand total</span><b>{{ po.grand_total|peso }}</b></div></td></tr>
       {% if po.advance_amount %}
       <tr class="after"><th>Paid up front</th><td>{{ po.advance_amount|peso }}</td></tr>

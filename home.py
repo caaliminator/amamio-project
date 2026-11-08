@@ -8,6 +8,7 @@ from datetime import date, timedelta
 
 from flask import url_for
 
+import additions_service as adds
 import assets_service
 import db
 import facility_service
@@ -24,6 +25,14 @@ def _task(title, sub, icon, endpoint, count=0, primary=False, **args):
             "primary": primary}
 
 
+def _lane_counts():
+    rows = services.receiving_box_rows(status=(services.BOX_AWAITING, services.BOX_HOLD))
+    out = {}
+    for lane in services.INSPECTION_LANES:
+        out["waiting_" + lane] = sum(1 for r in rows if r["lane"] == lane)
+    return out
+
+
 def _counts():
     boxes = db.read("receiving_boxes")
     runs = db.read("packing_runs")
@@ -34,6 +43,8 @@ def _counts():
         "awaiting": sum(1 for b in boxes
                         if services.box_status(b) == services.BOX_AWAITING),
         "held": sum(1 for b in boxes if services.box_status(b) == services.BOX_HOLD),
+        # Per inspection lane: raw materials / packaging & supplies.
+        **_lane_counts(),
         "open_deliveries": sum(1 for b in db.read("receiving_batches")
                                if b.get("status") in (services.RECEIVING_OPEN,
                                                       services.RECEIVING_FOR_CLOSING)),
@@ -84,10 +95,13 @@ def tasks_for(user, c):
         ]
     elif role == "production_head":
         t += [
-            _task("Inspect & clean boxes", "Count usable, can't be used and damaged",
-                  "inspect", "receiving.inspection", count=c["awaiting"] + c["held"],
-                  primary=bool(c["awaiting"])),
-            _task("Check honey", "Moisture & appearance — PASS or FAILED",
+            _task("Raw material inspection", "Clean, count and check ginger, lemon, cacao…",
+                  "inspect", "receiving.inspection", count=c["waiting_raw"],
+                  primary=bool(c["waiting_raw"])),
+            _task("Packaging & supplies check", "Jars, bottles, labels, cleaning and office supplies",
+                  "clipboard", "receiving.inspection_supplies", count=c["waiting_supplies"],
+                  primary=bool(c["waiting_supplies"])),
+            _task("Honey inspection", "Moisture & appearance — PASS or FAILED",
                   "honey", "honey.index", count=c["honey_pending"]),
             _task("Start a batch record", "Dispensing, procedure, yield and QA",
                   "production", "production.index", count=c["batches_open"],
@@ -107,13 +121,6 @@ def tasks_for(user, c):
                   "truck", "packing.index", count=c["packed_waiting"]),
             _task("Scan a QR code", "Open a packing run from its label", "qr", "qr.scan"),
         ]
-        if role == "packing_head":
-            t += [
-                _task("Upload sales file", "Shopee, TikTok, Lazada, Shopify exports",
-                      "upload", "platforms.upload"),
-                _task("Sales reports", "Weekly, monthly and yearly sales per platform",
-                      "chart", "platforms.index"),
-            ]
     elif role == "assets_head":
         t += [
             _task("Record equipment IN / OUT", "Borrowed, sent for repair, returned",
@@ -127,6 +134,34 @@ def tasks_for(user, c):
             _task("Pest control", "Monthly inspection of every area",
                   "shield", "facility.pest", count=1 if c["pest_missing"] else 0),
         ]
+    elif role == "customer_service_admin":
+        orders = db.read("sales_orders")
+        t += [
+            _task("Sales orders", "Confirm, take payment, schedule delivery",
+                  "orders", "orders.index",
+                  count=sum(1 for o in orders if o.get("status") == "Pending"),
+                  primary=True),
+            _task("New sales order", "A customer's order: products, price, discount",
+                  "plus", "orders.new"),
+            _task("Deliveries", "Scheduled, in transit and delivered",
+                  "deliveries", "deliveries.index",
+                  count=sum(1 for d in db.read("deliveries")
+                            if d.get("status") in ("Scheduled", "In Transit"))),
+            _task("Customers", "VIP and walk-in customers and their orders",
+                  "customers", "customers.index"),
+        ]
+    elif role == "sales_marketing_admin":
+        t += [
+            _task("Upload sales file", "Shopee, TikTok, Lazada, Shopify exports",
+                  "upload", "platforms.upload", primary=True),
+            _task("Sales reports", "Weekly, monthly and yearly sales per platform",
+                  "chart", "platforms.index"),
+            _task("Stock release", "Ask for finished goods to be released",
+                  "release", "sales.index",
+                  count=sum(1 for r in db.read("sales_requests")
+                            if r.get("requestor_id") == user["id"]
+                            and r.get("status") == "Pending Approval")),
+        ]
     elif role == "finance_admin":
         due = finance_service.payments_due()
         t += [
@@ -135,7 +170,7 @@ def tasks_for(user, c):
                   primary=True),
             _task("Supplier ledger", "Purchases, payments and balance per supplier",
                   "ledger", "ledger.index"),
-            _task("Cash & bank accounts", "Balances, money in / out and transfers",
+            _task("Cash & bank accounts", "Balances and statements (view only)",
                   "wallet", "finance.accounts"),
             _task("Purchase orders", "Issued POs and their payment terms",
                   "orders", "purchasing.index"),
@@ -176,12 +211,19 @@ def waiting_for(user, c):
     add(can(user, "receiving") and c["expected_pos"],
         "%d purchase order(s) expected" % c["expected_pos"],
         "Receive them against their PO when they arrive", "receiving.index")
-    add(can(user, "inspection") and c["awaiting"],
-        "%d box(es) waiting for inspection" % c["awaiting"],
-        "Received at the Receiving Area", "receiving.inspection")
-    add(can(user, "inspection") and c["held"],
-        "%d box(es) on hold" % c["held"], "Waiting for a test, document or QA decision",
-        "receiving.inspection")
+    add(can(user, "inspection") and c["waiting_raw"],
+        "%d raw material box(es) to inspect or on hold" % c["waiting_raw"],
+        "Raw Material Inspection", "receiving.inspection")
+    add(can(user, "inspection") and c["waiting_supplies"],
+        "%d packaging / supplies box(es) to check or on hold" % c["waiting_supplies"],
+        "Packaging & Supplies Check", "receiving.inspection_supplies")
+    expiring = services.expiring_batches() if (is_admin(user) or can(user, "receiving")
+                                               or can(user, "inspection")) else []
+    add(bool(expiring),
+        "%d batch(es) expired or expiring within %d days" % (len(expiring),
+                                                            services.EXPIRING_SOON_DAYS),
+        "First: %s · %s" % (expiring[0]["batch_no"], expiring[0]["expiry_date"]) if expiring else "",
+        "receiving.batches", show="expiring")
     add(can(user, "receiving") and c["for_closing"],
         "%d receipt(s) ready to close" % c["for_closing"],
         "Every box inspected — answer the Quick Control Check", "receiving.index")
@@ -252,6 +294,8 @@ def context(user):
         mine_pr, mine_po = pur.approvals_for(user)
         c["approvals"] = len(mine_pr) + len(mine_po) + sum(
             1 for r in db.read("sales_requests") if r.get("status") == "Pending Approval")
+        if adds.can_decide(user):           # new records the Admin added
+            c["approvals"] += adds.pending_count()
     return {
         "tasks": tasks_for(user, c),
         "waiting": waiting_for(user, c),

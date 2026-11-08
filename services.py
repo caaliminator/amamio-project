@@ -8,6 +8,7 @@ Stock is stored as ``stock_qty`` on the raw_materials / products record and is
 moved ONLY through :func:`adjust_stock` (which also writes the ledger).
 """
 from datetime import date, datetime, timezone
+import re
 
 import db
 import security
@@ -115,6 +116,20 @@ def stocked_materials(categories=None):
                              m.get("subcategory") or "", m.get("name") or ""))
     return rows
 
+
+def is_purchasable(material):
+    """False for a stock line made inside the plant, never bought from a
+    supplier — e.g. "Honey for Processing (QC failed)", the honey that failed
+    QC.  It stays in stock, Supplies In / Out and production, but is not
+    offered on purchase requests, POs, receiving or the Supplier Directory."""
+    return bool(material) and not material.get("internal") \
+        and (material.get("name") or "") != PROCESSING_HONEY
+
+
+def purchasable_materials(categories=None):
+    """stocked_materials() without the stock lines made in the plant."""
+    return [m for m in stocked_materials(categories) if is_purchasable(m)]
+
 # Packing channels the client ships through.
 PACKING_CHANNELS = ["VIP", "Shopee", "TikTok", "Lazada", "Walk-in"]
 
@@ -141,6 +156,8 @@ URGENCY_BADGE = {
 QC_RESULTS = ["Pass", "Failed"]
 QC_APPEARANCE = ["Clear", "Cloudy", "Crystallized", "With sediment",
                  "Fermented / off-smell"]
+# Appearances the guide treats as a fail (the QC form marks them).
+QC_FAIL_APPEARANCE = ("Fermented / off-smell", "With sediment")
 # Pass/fail guide applied when the checker does not override it.
 MOISTURE_PASS_MAX = 20.0
 
@@ -682,6 +699,8 @@ def create_production_request(requestor_id, product_id, qty, item_lines,
             "est_unit_cost": round(cost, 2),
             "est_total": round(cost * qty_wanted, 2),
             "preferred_supplier": suppliers.get(material.get("supplier_id")) or "",
+            "preferred_supplier_id": material.get("supplier_id")
+            if material.get("supplier_id") in suppliers else None,
             "budget_category": "Raw materials" if material_category(material) == "raw"
                                else "Packaging",
             "remark": (line.get("note") or "").strip(),
@@ -891,7 +910,7 @@ def create_sales_order(customer_id, lines, discount=0.0, remarks="", user_id=Non
         "created_by": user_id,
         "items": items,
     })
-    notify_role("packing_head", "Sales order #%d created for %s." %
+    notify_role("customer_service_admin", "Sales order #%d created for %s." %
                 (order["id"], customer.get("name")), link="/orders/%d" % order["id"])
     return order, None
 
@@ -971,7 +990,7 @@ def create_delivery(order_id, scheduled_date="", driver="", address="",
         "notes": "",
         "created_by": user_id,
     })
-    notify_role("packing_head", "Delivery #%d scheduled for order #%d." %
+    notify_role("customer_service_admin", "Delivery #%d scheduled for order #%d." %
                 (delivery["id"], order_id), link="/deliveries/")
     return delivery, None
 
@@ -1163,6 +1182,69 @@ INSPECTION_POINTS = [
     ("test", "Moisture / other test",
      "Within approved specification; record result if tested"),
 ]
+# Packaging & supplies (jars, bottles, seals, pouches, labels, boxes, tape;
+# cleaning and production supplies; office supplies) are checked with a
+# shorter list: no odor, temperature or lab test, plus a defects check.
+# DRAFT for the client's QA to confirm — based on AFP-WH-FRM-002.
+SUPPLY_INSPECTION_POINTS = [
+    ("identity", "Item identity",
+     "Right item, size and specification — matches PO and label"),
+    ("quantity", "Quantity",
+     "Actual count verified against PO / DR"),
+    ("packaging", "Packaging integrity",
+     "Cartons sealed and intact; not crushed, torn or wet"),
+    ("cleanliness", "Cleanliness",
+     "Clean; no dust, dirt or foreign matter (food-contact items)"),
+    ("defects", "Defects",
+     "No cracks, chips, leaks or misprints; caps and lids fit"),
+    ("pest", "Pest / infestation",
+     "No insects, droppings or pest damage in the cartons"),
+    ("lot", "Lot / batch traceability",
+     "Lot or batch number present and legible, if any"),
+    ("dates", "Expiry (cleaning chemicals)",
+     "Expiry date checked for chemicals; N/A for other items"),
+    ("coa", "Food-grade certificate / documents",
+     "Food-grade certificate for food-contact packaging; other documents if required"),
+]
+
+# The inspection lanes: how a received box is checked depends on what is in
+# it.  Honey containers have their own check (moisture, appearance) under
+# Honey Inspection.
+LANE_RAW, LANE_SUPPLIES = "raw", "supplies"
+INSPECTION_LANES = {
+    LANE_RAW: {"label": "Raw Material Inspection", "short": "Raw materials",
+               "endpoint": "receiving.inspection", "categories": ("raw",),
+               "points": INSPECTION_POINTS,
+               "form": "Incoming Material Inspection Checklist"},
+    LANE_SUPPLIES: {"label": "Packaging & Supplies Check", "short": "Packaging & supplies",
+                    "endpoint": "receiving.inspection_supplies",
+                    "categories": ("packaging", "cleaning", "office"),
+                    "points": SUPPLY_INSPECTION_POINTS,
+                    "form": "Packaging & Supplies Inspection Checklist"},
+}
+
+
+def lane_for_material(material):
+    """'raw' for raw materials, 'supplies' for packaging, cleaning / production
+    and office supplies."""
+    cat = material_category(material or {})
+    return LANE_SUPPLIES if cat in INSPECTION_LANES[LANE_SUPPLIES]["categories"] else LANE_RAW
+
+
+def lane_for_box(box):
+    """The lane a box is (or was) inspected in."""
+    if box.get("checklist_lane") in INSPECTION_LANES:
+        return box["checklist_lane"]
+    # Inspected before the lanes existed: it used the full checklist.
+    if "test" in (box.get("checklist") or {}) or "odor" in (box.get("checklist") or {}):
+        return LANE_RAW
+    return lane_for_material(db.get("raw_materials", box.get("material_id")) or {})
+
+
+def points_for_box(box):
+    return INSPECTION_LANES[lane_for_box(box)]["points"]
+
+
 CHECK_RESULTS = ["Pass", "Fail", "N/A"]
 NC_TYPES = ["Quantity shortage / overage", "Wrong item / specification",
             "Damaged packaging", "Contamination / pest",
@@ -1173,6 +1255,7 @@ NC_TYPE_FOR_POINT = {
     "identity": NC_TYPES[1], "quantity": NC_TYPES[0], "packaging": NC_TYPES[2],
     "cleanliness": NC_TYPES[3], "pest": NC_TYPES[3], "odor": NC_TYPES[3],
     "dates": NC_TYPES[4], "coa": NC_TYPES[5], "test": NC_TYPES[6],
+    "defects": NC_TYPES[2],
 }
 NC_CONTAINMENT = ["Tagged HOLD / REJECT", "Segregated in designated area",
                   "Production use blocked", "Supplier notified"]
@@ -1211,6 +1294,79 @@ def box_status(box):
 def box_stage(box):
     stage = box.get("stage")
     return _LEGACY_STAGE.get(stage, stage)
+
+
+# --- Batch numbers (lot / batch traceability) -------------------------------
+# Every item received gets a batch no. of its own, made by the system:
+# ITEM-YEAR-MONTH-NNN, e.g. GINGER-2026-11-001 — a running number per item
+# and month.  All boxes of the same item in the same delivery share it (one
+# batch per delivery and item; a different supplier lot makes another).  It
+# is kept in each box's ``lot_no`` and printed on the QR label, the box
+# page, the receiving and inspection reports, and Batches & Expiry.
+EXPIRING_SOON_DAYS = 30
+# A Supplies IN for this reason is new stock that did not come through
+# receiving — it starts a batch of its own (see assets_service).
+NEW_STOCK_REASON = "Delivery / purchase"
+
+
+def batch_prefix(name):
+    """'Ginger' -> 'GINGER'; 'Square Bottle 300 mL' -> 'SQUAREB300ML'."""
+    clean = re.sub(r"\([^)]*\)", " ", name or "")
+    words = [w for w in re.split(r"[^0-9A-Za-z]+", clean.upper()) if w]
+    if not words:
+        return "ITEM"
+    full = "".join(words)
+    if len(full) <= 14:
+        return full
+    # Long names: the first word, then initials — sizes (a number and the
+    # short unit after it, e.g. 300 ML) kept whole.
+    short = words[0]
+    for i, w in enumerate(words[1:], start=1):
+        after_number = any(ch.isdigit() for ch in words[i - 1]) and len(w) <= 3
+        short += w if any(ch.isdigit() for ch in w) or after_number else w[0]
+    return short[:20]
+
+
+def _all_batch_numbers():
+    """Every batch no. given so far: receiving boxes and stock taken IN by hand."""
+    nos = [b.get("lot_no") or "" for b in db.read("receiving_boxes")]
+    nos += [mv.get("batch_no") or "" for mv in db.read("stock_movements")
+            if mv.get("batch_new")]
+    return nos
+
+
+def _batch_numbers_used(prefix, ym, numbers=None):
+    pattern = re.compile(r"^%s-%s-(\d+)$" % (re.escape(prefix), re.escape(ym)))
+    used = []
+    for no in (_all_batch_numbers() if numbers is None else numbers):
+        m = pattern.match(no)
+        if m:
+            used.append(int(m.group(1)))
+    return used
+
+
+def next_batch_no(name, on_date=None, skip=0, numbers=None):
+    """The next batch no. for an item received on ``on_date`` (``skip``
+    looks further ahead, for a preview of several new batches; ``numbers``
+    reuses one read of the batch nos. given so far)."""
+    on = (on_date or today_iso())[:7]          # YYYY-MM
+    prefix = batch_prefix(name)
+    n = max(_batch_numbers_used(prefix, on, numbers) or [0]) + 1 + skip
+    return "%s-%s-%03d" % (prefix, on, n)
+
+
+def planned_batch_numbers(names, on_date=None):
+    """The batch nos. a delivery would get, one per item name in order
+    (repeats of an item share its batch) — for the receive form's preview."""
+    out, given, extra = [], {}, {}
+    for name in names:
+        key = (name or "").strip().lower()
+        if key not in given:
+            prefix = batch_prefix(name)
+            given[key] = next_batch_no(name, on_date, skip=extra.get(prefix, 0))
+            extra[prefix] = extra.get(prefix, 0) + 1
+        out.append(given[key])
+    return out
 
 
 def box_token(box_id):
@@ -1264,7 +1420,8 @@ def create_receiving_batch(supplier_id, received_date, user_id,
                            supplier_name="", received_time="", delivered_by="",
                            vehicle_plate="", receiving_area="",
                            supplier_contact="", docs_checked=None,
-                           docs_other="", discrepancies=None, save=True):
+                           docs_other="", discrepancies=None, or_no="",
+                           ar_no="", save=True):
     """Open a delivery record — the Material Receiving Report (MRR).  Boxes
     are added to it next.  With ``save=False`` the record is only built
     (for the receive form's preview)."""
@@ -1281,6 +1438,10 @@ def create_receiving_batch(supplier_id, received_date, user_id,
         "po_id": po_id,
         "po_no": (po_no or "").strip(),
         "delivery_ref": (delivery_ref or "").strip(),
+        # Official receipt and acknowledgement receipt numbers; each of the
+        # three documents (DR, OR, AR) may have a picture / PDF on file.
+        "or_no": (or_no or "").strip()[:40],
+        "ar_no": (ar_no or "").strip()[:40],
         "received_date": received_date or today_iso(),
         "received_time": (received_time or "").strip()
                          or datetime.now().strftime("%H:%M"),
@@ -1339,7 +1500,14 @@ def add_receiving_box(batch_id, material_id, declared_qty, user_id,
     if temperature_c not in (None, ""):
         temp = _to_float(temperature_c, None)
 
-    existing = len(db.query("receiving_boxes", batch_id=int(batch_id)))
+    siblings = db.query("receiving_boxes", batch_id=int(batch_id))
+    existing = len(siblings)
+    # One batch no. per delivery and item (and supplier lot, if one was given).
+    supplier_lot = (lot_no or "").strip()
+    same = [b for b in siblings if b.get("material_id") == material["id"]
+            and b.get("lot_no") and (b.get("supplier_lot") or "") == supplier_lot]
+    batch_no = same[0]["lot_no"] if same else next_batch_no(
+        material.get("name"), batch.get("received_date"))
     created = []
     for i in range(count):
         box = db.insert("receiving_boxes", {
@@ -1353,8 +1521,10 @@ def add_receiving_box(batch_id, material_id, declared_qty, user_id,
             "po_line_no": po_line_no,
             "track_mode": material.get("track_mode") or "weight",
             "declared_qty": declared,
-            "lot_no": (lot_no or "").strip(),
+            "lot_no": batch_no,               # our batch no. (made by the system)
+            "supplier_lot": supplier_lot,     # the supplier's own lot no., if given
             "expiry_date": (expiry_date or "").strip(),
+            "mfg_date": "",
             "packaging_condition": (packaging_condition or "").strip(),
             "temperature_c": temp,
             "good_qty": None,
@@ -1496,7 +1666,10 @@ def preview_delivery(user, supplier_id, received_date, lines, po_no="",
         supplier_name=(po or {}).get("supplier_name") or "",
         discrepancies=_po_discrepancies(po, clean) if po else [], save=False, **mrr)
     out, po_seen = [], set()
-    for material, line, po_line in clean:
+    names = [(material or {}).get("name") or (po_line or {}).get("description")
+             for material, line, po_line in clean]
+    batch_nos = planned_batch_numbers(names, received_date)
+    for (material, line, po_line), batch_no in zip(clean, batch_nos):
         no = po_line["line_no"] if po_line else None
         out.append({
             "material_name": (material or {}).get("name") or (po_line or {}).get("description"),
@@ -1504,7 +1677,7 @@ def preview_delivery(user, supplier_id, received_date, lines, po_no="",
             "po_line_no": no,
             # The ordered quantity, once per PO line (as on the saved MRR).
             "po_qty": _to_float(po_line.get("qty")) if po_line and no not in po_seen else None,
-            "lot_no": line.get("lot_no") or "", "expiry_date": line.get("expiry_date") or "",
+            "lot_no": batch_no, "expiry_date": line.get("expiry_date") or "",
             "boxes": max(1, int(_to_float(line.get("boxes"), 1))),
             "actual_qty": round(_line_total(line), 3), "accepted_qty": 0.0,
             "hold_qty": 0.0, "rejected_qty": 0.0,
@@ -1635,11 +1808,12 @@ def _post_box_decision(box, material, user_id):
                       stage="Inspection & Cleaning", user_id=user_id)
 
 
-def _clean_checklist(checklist):
-    """Every inspection point marked Pass / Fail / N/A, with a remark on each
-    failure.  Returns ``(checklist, None)`` or ``(None, message)``."""
+def _clean_checklist(checklist, points=None):
+    """Every inspection point (of the box's lane) marked Pass / Fail / N/A,
+    with a remark on each failure.  Returns ``(checklist, None)`` or
+    ``(None, message)``."""
     clean = {}
-    for key, point, _ in INSPECTION_POINTS:
+    for key, point, _ in points or INSPECTION_POINTS:
         entry = checklist.get(key) or {}
         result = entry.get("result") or ""
         remarks = (entry.get("remarks") or "").strip()
@@ -1655,7 +1829,8 @@ def _legacy_checks(checklist):
     """The visual / COA / sampling columns of the Raw Materials Receiving and
     Inspection Report, read off the checklist so that report still fills in."""
     visual = [checklist[k]["result"]
-              for k in ("packaging", "cleanliness", "pest", "odor")]
+              for k in ("packaging", "cleanliness", "pest", "odor", "defects")
+              if k in checklist]
     if "Fail" in visual:
         visual = "Fail"
     elif all(r == "N/A" for r in visual):
@@ -1665,7 +1840,7 @@ def _legacy_checks(checklist):
     coa = {"Pass": "Complete", "Fail": "Incomplete",
            "N/A": "Not required"}[checklist["coa"]["result"]]
     test = {"Pass": "Passed", "Fail": "Failed",
-            "N/A": "Not required"}[checklist["test"]["result"]]
+            "N/A": "Not required"}[(checklist.get("test") or {"result": "N/A"})["result"]]
     return visual, coa, test
 
 
@@ -1673,14 +1848,14 @@ def failed_points(box):
     """[(point, remarks)] of the checklist points a box failed."""
     checklist = box.get("checklist") or {}
     return [(point, checklist[key].get("remarks") or "")
-            for key, point, _ in INSPECTION_POINTS
+            for key, point, _ in points_for_box(box)
             if (checklist.get(key) or {}).get("result") == "Fail"]
 
 
 def nc_types_for(box):
     """The types of nonconformity a box's failed checks point to."""
     types = []
-    for key, _, _ in INSPECTION_POINTS:
+    for key, _, _ in points_for_box(box):
         kind = NC_TYPE_FOR_POINT.get(key)
         if ((box.get("checklist") or {}).get(key) or {}).get("result") == "Fail" \
                 and kind and kind not in types:
@@ -1700,7 +1875,7 @@ def inspect_receiving_box(box_id, user_id, usable_qty, unusable_qty=0,
                           verified_by_name="", checklist=None,
                           test_parameter="", test_spec="", test_result="",
                           test_method="", nc_types=None, nc_other="",
-                          visual_description=""):
+                          visual_description="", mfg_date="", expiry_date=None):
     """Part 2: record the inspection & cleaning of one box.
 
     With ``checklist`` ({point key: {result, remarks}}) this is the Incoming
@@ -1743,10 +1918,11 @@ def inspect_receiving_box(box_id, user_id, usable_qty, unusable_qty=0,
         if not (visual_description or "").strip():
             return None, ("Describe what the material looks like — e.g. free "
                           "from molds, insects, decay and rot.")
-        checklist, err = _clean_checklist(checklist)
+        points = points_for_box(box)
+        checklist, err = _clean_checklist(checklist, points)
         if err:
             return None, err
-        failed = [point for key, point, _ in INSPECTION_POINTS
+        failed = [point for key, point, _ in points
                   if checklist[key]["result"] == "Fail"]
         if failed and acceptance == "Accepted":
             return None, ("\"%s\" failed — only material that meets every "
@@ -1756,6 +1932,22 @@ def inspect_receiving_box(box_id, user_id, usable_qty, unusable_qty=0,
                 and not (nc_other or "").strip():
             return None, "Tick the type of nonconformity."
         visual_inspection, coa_check, sampling_test = _legacy_checks(checklist)
+        # Date marking: picked on a calendar.  "Pass" means the dates were
+        # checked, so the expiry / best-before date is needed.
+        if checklist.get("dates", {}).get("result") == "Pass" \
+                and not (expiry_date or box.get("expiry_date")):
+            return None, ("Date marking is marked Pass — pick the expiry / "
+                          "best-before date on the calendar (or mark it N/A).")
+    for label, value in (("manufacturing", mfg_date), ("expiry", expiry_date)):
+        if value:
+            try:
+                date.fromisoformat(value)
+            except ValueError:
+                return None, "Pick the %s date on the calendar." % label
+    if mfg_date and expiry_date and expiry_date < mfg_date:
+        return None, "The expiry date can't be before the manufacturing date."
+    if mfg_date and mfg_date > today_iso():
+        return None, "The manufacturing date can't be in the future."
 
     material = db.get("raw_materials", box.get("material_id"))
     if not material:
@@ -1784,6 +1976,10 @@ def inspect_receiving_box(box_id, user_id, usable_qty, unusable_qty=0,
         "inspection_no": box.get("inspection_no")
                          or _next_ref("INS", "receiving_boxes", "inspection_no"),
         "checklist": checklist or {},
+        "checklist_lane": lane_for_box(box),
+        "mfg_date": (mfg_date or box.get("mfg_date") or "").strip(),
+        "expiry_date": (expiry_date if expiry_date is not None
+                        else box.get("expiry_date") or "").strip(),
         "test_parameter": (test_parameter or "").strip(),
         "test_spec": (test_spec or "").strip(),
         "test_result": (test_result or "").strip(),
@@ -2095,6 +2291,184 @@ def fefo_first(box):
     return min(earlier, key=order) if earlier else None
 
 
+
+# --- Batches & Expiry -------------------------------------------------------
+def _batch_status(row, today):
+    if row["waiting"]:
+        return "Waiting for inspection", "badge-warn"
+    if row["remaining"] <= 0.0005:
+        return "No stock left", "badge-muted"
+    if row["expiry_date"] and row["expiry_date"] < today:
+        return "Expired", "badge-danger"
+    if row["days_left"] is not None and row["days_left"] <= EXPIRING_SOON_DAYS:
+        return "Expiring soon", "badge-warn"
+    return "In stock", "badge-ok"
+
+
+def _batch_key(material_id, batch_no):
+    try:
+        mid = int(material_id)
+    except (TypeError, ValueError):
+        return None
+    no = (batch_no or "").strip().upper()
+    return (mid, no) if no else None
+
+
+def _batch_usage():
+    """(material_id, batch no.) -> [taken out, put back], from the records
+    that name a batch: Supplies OUT / IN and finished production batches
+    (each dispensing line's batch no.)."""
+    usage = {}
+
+    def add(key, out=0.0, back=0.0):
+        if key:
+            u = usage.setdefault(key, [0.0, 0.0])
+            u[0] += out
+            u[1] += back
+
+    for mv in db.read("stock_movements"):
+        if mv.get("batch_new"):
+            continue                    # it started the batch: not a use
+        key = _batch_key(mv.get("material_id"), mv.get("batch_no"))
+        if mv.get("direction") == "OUT":
+            add(key, out=_to_float(mv.get("qty")))
+        else:
+            add(key, back=_to_float(mv.get("qty")))
+    for rec in db.read("batch_records"):
+        if not rec.get("stock_posted"):
+            continue
+        for line in rec.get("dispensing") or []:
+            add(_batch_key(line.get("material_id"), line.get("lot_no")),
+                out=_to_float(line.get("theoretical_qty")))
+    return usage
+
+
+def _apply_batch_usage(row, usage, today):
+    """Work out what is left of a batch.  Boxes marked "Consumed" are used
+    up; what the records say was taken out beyond that comes off the
+    production area first, then storage.  Stock put back returns to storage."""
+    out, back = usage or (0.0, 0.0)
+    boxes_done = row["consumed"]
+    used = max(0.0, min(max(boxes_done, out) - back, row["accepted_qty"]))
+    store, prod = row["in_storage"], row["in_production"]
+    extra = used - boxes_done
+    if extra >= 0:
+        take = min(prod, extra)
+        prod -= take
+        store = max(0.0, store - (extra - take))
+    else:
+        store -= extra
+    row["in_storage"], row["in_production"] = round(store, 3), round(prod, 3)
+    row["consumed"] = round(used, 3)
+    row["remaining"] = round(store + prod, 3)
+    row["days_left"] = ((date.fromisoformat(row["expiry_date"]) - date.fromisoformat(today)).days
+                        if row["expiry_date"] else None)
+    row["status"], row["badge"] = _batch_status(row, today)
+    return row
+
+
+def batch_rows(material_id=None):
+    """One row per batch no.: what was received and accepted, what is left
+    in storage / the production area, and its expiry — newest first.
+    Batches come from receiving (the boxes) and from stock taken in by hand
+    on Supplies In / Out."""
+    today = today_iso()
+    deliveries = {b["id"]: b for b in db.read("receiving_batches")}
+    usage = _batch_usage()
+    if material_id is not None:
+        material_id = int(material_id)
+    groups = {}
+    for box in db.read("receiving_boxes"):
+        key = _batch_key(box.get("material_id"), box.get("lot_no"))
+        if not key or (material_id is not None and key[0] != material_id):
+            continue
+        groups.setdefault(key, []).append(box)
+    rows = []
+    for key, boxes in groups.items():
+        first = boxes[0]
+        delivery = deliveries.get(first.get("batch_id")) or {}
+        status_of = [box_status(b) for b in boxes]
+        accepted = [b for b, s in zip(boxes, status_of) if s == BOX_ACCEPTED]
+        def qty(where):
+            return round(sum(_to_float(b.get("good_qty")) for b in accepted
+                             if box_stage(b) in where), 3)
+        expiries = sorted(b["expiry_date"] for b in boxes if b.get("expiry_date"))
+        mfgs = sorted(b["mfg_date"] for b in boxes if b.get("mfg_date"))
+        row = {
+            "batch_no": first["lot_no"], "material_id": first.get("material_id"),
+            "material_name": first.get("material_name"), "unit": first.get("unit") or "",
+            "supplier_lot": first.get("supplier_lot") or "", "source": "Receiving",
+            "delivery_id": first.get("batch_id"), "delivery_ref": delivery.get("ref_no") or "",
+            "supplier_name": delivery.get("supplier_name") or "",
+            "received_date": delivery.get("received_date") or (first.get("created_at") or "")[:10],
+            "boxes": len(boxes),
+            "received_qty": round(sum(_to_float(b.get("declared_qty")) for b in boxes), 3),
+            "accepted_qty": round(sum(_to_float(b.get("good_qty")) for b in accepted), 3),
+            # An accepted box not yet moved on counts as in storage.
+            "in_storage": qty(("Receiving Area", "Storage Area", None, "")),
+            "in_production": qty(("Production Area",)),
+            "consumed": qty(("Consumed",)),
+            "waiting": sum(1 for s in status_of if s in (BOX_AWAITING, BOX_HOLD)),
+            "expiry_date": expiries[0] if expiries else "",
+            "mfg_date": mfgs[0] if mfgs else "",
+        }
+        rows.append(_apply_batch_usage(row, usage.get(key), today))
+    for mv in db.read("stock_movements"):
+        if not mv.get("batch_new"):
+            continue
+        key = _batch_key(mv.get("material_id"), mv.get("batch_no"))
+        if not key or (material_id is not None and key[0] != material_id):
+            continue
+        qty_in = round(_to_float(mv.get("qty")), 3)
+        row = {
+            "batch_no": mv["batch_no"], "material_id": mv.get("material_id"),
+            "material_name": mv.get("material_name"), "unit": mv.get("unit") or "",
+            "supplier_lot": "", "source": "Supplies IN",
+            "delivery_id": None, "delivery_ref": mv.get("reference") or "SM-%d" % mv["id"],
+            "supplier_name": mv.get("person") or "",
+            "received_date": (mv.get("moved_at") or "")[:10], "boxes": 0,
+            "received_qty": qty_in, "accepted_qty": qty_in,
+            "in_storage": qty_in, "in_production": 0.0, "consumed": 0.0, "waiting": 0,
+            "expiry_date": mv.get("expiry_date") or "", "mfg_date": "",
+        }
+        rows.append(_apply_batch_usage(row, usage.get(key), today))
+    rows.sort(key=lambda r: (r["received_date"], r["batch_no"]), reverse=True)
+    return rows
+
+
+def _fefo_key(row):
+    return (row["expiry_date"] or "9999-12-31", row["received_date"], row["batch_no"])
+
+
+def batch_choices(material_id, stock_qty=None):
+    """The batches of one item for a Supplies IN / OUT, the one to use first
+    on top (FEFO, else FIFO), and how much of the stock has no batch no.
+    (stock from before batch numbers).  Returns (rows, loose_qty)."""
+    rows = [r for r in batch_rows(material_id)
+            if r["remaining"] > 0.0005 or r["consumed"] > 0.0005]
+    rows.sort(key=_fefo_key)
+    if stock_qty is None:
+        stock_qty = current_stock("material", material_id)
+    batched = sum(r["remaining"] for r in rows)
+    return rows, round(max(0.0, _to_float(stock_qty) - batched), 3)
+
+
+def expiring_batches():
+    """Batches with stock left that expired or expire within
+    EXPIRING_SOON_DAYS — what to use (or pull) first."""
+    rows = [r for r in batch_rows() if r["status"] in ("Expired", "Expiring soon")]
+    rows.sort(key=lambda r: r["expiry_date"])
+    return rows
+
+
+def fefo_batch(material_id):
+    """The batch of an item to use first: stock left, earliest expiry (FEFO),
+    else the oldest received (FIFO).  None when nothing is in stock."""
+    rows = [r for r in batch_rows(material_id) if r["remaining"] > 0.0005]
+    if not rows:
+        return None
+    return min(rows, key=_fefo_key)
+
 # --- Nonconforming Material Hold / Rejection Report (AFP-WH-FRM-003) -------
 # Opened automatically for every box put on HOLD or REJECTED.  The receiving
 # area records the containment (tag, segregate, block, notify supplier); QA
@@ -2340,7 +2714,7 @@ def box_qr_text(box, batch=None):
              box.get("material_name") or "",
              fmt_qty(box.get("declared_qty"), box.get("unit") or "")]
     if box.get("lot_no"):
-        parts.append("Lot %s" % box.get("lot_no"))
+        parts.append("Batch %s" % box.get("lot_no"))
     if box.get("expiry_date"):
         parts.append("Exp %s" % box.get("expiry_date"))
     parts += [batch.get("ref_no") or "",
@@ -2380,6 +2754,7 @@ def receiving_box_rows(batch_id=None, status=None, limit=None):
     boxes.sort(key=lambda b: (b.get("batch_id") or 0, b.get("seq") or 0))
     batches = {b["id"]: b for b in db.read("receiving_batches")}
     ncrs = {r.get("box_id"): r for r in db.read("nonconformance_reports")}
+    materials = {m["id"]: m for m in db.read("raw_materials")}
     rows = []
     for b in boxes:
         batch = batches.get(b.get("batch_id"), {})
@@ -2387,12 +2762,15 @@ def receiving_box_rows(batch_id=None, status=None, limit=None):
         ncr = ncrs.get(b["id"]) or {}
         rows.append({
             "id": b["id"], "box_code": b.get("box_code"), "seq": b.get("seq"),
+            "lane": b.get("checklist_lane") if b.get("checklist_lane") in INSPECTION_LANES
+                    else lane_for_material(materials.get(b.get("material_id"))),
             "material_id": b.get("material_id"),
             "material_name": b.get("material_name"), "unit": b.get("unit"),
             "track_mode": b.get("track_mode"),
             "track_label": TRACK_MODE_LABELS.get(b.get("track_mode"), ""),
             "declared_qty": b.get("declared_qty"),
             "lot_no": b.get("lot_no"), "expiry_date": b.get("expiry_date"),
+            "supplier_lot": b.get("supplier_lot") or "", "mfg_date": b.get("mfg_date") or "",
             "packaging_condition": b.get("packaging_condition"),
             "temperature_c": b.get("temperature_c"),
             "good_qty": b.get("good_qty"),
@@ -2581,7 +2959,7 @@ def suggested_qc_result(moisture_pct, appearance):
         return ""
     if moisture > MOISTURE_PASS_MAX:
         return "Failed"
-    if appearance in ("Fermented / off-smell", "With sediment"):
+    if appearance in QC_FAIL_APPEARANCE:
         return "Failed"
     return "Pass"
 
@@ -2655,6 +3033,7 @@ def _processing_honey_id():
         return found[0]["id"]
     return db.insert("raw_materials", {
         "name": PROCESSING_HONEY, "category": "raw", "subcategory": "Honey",
+        "internal": True,       # made in the plant: never bought or received
         "unit": "kg", "track_mode": "weight", "stock_qty": 0.0,
         "reorder_level": 0, "supplier_id": None, "unit_cost": 0.0,
         "expiry_date": "", "storage_location": "Production Area",

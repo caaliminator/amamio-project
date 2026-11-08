@@ -23,7 +23,7 @@
     </div>
     <div class="form-row">
       <label class="form-label">Account no.</label>
-      <input type="text" name="account_no" maxlength="40" value="{{ v.get('account_no') or '' }}" placeholder="Optional · not for cash">
+      <input type="text" name="account_no" inputmode="numeric" data-chars="account" maxlength="40" value="{{ v.get('account_no') or '' }}" placeholder="Optional · not for cash">
     </div>
     <div class="form-row">
       <label class="form-label">Opening balance (₱)</label>

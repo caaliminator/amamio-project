@@ -2,8 +2,9 @@
 
 Seeds only when there are no users yet.  Master data comes from the client's
 own paper forms (``seed_catalog.py``): the product list of the Daily
-Production Report, the supplies on the four month-end reports, the asset
-register and the supplier directory.  On top of that it creates a login per
+Production Report, the supplies on the four month-end reports and the asset
+register; the Supplier Directory is the client's spreadsheet
+(``seed_suppliers.py``).  On top of that it creates a login per
 role, ~12 weeks of backdated history (so the AI has data to forecast), and
 live examples of every monitored flow: deliveries received and inspected,
 honey containers that passed and failed, packing runs that were disbursed or
@@ -19,7 +20,9 @@ from werkzeug.security import generate_password_hash
 import db
 import purchasing_service as pur
 import seed_catalog as cat
+import seed_suppliers
 import services
+import supplier_service
 from security import ROLE_LABELS, ROLES
 
 WEEKS = 12
@@ -46,6 +49,10 @@ DEMO_USERS = [
      "assets", "assets123", "assets_head"),
     (("Theresa", "Lim", "Villareal"), "Finance Officer",
      "finance", "finance123", "finance_admin"),
+    (("Kristine", "Uy", "Belmonte"), "Customer Service Officer",
+     "service", "service123", "customer_service_admin"),
+    (("Paolo", "Cruz", "Dizon"), "Sales & Marketing Officer",
+     "marketing", "market123", "sales_marketing_admin"),
 ]
 
 # Staff without an account (Super Admin → Employees): placeholder names,
@@ -92,6 +99,7 @@ def seed_if_empty():
     suppliers = _seed_suppliers()
     _seed_customers()
     materials = _seed_materials(suppliers)
+    _seed_supplier_items(suppliers, materials)
     products = _seed_products()
     _seed_assets()
     _seed_bom(materials, products)
@@ -189,29 +197,25 @@ def seed_employees():
 
 
 def _seed_suppliers():
-    suppliers = {}
+    """The client's Supplier Directory (``seed_suppliers.py``), keyed by the
+    spreadsheet's No.  It starts on the Approved Supplier List (SOP
+    section 6), as the paper directory did."""
     now = services.now_iso()
-    rows = []
-    for name, category, items, contact in cat.DEMO_RAW_SUPPLIERS:
-        rows.append({"name": name, "tin": "", "category": category,
-                     "contact_person": "", "phone": contact, "email": "",
-                     "address": "", "materials_supplied": items,
-                     "buy_from": "", "lead_time_days": 3, "notes": "Demo supplier",
-                     "created_at": now})
-    for name, tin, category, items, contact in cat.SUPPLIERS:
-        is_phone = any(ch.isdigit() for ch in contact)
-        rows.append({"name": name, "tin": tin, "category": category,
-                     "contact_person": contact.split(" 0")[0] if is_phone and not contact[:1].isdigit() else "",
-                     "phone": contact[contact.find("0"):] if is_phone else "",
-                     "email": "", "address": "", "materials_supplied": items,
-                     "buy_from": "" if is_phone else contact,
-                     "lead_time_days": None, "notes": "", "created_at": now})
-    # The demo directory starts on the Approved Supplier List (SOP section 6).
-    for row in rows:
-        row.update({"approved": True, "approved_by": None, "approved_at": now})
-    for row in db.insert_many("suppliers", rows):
-        suppliers[row["name"]] = row
-    return suppliers
+    rows = [dict(row, created_at=now, approved=True, approved_by=None,
+                 approved_at=now) for row in seed_suppliers.rows()]
+    return {row["ref_no"]: row for row in db.insert_many("suppliers", rows)}
+
+
+def _seed_supplier_items(suppliers, materials):
+    """Which catalog items each supplier supplies (``supplier_items``)."""
+    now = services.now_iso()
+    links = []
+    for no, names in seed_suppliers.ITEM_LINKS.items():
+        for name in names:
+            links.append({"supplier_id": suppliers[no]["id"],
+                          "material_id": materials[name]["id"],
+                          "created_at": now})
+    db.insert_many("supplier_items", links)
 
 
 def _seed_customers():
@@ -234,19 +238,22 @@ def _seed_customers():
 
 
 def _seed_materials(suppliers):
-    produce = suppliers["Highland Produce Traders"]["id"]
-    honey = suppliers["Mindanao Forest Apiary"]["id"]
-    cacao = suppliers["Agusan Cacao Growers"]["id"]
-    by_cat = {"packaging": suppliers["Davao CVI"]["id"],
-              "cleaning": suppliers["Sanitary Care Products Asia"]["id"],
-              "office": suppliers["Yopsun"]["id"]}
-    raw_source = {"Raw Honey": honey, "Honey Comb": honey,
-                  "Cacao Beans": cacao}
+    # Usual supplier: as chosen in seed_suppliers.USUAL, else the
+    # lowest-numbered supplier linked to the item, else none.
+    linked = {}
+    for no, names in sorted(seed_suppliers.ITEM_LINKS.items(),
+                            key=lambda kv: int(kv[0])):
+        for name in names:
+            linked.setdefault(name, no)
+
+    def usual(name):
+        no = seed_suppliers.USUAL.get(name) or linked.get(name)
+        return suppliers[no]["id"] if no else None
+
     now = services.now_iso()
     rows = []
     for category, sub, name, unit, mode, stock, reorder, cost in cat.MATERIALS:
-        supplier_id = (raw_source.get(name, produce) if category == "raw"
-                       else by_cat.get(category))
+        supplier_id = usual(name)
         rows.append({
             "name": name, "category": category, "subcategory": sub,
             "unit": unit, "track_mode": mode, "stock_qty": stock,
@@ -376,7 +383,7 @@ HISTORY_PRODUCTS = [
 def _seed_history(users, materials, products):
     rng = random.Random(42)
     monday0 = _this_monday()
-    packing_uid = users["packing_head"]["id"]
+    packing_uid = users["sales_marketing_admin"]["id"]     # stock release requests
     prod_uid = users["production_head"]["id"]
 
     boms = db.read("bill_of_materials")
@@ -401,7 +408,7 @@ def _seed_history(users, materials, products):
                 "product_unit": product["unit"], "qty": qty,
                 "channel": rng.choice(services.PACKING_CHANNELS),
                 "requestor_id": packing_uid,
-                "requestor_name": users["packing_head"]["name"],
+                "requestor_name": users["sales_marketing_admin"]["name"],
                 "status": status, "remarks": TAG, "created_at": _iso(created),
             })
             if status == "Fulfilled":
@@ -437,11 +444,14 @@ def _seed_history(users, materials, products):
 
 
 def _seed_receiving(users, suppliers, materials):
-    """Two deliveries already inspected, one still waiting on the floor."""
+    """Deliveries already inspected, and some still waiting on the floor.
+    Each comes from the spreadsheet supplier that supplies it."""
     uid = users["receiving_head"]["id"]
     qa = users["production_head"]["id"]
-    produce = suppliers["Highland Produce Traders"]["id"]
-    pack = suppliers["Davao CVI"]["id"]
+    ginger_turmeric = suppliers["5"]["id"]     # CHONA DANLOG
+    lemon = suppliers["3"]["id"]               # GROWER'S CHOICE INC.
+    calamansi = suppliers["4"]["id"]           # Dexter Reblinca
+    jars = suppliers["13"]["id"]               # Tengjia International
     m = materials
 
     def lines(*rows):
@@ -451,17 +461,20 @@ def _seed_receiving(users, suppliers, materials):
                 for name, per, count, lot, exp, cond, temp in rows]
 
     # Delivery 1 — produce, inspected, with some loss.
-    batch, boxes, _ = services.receive_delivery(
-        uid, produce, _days_ago(6), lines(
-            ("Ginger", 12.0, 3, "GIN-1006", "", "Good / intact", 27.0),
-            ("Lemon", 120.0, 2, "LEM-1006", "", "Slightly dented / torn", 27.0),
-            ("Turmeric", 8.0, 1, "TUR-1006", "", "Good / intact", 27.0)),
-        po_no="PO-1043", delivery_ref="DR-88412",
-        remarks="Weekly ginger and lemon delivery.")
     outcome = {"Ginger": (11.0, 0.4, 0.6, "Undersized roots", "Soft and bruised"),
                "Lemon": (110.0, 6.0, 4.0, "Overripe", "Split skins in transit"),
                "Turmeric": (8.0, 0.0, 0.0, "", "")}
-    for box in boxes:
+    _, boxes, _ = services.receive_delivery(
+        uid, ginger_turmeric, _days_ago(6), lines(
+            ("Ginger", 12.0, 3, "GIN-1006", "", "Good / intact", 27.0),
+            ("Turmeric", 8.0, 1, "TUR-1006", "", "Good / intact", 27.0)),
+        po_no="PO-1043", delivery_ref="DR-88412",
+        remarks="Weekly ginger and turmeric delivery.")
+    _, lemon_boxes, _ = services.receive_delivery(
+        uid, lemon, _days_ago(6), lines(
+            ("Lemon", 120.0, 2, "LEM-1006", "", "Slightly dented / torn", 27.0)),
+        delivery_ref="DR-88413", remarks="Weekly lemon delivery.")
+    for box in boxes + lemon_boxes:
         good, unusable, damaged, ureason, dreason = outcome[box["material_name"]]
         services.inspect_receiving_box(
             box["id"], qa, good, unusable, damaged, ureason, dreason,
@@ -472,7 +485,7 @@ def _seed_receiving(users, suppliers, materials):
 
     # Delivery 2 — bottles, one carton held for a missing document.
     batch2, boxes2, _ = services.receive_delivery(
-        uid, pack, _days_ago(3), lines(
+        uid, jars, _days_ago(3), lines(
             ("Square Bottle 300 mL", 200.0, 2, "SB300-2210", "", "Good / intact", None),
             ("Hexagonal Jar 250 mL", 150.0, 1, "HX250-2210", "", "Good / intact", None)),
         delivery_ref="DR-55120", remarks="Bottles for the next HLGC run.")
@@ -493,19 +506,25 @@ def _seed_receiving(users, suppliers, materials):
 
     # Delivery 3 — arrived this morning, boxes waiting for inspection.
     services.receive_delivery(
-        uid, produce, services.today_iso(), lines(
-            ("Ginger", 15.0, 2, "GIN-1016", "", "Good / intact", 26.5),
-            ("Calamansi", 10.0, 1, "CAL-1016", "", "Good / intact", 26.5),
-            ("Lemon", 150.0, 2, "LEM-1016", "", "Good / intact", 26.5)),
+        uid, ginger_turmeric, services.today_iso(), lines(
+            ("Ginger", 15.0, 2, "GIN-1016", "", "Good / intact", 26.5)),
         po_no="PO-1051", delivery_ref="DR-88630",
         remarks="Arrived this morning.")
+    services.receive_delivery(
+        uid, calamansi, services.today_iso(), lines(
+            ("Calamansi", 10.0, 1, "CAL-1016", "", "Good / intact", 26.5)),
+        delivery_ref="DR-88631", remarks="Arrived this morning.")
+    services.receive_delivery(
+        uid, lemon, services.today_iso(), lines(
+            ("Lemon", 150.0, 2, "LEM-1016", "", "Good / intact", 26.5)),
+        delivery_ref="DR-88632", remarks="Arrived this morning.")
 
 
 def _seed_honey(users, suppliers, materials):
     """Containers across all three QC states, including failures."""
     recv = users["receiving_head"]["id"]
     qa = users["production_head"]["id"]
-    apiary = suppliers["Mindanao Forest Apiary"]["id"]
+    apiary = suppliers["1"]["id"]            # VIGILIO ESCLITO (honey)
     honey_material = materials["Raw Honey"]["id"]
 
     # (net kg, result, moisture, appearance, note, [(product, kg), ...])
@@ -592,10 +611,6 @@ def _seed_packing(users, products):
 
 def _seed_live_docs(users, products, materials):
     """Pending approvals and customer orders so no screen starts empty."""
-    # The client's own PR 2026-09-017 and its PO, as on the paper forms.
-    for s in db.query("suppliers", name="Trimix Butuan"):
-        db.update("suppliers", s["id"], {"address": "Butuan"})
-    pur.seed_demo(users, {s["name"]: s for s in db.read("suppliers")})
     services.create_production_request(
         requestor_id=users["production_head"]["id"],
         product_id=products["Honey Lemon Ginger Concentrate 300 mL"]["id"],
@@ -617,12 +632,12 @@ def _seed_live_docs(users, products, materials):
         "Cleaning supplies below reorder level", _days_ago(-7),
         [{"description": "Dishwashing Liquid 3.78 L", "purpose_use": "Washing area",
           "qty": 4, "unit": "gal", "est_unit_cost": 385,
-          "preferred_supplier": "Sanitary Care Products Asia",
+          "preferred_supplier_id": db.query("suppliers", ref_no="51")[0]["id"],
           "budget_category": "Production supplies"}],
         notes="For the washing area — two gallons left.")
 
     services.create_sales_request(
-        requestor_id=users["packing_head"]["id"],
+        requestor_id=users["sales_marketing_admin"]["id"],
         product_id=products["Pure Honey 250 mL"]["id"], qty=12,
         remarks="Reserve stock for the Sunrise Cafe walk-in pickup.")
 
@@ -631,7 +646,7 @@ def _seed_live_docs(users, products, materials):
         return
     hlgc = products["Honey Lemon Ginger Concentrate 300 mL"]["id"]
     ph = products["Pure Honey 250 mL"]["id"]
-    packing_uid = users["packing_head"]["id"]
+    packing_uid = users["customer_service_admin"]["id"]     # orders & deliveries
 
     order1, _ = services.create_sales_order(
         customers[0]["id"],
@@ -661,7 +676,7 @@ def _seed_platform_sales(users):
     """Import the sample marketplace exports, so Module 5 has data on day one."""
     import platform_service as ps
     ps.seed_builtin_templates()
-    uid = users["packing_head"]["id"]
+    uid = users["sales_marketing_admin"]["id"]
     templates = {t["platform"]: t for t in ps.all_templates()}
     for filename in ps.folder_files():
         name = filename["name"].lower()

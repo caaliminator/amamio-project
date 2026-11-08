@@ -122,6 +122,32 @@ def find_employee(name):
     return None
 
 
+EMPLOYEE_FIELDS = ("first_name", "middle_name", "last_name", "suffix", "position",
+                   "department", "employee_no", "phone")
+
+
+def clean_employee(form, departments, exclude_id=None):
+    """An employee-list entry from a form.  Returns (values to store, error).
+    Used by the Super Admin's edit and by the Admin's "Add new employee"
+    (which waits for the Super Admin's approval)."""
+    values = {k: " ".join((form.get(k) or "").split()) for k in EMPLOYEE_FIELDS}
+    if not values["first_name"] or not values["last_name"]:
+        return None, "First name and last name are required."
+    if values["department"] not in departments:
+        return None, "Choose the employee's department."
+    if values["suffix"] not in SUFFIXES:
+        values["suffix"] = values["suffix"][:10]
+    values["name"] = full_name(values["first_name"], values["middle_name"],
+                               values["last_name"], values["suffix"])
+    same = find_employee(values["name"])
+    if same and same["id"] != exclude_id:
+        return None, "%s is already on the employee list." % values["name"]
+    if find_user(name=values["name"]):
+        return None, ("%s has a system account — the list is for staff without "
+                      "one." % values["name"])
+    return values, None
+
+
 def employee_label(emp):
     """'Juan Santos Reyes (Machine Operator)' — how the list shows a name."""
     position = (emp or {}).get("position") or ""

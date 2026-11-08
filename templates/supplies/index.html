@@ -15,6 +15,9 @@
     <p class="page-sub">Raw materials, jars &amp; packaging, cleaning and office supplies — everything taken in or issued out.</p>
   </div>
   <div class="page-head-actions">
+    {% if is_admin and not is_super_admin %}{# the Admin adds; the Super Admin approves #}
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('additions.new_item', kind='material' if cat == 'raw' else 'supply') }}">{{ icon('plus', 15) }} {{ 'Add new material' if cat == 'raw' else 'Add new supply' }}</a>
+    {% endif %}
     <a class="btn btn-ghost btn-sm" href="{{ url_for('supplies.count', category=cat) }}">{{ icon('count', 15) }} Month-end count</a>
     <a class="btn btn-ghost btn-sm" href="{{ url_for('supplies.report', category=cat) }}">{{ icon('printer', 15) }} Month-end report</a>
     <a class="btn btn-primary" href="{{ url_for('supplies.move', category=cat) }}">{{ icon('swap', 16) }} Record IN / OUT</a>

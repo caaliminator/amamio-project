@@ -1,6 +1,13 @@
 {% extends "base.html" %}
 {% block title %}{{ page_title }}{% endblock %}
 {% block content %}
+<style>
+  .pick-items { max-height: 340px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; padding: 4px 12px 8px; }
+  .pick-items .pick-group { font-size: .7rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin: 12px 0 4px; }
+  .pick-items label { display: flex; gap: 10px; align-items: center; padding: 5px 0; cursor: pointer; }
+  .pick-items label small { color: var(--muted); }
+  .pick-items label.is-hidden, .pick-items .pick-group.is-hidden { display: none; }
+</style>
 {% if supplier and supplier.id %}
 <a class="back-link" href="{{ url_for('suppliers.detail', supplier_id=supplier.id) }}">{{ icon('arrow-left', 15) }} {{ supplier.name }}</a>
 {% else %}
@@ -18,6 +25,7 @@
         <label class="form-label" for="name">Supplier name <span class="req">*</span></label>
         <input type="text" id="name" name="name" maxlength="120" required value="{{ f.name or '' }}"
                placeholder="e.g. Davao CVI">
+        <div class="form-hint">Another branch of a supplier already listed? Use the same name and give its own address.</div>
       </div>
       <div class="form-row">
         <div class="form-label">Filed under <span class="req">*</span></div>
@@ -31,8 +39,23 @@
     </div>
   </section>
 
+  <section class="wz-step" data-title="What kind of supplier are they?"
+           data-hint="The Reference column of the directory. It prints on purchase orders as the supplier type. Skip it if you don't know.">
+    <div class="wz-body">
+      <div class="form-row">
+        <div class="form-label">Supplier type</div>
+        <div class="chip-choices" data-review-label="Supplier type">
+          {% for t in types %}
+          <label class="chip-choice" title="{{ type_hints[t] }}"><input type="radio" name="supplier_type" value="{{ t }}" {{ 'checked' if f.supplier_type == t }}><span>{{ t }}</span></label>
+          {% endfor %}
+        </div>
+        <div class="form-hint" id="typeHint">{{ type_hints[f.supplier_type] if f.supplier_type in type_hints else 'Farmer, cooperative, direct supplier, online shop…' }}</div>
+      </div>
+    </div>
+  </section>
+
   <section class="wz-step" data-title="What do you buy from them?"
-           data-hint="List the items, sizes included — this is the ITEMS column of the directory. You can skip it and fill it in later.">
+           data-hint="List the items, sizes included — this is the items column of the directory. You can skip it and fill it in later.">
     <div class="wz-body">
       <div class="form-row">
         <label class="form-label" for="materials_supplied">Items supplied</label>
@@ -42,21 +65,43 @@
     </div>
   </section>
 
+  <section class="wz-step" id="pickStep" data-title="Which catalog items do they supply?"
+           data-hint="Tick the stocked items you buy from them. Purchase requests and purchase orders then offer this supplier for these items. Leave it empty if none of their items are on the materials list yet.">
+    <div class="wz-body">
+      <div class="form-row">
+        <input type="search" id="itemFilter" placeholder="Type to find an item, e.g. jar, honey, tape" autocomplete="off" aria-label="Find an item" data-review-skip>
+      </div>
+      <div class="pick-items" id="pickItems">
+        {% for label, rows in material_groups %}
+        <div class="pick-group">{{ label }}</div>
+        {% for m in rows %}
+        <label data-name="{{ m.name|lower }}">
+          <input type="checkbox" name="material_ids" value="{{ m.id }}" {{ 'checked' if m.id in linked }}>
+          <span>{{ m.name }}{% if m.id in usual %} <small>· usual supplier</small>{% endif %}</span>
+        </label>
+        {% endfor %}
+        {% endfor %}
+      </div>
+      <p class="muted small" id="pickCount"></p>
+    </div>
+  </section>
+
   <section class="wz-step" data-title="How do you reach them?"
            data-hint="Everything here is optional — fill in what you have.">
     <div class="wz-body">
       <div class="form-grid cols-2">
         <div class="form-row">
           <label class="form-label" for="tin">TIN</label>
-          <input type="text" id="tin" name="tin" maxlength="30" value="{{ f.tin or '' }}" placeholder="000-000-000-00000" inputmode="numeric">
+          <input type="text" id="tin" name="tin" maxlength="30" value="{{ f.tin or '' }}" placeholder="000-000-000-00000" inputmode="numeric" data-chars="tin">
         </div>
         <div class="form-row">
           <label class="form-label" for="contact_person">Contact person</label>
           <input type="text" id="contact_person" name="contact_person" maxlength="120" value="{{ f.contact_person or '' }}">
         </div>
         <div class="form-row">
-          <label class="form-label" for="phone">Phone</label>
-          <input type="text" inputmode="tel" id="phone" name="phone" maxlength="40" value="{{ f.phone or '' }}" placeholder="09xx-xxx-xxxx">
+          <label class="form-label" for="phone">Mobile / phone numbers</label>
+          <textarea id="phone" name="phone" rows="3" maxlength="160" inputmode="tel" data-chars="phone" placeholder="09xx-xxx-xxxx&#10;One number per line">{{ phones }}</textarea>
+          <div class="form-hint">One number per line.</div>
         </div>
         <div class="form-row">
           <label class="form-label" for="email">Email</label>
@@ -64,7 +109,7 @@
         </div>
       </div>
       <div class="form-row">
-        <label class="form-label" for="address">Address</label>
+        <label class="form-label" for="address">Address / branch</label>
         <input type="text" id="address" name="address" maxlength="300" value="{{ f.address or '' }}" placeholder="e.g. Cagayan de Oro City">
       </div>
     </div>
@@ -111,7 +156,7 @@
 <script>
 (function () {
   var form = document.getElementById("supForm");
-  var hints = {{ hints|tojson }};
+  var hints = {{ hints|tojson }}, typeHints = {{ type_hints|tojson }};
   var row = document.getElementById("otherRow"), other = document.getElementById("buy_from_other");
   function sync() {
     var b = form.querySelector('[name="buy_from"]:checked');
@@ -120,9 +165,42 @@
     other.disabled = !on;
     var c = form.querySelector('[name="category"]:checked');
     if (c) document.getElementById("catHint").textContent = hints[c.value] || "";
+    var t = form.querySelector('[name="supplier_type"]:checked');
+    if (t) document.getElementById("typeHint").textContent = typeHints[t.value] || "";
+    var n = form.querySelectorAll('[name="material_ids"]:checked').length;
+    document.getElementById("pickCount").textContent = n ? n + " item" + (n === 1 ? "" : "s") + " ticked" : "No catalog items ticked";
   }
   form.addEventListener("change", sync);
   sync();
+
+  // Find an item in the list (hides the others and empty groups).
+  var box = document.getElementById("itemFilter"), list = document.getElementById("pickItems");
+  box.addEventListener("input", function () {
+    var words = box.value.toLowerCase().split(/\s+/).filter(Boolean);
+    var group = null, shown = 0;
+    Array.prototype.forEach.call(list.children, function (el) {
+      if (el.classList.contains("pick-group")) {
+        if (group) group.classList.toggle("is-hidden", !shown);
+        group = el; shown = 0; return;
+      }
+      var name = el.getAttribute("data-name");
+      var hit = words.every(function (w) { return name.indexOf(w) !== -1; });
+      el.classList.toggle("is-hidden", !hit);
+      if (hit) shown++;
+    });
+    if (group) group.classList.toggle("is-hidden", !shown);
+  });
+  box.addEventListener("keydown", function (e) { if (e.key === "Enter") e.preventDefault(); });
+
+  // The check-and-save step lists the ticked items by name.
+  document.getElementById("pickStep").reviewHtml = function () {
+    var names = Array.prototype.map.call(list.querySelectorAll('[name="material_ids"]:checked'), function (el) {
+      return el.closest("label").querySelector("span").firstChild.textContent.trim();
+    });
+    var d = document.createElement("div");
+    d.textContent = names.length ? names.join(", ") : "None";
+    return "<dt>Catalog items</dt><dd>" + d.innerHTML + "</dd>";
+  };
 })();
 </script>
 {% endblock %}

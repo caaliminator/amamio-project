@@ -3,10 +3,12 @@
 {% block content %}
 <div class="flex gap mb" style="justify-content: space-between; flex-wrap: wrap;">
   <h1 class="page-title" style="margin: 0;">Materials</h1>
-  <button class="btn btn-primary" type="button"
-          data-modal-open="materialModal" data-mode="create">
-    + Add material
-  </button>
+  {% if can_add %}
+  <div class="flex gap-sm">
+    <a class="btn btn-ghost" href="{{ url_for('additions.new_item', kind='supply') }}">+ Add supply</a>
+    <a class="btn btn-primary" href="{{ url_for('additions.new_item', kind='material') }}">+ Add material</a>
+  </div>
+  {% endif %}
 </div>
 
 <div class="card">

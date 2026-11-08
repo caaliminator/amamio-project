@@ -11,6 +11,7 @@ approver has one queue."""
 from flask import (Blueprint, abort, flash, redirect, render_template, request,
                    url_for)
 
+import additions_service as adds
 import db
 import purchasing_service as pur
 import services
@@ -45,6 +46,8 @@ def index():
                            requests=[_queue_row(r) for r in mine],
                            others=[_queue_row(r) for r in others],
                            orders=orders, waiting_on=pur.waiting_on,
+                           creations=adds.pending(), kinds=adds.KINDS,
+                           can_decide=adds.can_decide(user),
                            urgency_badge=services.URGENCY_BADGE)
 
 

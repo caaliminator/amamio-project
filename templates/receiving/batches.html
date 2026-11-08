@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Batches &amp; Expiry{% endblock %}
+{% block content %}
+<style>
+  .bt-search { position: relative; flex: 1 1 260px; max-width: 420px; }
+  .bt-search input[type="search"] { width: 100%; }
+  .bt-left { font-weight: 700; }
+  .bt-days.is-bad { color: var(--danger-ink, var(--danger)); font-weight: 700; }
+  .bt-days.is-warn { color: var(--gold-ink); font-weight: 700; }
+</style>
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Batches &amp; Expiry</h1>
+    <p class="page-sub">Every item received gets a batch no. (e.g. GINGER-2026-11-001). See what is left of each batch, where it is, and when it expires — use the one that expires first.</p>
+  </div>
+</div>
+
+<div class="tabs">
+  <a href="{{ url_for('receiving.batches', show='stock') }}" class="{{ 'is-active' if show == 'stock' }}">With stock <span class="muted">{{ counts.stock }}</span></a>
+  <a href="{{ url_for('receiving.batches', show='expiring') }}" class="{{ 'is-active' if show == 'expiring' }}">Expired or expiring within {{ soon }} days <span class="muted">{{ counts.expiring }}</span></a>
+  <a href="{{ url_for('receiving.batches', show='all') }}" class="{{ 'is-active' if show == 'all' }}">All batches <span class="muted">{{ counts.all }}</span></a>
+</div>
+
+<div class="toolbar">
+  <label class="bt-search">
+    <input type="search" id="btSearch" value="{{ q }}" placeholder="Search a batch no., item or supplier…" aria-label="Search batches" autocomplete="off">
+  </label>
+  <span class="muted small" id="btCount">{{ rows|length }} batch{{ 'es' if rows|length != 1 }}</span>
+</div>
+
+{% if rows %}
+<div class="card">
+  <div class="table-wrap">
+    <table class="table" id="btTable">
+      <thead><tr>
+        <th>Batch no.</th><th>Item</th><th>Received</th><th>Expiry</th><th>Status</th>
+        <th class="num">In storage</th><th class="num">Production area</th>
+        <th class="num">Received</th><th class="num">Accepted</th><th class="num">Used</th>
+      </tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-search="{{ (r.batch_no ~ ' ' ~ r.material_name ~ ' ' ~ r.supplier_name ~ ' ' ~ r.supplier_lot)|lower }}">
+          <td class="nowrap"><b>{{ r.batch_no }}</b>{% if r.supplier_lot %}<div class="muted small">supplier lot {{ r.supplier_lot }}</div>{% endif %}</td>
+          <td>{{ r.material_name }}<div class="muted small">{{ r.supplier_name or '—' }}</div></td>
+          <td class="nowrap">{{ r.received_date|longdate }}<div class="muted small">{% if can('receiving') and r.delivery_id %}<a href="{{ url_for('receiving.batch', batch_id=r.delivery_id) }}">{{ r.delivery_ref }}</a>{% else %}{{ r.delivery_ref }}{% endif %} · {{ r.boxes }} box{{ 'es' if r.boxes != 1 }}</div></td>
+          <td class="nowrap">{% if r.expiry_date %}{{ r.expiry_date|longdate }}
+            <div class="small bt-days {{ 'is-bad' if r.days_left is not none and r.days_left < 0 else ('is-warn' if r.days_left is not none and r.days_left <= soon else '') }}">
+              {% if r.days_left < 0 %}expired {{ -r.days_left }} day{{ 's' if r.days_left != -1 }} ago{% elif r.days_left == 0 %}expires today{% else %}{{ r.days_left }} day{{ 's' if r.days_left != 1 }} left{% endif %}</div>
+            {% else %}<span class="muted">Not recorded</span>{% endif %}{% if r.mfg_date %}<div class="muted small">MFG {{ r.mfg_date|longdate }}</div>{% endif %}</td>
+          <td><span class="badge {{ r.badge }}">{{ r.status }}</span></td>
+          <td class="num bt-left">{{ r.in_storage|qty(r.unit) if r.in_storage else '—' }}</td>
+          <td class="num">{{ r.in_production|qty(r.unit) if r.in_production else '—' }}</td>
+          <td class="num">{{ r.received_qty|qty(r.unit) }}</td>
+          <td class="num">{{ r.accepted_qty|qty(r.unit) if r.accepted_qty else '—' }}</td>
+          <td class="num">{{ r.consumed|qty(r.unit) if r.consumed else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted small mt">Expiry comes from the date marking picked at inspection. Batches without one are listed but can't be flagged as expiring.</p>
+</div>
+<div class="card" id="btNone" style="display:none"><div class="empty">
+  <div class="empty-title">No batch matches</div>
+</div></div>
+{% else %}
+<div class="card"><div class="empty">
+  <div class="empty-icon">{{ icon('calendar', 30) }}</div>
+  <div class="empty-title">{{ 'Nothing expired or expiring soon' if show == 'expiring' else 'No batches here' }}</div>
+  <p class="muted">Batches are created by themselves when a delivery is received.</p>
+</div></div>
+{% endif %}
+
+<script>
+(function () {
+  var box = document.getElementById("btSearch"), table = document.getElementById("btTable");
+  if (!box || !table) return;
+  var rows = Array.prototype.slice.call(table.querySelectorAll("tbody tr"));
+  function run() {
+    var words = box.value.toLowerCase().split(/\s+/).filter(Boolean), shown = 0;
+    table.classList.toggle("is-filtering", words.length > 0);
+    rows.forEach(function (tr) {
+      var hit = words.every(function (w) { return tr.getAttribute("data-search").indexOf(w) !== -1; });
+      tr.hidden = !hit;
+      if (hit) shown++;
+    });
+    document.getElementById("btCount").textContent = shown + (shown === 1 ? " batch" : " batches");
+    document.getElementById("btNone").style.display = shown ? "none" : "";
+  }
+  box.addEventListener("input", run);
+  if (box.value) run();
+})();
+</script>
+{% endblock %}

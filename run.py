@@ -32,6 +32,7 @@ if __name__ == "__main__":
     print(" Demo logins:  superadmin/super123   admin/admin123")
     print("               receiving/recv123     production/prod123")
     print("               packing/pack123       packer1/member123")
-    print("               assets/assets123")
+    print("               assets/assets123      finance/finance123")
+    print("               service/service123    marketing/market123")
     print("=" * 66)
     app.run(host=host, port=port, debug=debug)

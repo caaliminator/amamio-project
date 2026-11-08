@@ -1,9 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Log honey containers{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('honey.index') }}">{{ icon('arrow-left', 15) }} Honey Containers</a>
+<a class="back-link" href="{{ url_for('honey.index') }}">{{ icon('arrow-left', 15) }} Honey Inspection</a>
 
-<form method="post" class="wizard" data-wizard data-wizard-start="{{ start }}"
+{# Three steps: where the honey is from, the containers (supplier, weight,
+   dates on one page), then check and save. #}
+<form method="post" class="wizard" data-wizard data-wizard-start="{{ start }}" id="honeyForm"
       data-submit-label="Save &amp; print QR labels" data-cancel="{{ url_for('honey.index') }}">
 
   <section class="wz-step" data-title="Where is the honey from?">
@@ -17,60 +19,80 @@
     </div>
   </section>
 
-  <section class="wz-step" data-title="Which supplier?" data-when="source!=Own harvest">
-    <div class="wz-body">
-      <div class="form-row">
-        <label class="form-label" for="supplier_id">Supplier / beekeeper</label>
-        <select id="supplier_id" name="supplier_id">
-          <option value="">Not listed</option>
-          {% for s in suppliers %}<option value="{{ s.id }}" {{ 'selected' if form.supplier_id == s.id|string }}>{{ s.name }}</option>{% endfor %}
-        </select>
-      </div>
-    </div>
-  </section>
-
-  <section class="wz-step" data-title="How much honey?"
+  <section class="wz-step" id="detailsStep" data-title="About the containers"
            data-hint="Containers of the same weight can be logged together — each still gets its own QR code.">
-    <div class="wz-body">
-      <div class="form-grid cols-2">
-        <div class="form-row">
-          <label class="form-label" for="net_weight_kg">Net weight per container <span class="req">*</span></label>
-          <div class="big-field">
-            <input type="number" id="net_weight_kg" name="net_weight_kg" step="0.01" min="0.01" required inputmode="decimal" value="{{ form.net_weight_kg or '' }}">
-            <span class="unit">kg</span>
-          </div>
-        </div>
-        <div class="form-row">
-          <label class="form-label" for="count">Number of containers <span class="req">*</span></label>
-          <div class="big-field">
-            <input type="number" id="count" name="count" min="1" max="50" required inputmode="numeric" value="{{ form.count or 1 }}">
-            <span class="unit">pcs</span>
-          </div>
-        </div>
-      </div>
-      <details {{ 'open' if form.gross_weight_kg }}>
-        <summary class="small gold" style="cursor:pointer;margin-bottom:12px">Gross &amp; tare weight (optional)</summary>
-        <div class="form-grid cols-2">
-          <div class="form-row"><label class="form-label" for="gross_weight_kg">Gross weight (kg)</label>
-            <input type="number" id="gross_weight_kg" name="gross_weight_kg" step="0.01" min="0" value="{{ form.gross_weight_kg or '' }}"></div>
-          <div class="form-row"><label class="form-label" for="tare_weight_kg">Container (tare) weight (kg)</label>
-            <input type="number" id="tare_weight_kg" name="tare_weight_kg" step="0.01" min="0" value="{{ form.tare_weight_kg or '' }}"></div>
-        </div>
-      </details>
-    </div>
-  </section>
+    <div class="wz-body hq-body">
 
-  <section class="wz-step" data-title="Dates">
-    <div class="wz-body">
-      <div class="form-grid cols-2">
-        <div class="form-row"><label class="form-label" for="received_date">Date received <span class="req">*</span></label>
-          <input type="date" id="received_date" name="received_date" required value="{{ form.received_date or today }}" max="{{ today }}"></div>
-        <div class="form-row"><label class="form-label" for="harvest_date">Harvest date</label>
-          <input type="date" id="harvest_date" name="harvest_date" value="{{ form.harvest_date or '' }}" max="{{ today }}"></div>
+      <div class="hq-section" id="supSection">
+        <div class="hq-head"><span class="hq-num"></span>
+          <div><div class="hq-title">Supplier</div>
+            <div class="hq-sub">Who it came from. Suppliers of honey in the directory are listed first.</div></div>
+        </div>
+        <div class="form-row" style="margin:0;max-width:520px">
+          <label class="form-label" for="supplier_id">Supplier / beekeeper</label>
+          <select id="supplier_id" name="supplier_id">
+            <option value="">Not listed</option>
+            {% if honey_suppliers %}
+            <optgroup label="Supply honey">
+              {% for s in honey_suppliers %}<option value="{{ s.id }}" {{ 'selected' if form.supplier_id == s.id|string }}>{{ s.name }}</option>{% endfor %}
+            </optgroup>
+            {% endif %}
+            <optgroup label="{{ 'Other suppliers' if honey_suppliers else 'Suppliers' }}">
+              {% for s in other_suppliers %}<option value="{{ s.id }}" {{ 'selected' if form.supplier_id == s.id|string }}>{{ s.name }}</option>{% endfor %}
+            </optgroup>
+          </select>
+        </div>
       </div>
-      <div class="form-row"><label class="form-label" for="batch_ref">Batch reference</label>
-        <input type="text" id="batch_ref" name="batch_ref" maxlength="40" value="{{ form.batch_ref or '' }}" placeholder="Leave blank to number it automatically">
+
+      <div class="hq-section">
+        <div class="hq-head"><span class="hq-num"></span>
+          <div><div class="hq-title">How much honey?</div>
+            <div class="hq-sub">The net weight of one container, and how many there are.</div></div>
+        </div>
+        <div class="form-grid cols-2">
+          <div class="form-row">
+            <label class="form-label" for="net_weight_kg">Net weight per container <span class="req">*</span></label>
+            <div class="big-field">
+              <input type="number" id="net_weight_kg" name="net_weight_kg" step="0.01" min="0.01" required inputmode="decimal"
+                     value="{{ form.net_weight_kg or '' }}" placeholder="e.g. 25">
+              <span class="unit">kg</span>
+            </div>
+          </div>
+          <div class="form-row">
+            <label class="form-label" for="count">Number of containers <span class="req">*</span></label>
+            <div class="big-field">
+              <input type="number" id="count" name="count" min="1" max="50" step="1" required inputmode="numeric" value="{{ form.count or 1 }}">
+              <span class="unit">pcs</span>
+            </div>
+          </div>
+        </div>
+        <div class="tally hq-total" id="totalLine" hidden></div>
+        <details class="hq-more" {{ 'open' if form.gross_weight_kg }}>
+          <summary>Gross &amp; tare weight <span class="muted">(optional)</span></summary>
+          <div class="form-grid cols-2">
+            <div class="form-row"><label class="form-label" for="gross_weight_kg">Gross weight (kg)</label>
+              <input type="number" id="gross_weight_kg" name="gross_weight_kg" step="0.01" min="0" value="{{ form.gross_weight_kg or '' }}"></div>
+            <div class="form-row"><label class="form-label" for="tare_weight_kg">Container (tare) weight (kg)</label>
+              <input type="number" id="tare_weight_kg" name="tare_weight_kg" step="0.01" min="0" value="{{ form.tare_weight_kg or '' }}"></div>
+          </div>
+        </details>
       </div>
+
+      <div class="hq-section">
+        <div class="hq-head"><span class="hq-num"></span>
+          <div><div class="hq-title">Dates &amp; batch</div>
+            <div class="hq-sub">Leave the batch reference blank to number it automatically.</div></div>
+        </div>
+        <div class="form-grid cols-3">
+          <div class="form-row"><label class="form-label" for="received_date">Date received <span class="req">*</span></label>
+            <input type="date" id="received_date" name="received_date" required value="{{ form.received_date or today }}" max="{{ today }}"></div>
+          <div class="form-row"><label class="form-label" for="harvest_date">Harvest date</label>
+            <input type="date" id="harvest_date" name="harvest_date" value="{{ form.harvest_date or '' }}" max="{{ today }}"></div>
+          <div class="form-row"><label class="form-label" for="batch_ref">Batch reference</label>
+            <input type="text" id="batch_ref" name="batch_ref" maxlength="40" value="{{ form.batch_ref or '' }}" placeholder="Automatic"></div>
+        </div>
+      </div>
+
     </div>
   </section>
 
@@ -79,4 +101,31 @@
     <div class="wz-body"></div>
   </section>
 </form>
+
+<script>
+(function () {
+  var form = document.getElementById("honeyForm");
+  var sup = document.getElementById("supSection"), select = document.getElementById("supplier_id");
+  var weight = document.getElementById("net_weight_kg"), count = document.getElementById("count");
+  var total = document.getElementById("totalLine");
+  function n(v) { return Math.round(v * 100) / 100; }
+  // Own harvest has no supplier: the section hides (and isn't saved).
+  function syncSource() {
+    var r = form.querySelector("[name=source]:checked"), own = !r || r.value === "Own harvest";
+    sup.hidden = own;
+    select.disabled = own;
+  }
+  // "3 containers × 25 kg = 75 kg of honey"
+  function syncTotal() {
+    var w = parseFloat(weight.value) || 0, c = parseInt(count.value, 10) || 0;
+    total.hidden = !(w > 0 && c > 0);
+    total.innerHTML = "<span>" + c + " container" + (c === 1 ? "" : "s") + " × " + n(w) + " kg</span><b>" + n(w * c) + " kg of honey</b>";
+  }
+  form.addEventListener("change", function (e) { if (e.target.name === "source") syncSource(); });
+  form.addEventListener("input", syncTotal);
+  document.getElementById("detailsStep").addEventListener("wz:enter", function () { syncSource(); syncTotal(); });
+  syncSource();
+  syncTotal();
+})();
+</script>
 {% endblock %}

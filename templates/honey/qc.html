@@ -1,66 +1,100 @@
 {% extends "base.html" %}
 {% block title %}Check {{ c.container_code }}{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('honey.index') }}">{{ icon('arrow-left', 15) }} Honey Containers</a>
+<a class="back-link" href="{{ url_for('honey.index') }}">{{ icon('arrow-left', 15) }} Honey Inspection</a>
 
+{# Three steps: the container, the check (moisture, appearance and the
+   decision on one page), then check and save. #}
 <form method="post" class="wizard" data-wizard data-wizard-start="{{ start }}" id="qcForm"
       data-submit-label="Save result" data-cancel="{{ url_for('honey.container', container_id=c.id) }}">
 
-  <section class="wz-step" data-title="Is this the right container?" data-no-review>
-    <div class="wz-body">
-      <div class="qr-inline">
-        <img src="{{ url_for('qr.image', token=c.container_code) }}" alt="QR code {{ c.container_code }}">
-        <div>
-          <div class="record-code">{{ c.container_code }}</div>
-          <div class="record-title" style="font-size:1.3rem">Honey — {{ c.net_weight_kg|qty('kg') }}</div>
-          <div class="muted small">{{ c.supplier_name or c.source }} · {{ c.batch_ref }} · received {{ c.received_date }}</div>
+  <section class="wz-step" id="containerStep" data-title="Is this the right container?"
+           data-hint="Match the code below with the QR label on the container.">
+    <div class="hq-container">
+      <div class="hq-qr"><img src="{{ url_for('qr.image', token=c.container_code) }}" alt="QR code {{ c.container_code }}"></div>
+      <div class="hq-info">
+        <div class="record-code">{{ c.container_code }}</div>
+        <div class="hq-weight">{{ c.net_weight_kg|qty('kg') }} <span>of honey</span></div>
+        <dl class="hq-facts">
+          <div><dt>Source</dt><dd>{{ c.supplier_name or c.source }}</dd></div>
+          <div><dt>Batch</dt><dd>{{ c.batch_ref or '—' }}</dd></div>
+          <div><dt>Received</dt><dd>{{ c.received_date|longdate if c.received_date else '—' }}</dd></div>
+          {% if c.harvest_date %}<div><dt>Harvested</dt><dd>{{ c.harvest_date|longdate }}</dd></div>{% endif %}
+          {% if c.gross_weight_kg %}<div><dt>Gross / tare</dt><dd>{{ c.gross_weight_kg|qty('kg') }} / {{ (c.tare_weight_kg or 0)|qty('kg') }}</dd></div>{% endif %}
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <section class="wz-step" id="checkStep" data-title="Check the honey"
+           data-hint="Moisture, appearance, then your decision — all on this page.">
+    <div class="wz-body hq-body">
+
+      <div class="hq-section">
+        <div class="hq-head"><span class="hq-num"></span>
+          <div><div class="hq-title">Moisture content</div>
+            <div class="hq-sub">Read it with the refractometer. Honey above {{ moisture_max|qty }}% moisture usually fails.</div></div>
+        </div>
+        <div class="hq-moist">
+          <div class="form-row" style="margin:0">
+            <label class="form-label" for="moisture_pct">Moisture <span class="req">*</span></label>
+            <div class="big-field">
+              <input type="number" id="moisture_pct" name="moisture_pct" step="0.1" min="0" max="100" required
+                     inputmode="decimal" value="{{ form.moisture_pct or '' }}" placeholder="e.g. 18.5">
+              <span class="unit">%</span>
+            </div>
+          </div>
+          <div class="hq-gauge" aria-hidden="true">
+            <div class="hq-gauge-bar">
+              <span class="hq-zone-ok" style="width: {{ ((moisture_max - 10) / 20 * 100)|round(1) }}%"></span>
+              <span class="hq-marker" id="gaugeMarker" hidden></span>
+            </div>
+            <div class="hq-gauge-scale"><span>10%</span><span class="hq-limit">{{ moisture_max|qty }}% limit</span><span>30%</span></div>
+            <div class="hq-reading" id="moistNote">Enter the reading to see where it falls.</div>
+          </div>
         </div>
       </div>
-    </div>
-  </section>
 
-  <section class="wz-step" data-title="Moisture content"
-           data-hint="Read it with the moisture meter (refractometer). Honey above {{ moisture_max|qty }}% moisture usually fails.">
-    <div class="wz-body">
-      <div class="form-row">
-        <label class="form-label" for="moisture_pct">Moisture <span class="req">*</span></label>
-        <div class="big-field" style="max-width:280px">
-          <input type="number" id="moisture_pct" name="moisture_pct" step="0.1" min="0" max="100" required inputmode="decimal" value="{{ form.moisture_pct or '' }}">
-          <span class="unit">%</span>
+      <div class="hq-section">
+        <div class="hq-head"><span class="hq-num"></span>
+          <div><div class="hq-title">Appearance</div>
+            <div class="hq-sub">What does the honey look like?</div></div>
+        </div>
+        <div class="chip-choices hq-chips" data-review-label="Appearance">
+          {% for a in appearances %}
+          <label class="chip-choice"><input type="radio" name="appearance" value="{{ a }}" required {{ 'checked' if form.appearance == a }}>
+            <span>{{ a }}{% if a in fail_signs %} <small class="hq-flag">fail sign</small>{% endif %}</span></label>
+          {% endfor %}
         </div>
       </div>
-    </div>
-  </section>
 
-  <section class="wz-step" data-title="Appearance" data-hint="What does the honey look like?">
-    <div class="chip-choices" data-review-label="Appearance">
-      {% for a in appearances %}
-      <label class="chip-choice"><input type="radio" name="appearance" value="{{ a }}" required data-autonext {{ 'checked' if form.appearance == a }}><span>{{ a }}</span></label>
-      {% endfor %}
-    </div>
-  </section>
-
-  <section class="wz-step" data-title="PASS or FAILED?" id="resultStep">
-    <p class="muted small" id="suggestLine" style="margin-top:-8px"></p>
-    <div class="choice-grid cols-2 mb" data-review-label="Result">
-      <label class="choice is-pass"><input type="radio" name="result" value="Pass" required {{ 'checked' if form.result == 'Pass' }}>
-        <span class="choice-card"><span class="choice-icon">{{ icon('check', 22) }}</span>
-        <span><span class="choice-title">PASS</span>
-        <span class="choice-sub">For selling — goes to {{ pass_products|join(', ') }}</span></span></span></label>
-      <label class="choice is-fail"><input type="radio" name="result" value="Failed" {{ 'checked' if form.result == 'Failed' }}>
-        <span class="choice-card"><span class="choice-icon">{{ icon('x-circle', 22) }}</span>
-        <span><span class="choice-title">FAILED</span>
-        <span class="choice-sub">Not discarded — goes to {{ fail_products|join(', ') }}</span></span></span></label>
-    </div>
-    <div class="wz-body">
-      <div class="form-row">
-        <label class="form-label" for="qc_notes">Notes</label>
-        <input type="text" id="qc_notes" name="qc_notes" maxlength="200" value="{{ form.qc_notes or '' }}" placeholder="Optional">
+      <div class="hq-section">
+        <div class="hq-head"><span class="hq-num"></span>
+          <div><div class="hq-title">Your decision</div>
+            <div class="hq-sub">The guide only suggests — you decide.</div></div>
+        </div>
+        <div class="hq-suggest" id="suggestLine" hidden></div>
+        <div class="choice-grid cols-2" data-review-label="Result">
+          <label class="choice is-pass"><input type="radio" name="result" value="Pass" required {{ 'checked' if form.result == 'Pass' }}>
+            <span class="choice-card"><span class="choice-icon">{{ icon('check', 22) }}</span>
+            <span><span class="choice-title">PASS</span>
+            <span class="choice-sub">For selling — goes to {{ pass_products|join(', ') }}</span></span></span></label>
+          <label class="choice is-fail"><input type="radio" name="result" value="Failed" {{ 'checked' if form.result == 'Failed' }}>
+            <span class="choice-card"><span class="choice-icon">{{ icon('x-circle', 22) }}</span>
+            <span><span class="choice-title">FAILED</span>
+            <span class="choice-sub">Not discarded — goes to {{ fail_products|join(', ') }}</span></span></span></label>
+        </div>
+        <div class="form-row" style="margin:16px 0 0">
+          <label class="form-label" for="qc_notes">Notes</label>
+          <input type="text" id="qc_notes" name="qc_notes" maxlength="200" value="{{ form.qc_notes or '' }}" placeholder="Optional">
+        </div>
       </div>
+
     </div>
   </section>
 
-  <section class="wz-step" data-title="Check and save" data-review>
+  <section class="wz-step" id="reviewStep" data-title="Check and save" data-review
+           data-hint="Look it over, then save. The result can't be changed once saved.">
     <div class="wz-body"></div>
   </section>
 </form>
@@ -68,17 +102,102 @@
 <script>
 (function () {
   var form = document.getElementById("qcForm");
-  var line = document.getElementById("suggestLine");
-  var URL = "{{ url_for('honey.suggest') }}";
-  document.getElementById("resultStep").addEventListener("wz:enter", function () {
-    var m = form.moisture_pct.value;
-    var a = (form.querySelector("[name=appearance]:checked") || {}).value || "";
-    window.IMS.fetchJSON(URL + "?moisture_pct=" + encodeURIComponent(m) + "&appearance=" + encodeURIComponent(a))
-      .then(function (d) {
-        if (!d.suggested) { line.textContent = ""; return; }
-        line.innerHTML = "Based on " + window.IMS.esc(m) + "% moisture and “" + window.IMS.esc(a.toLowerCase()) +
-          "”, the guide suggests <b>" + (d.suggested === "Pass" ? "PASS" : "FAILED") + "</b>. You decide.";
-      }).catch(function () {});
+  var LIMIT = {{ moisture_max|tojson }}, LO = 10, HI = 30, ODD_LOW = 12, ODD_HIGH = 30;
+  var moist = document.getElementById("moisture_pct");
+  var marker = document.getElementById("gaugeMarker"), note = document.getElementById("moistNote");
+  var line = document.getElementById("suggestLine"), notes = document.getElementById("qc_notes");
+  var suggested = "";
+  function val(name) { var r = form.querySelector("[name=" + name + "]:checked"); return r ? r.value : ""; }
+
+  // The gauge: where the reading falls against the {{ moisture_max|qty }}% limit.
+  function gauge() {
+    var v = parseFloat(moist.value);
+    if (isNaN(v)) { marker.hidden = true; note.textContent = "Enter the reading to see where it falls."; note.className = "hq-reading"; return; }
+    var pct = Math.max(0, Math.min(100, (v - LO) / (HI - LO) * 100));
+    marker.hidden = false;
+    marker.style.left = pct + "%";
+    var over = v > LIMIT, odd = v < ODD_LOW || v > ODD_HIGH;
+    marker.classList.toggle("is-over", over);
+    note.className = "hq-reading " + (odd ? "is-odd" : over ? "is-bad" : "is-good");
+    note.textContent = odd ? v + "% is unusual for honey (most read " + ODD_LOW + "–25%) — please check the refractometer reading."
+                     : over ? v + "% — above the " + LIMIT + "% limit; this usually fails."
+                     : v + "% — within the " + LIMIT + "% limit.";
+  }
+
+  // The guide's suggestion, as soon as both readings are in — the same rule
+  // as services.suggested_qc_result (above the limit, or a fail sign, fails).
+  var FAIL_SIGNS = {{ fail_signs|list|tojson }};
+  function suggest() {
+    var m = parseFloat(moist.value), a = val("appearance");
+    if (isNaN(m) || !a) { suggested = ""; line.hidden = true; mismatch(); return; }
+    suggested = (m > LIMIT || FAIL_SIGNS.indexOf(a) !== -1) ? "Failed" : "Pass";
+    var pass = suggested === "Pass";
+    line.className = "hq-suggest " + (pass ? "is-pass" : "is-fail");
+    line.innerHTML = "<span>Guide suggests</span><b>" + (pass ? "PASS" : "FAILED") + "</b><em>" +
+      window.IMS.esc(String(m)) + "% moisture · " + window.IMS.esc(a.toLowerCase()) + "</em>";
+    line.hidden = false;
+    mismatch();
+  }
+  // Going against the guide: ask for a reason in the notes.
+  function mismatch() {
+    var r = val("result"), differs = suggested && r && r !== suggested;
+    notes.placeholder = differs ? "Why " + (r === "Pass" ? "PASS" : "FAILED") + "? It differs from the guide." : "Optional";
+  }
+
+  moist.addEventListener("input", function () { gauge(); suggest(); });
+  form.addEventListener("change", function (e) {
+    if (e.target.name === "appearance") suggest();
+    if (e.target.name === "result") mismatch();
+  });
+  gauge();
+  suggest();
+
+  document.getElementById("containerStep").reviewHtml = function () {
+    return "<dt>Container</dt><dd>{{ c.container_code }} · {{ c.net_weight_kg|qty('kg') }}</dd>";
+  };
+
+  // Last step: a summary card instead of the plain list — the decision on
+  // top (with where the honey goes and how it compares to the guide), then
+  // the container and the two readings, each with a link back to change it.
+  var C = {{ {"code": c.container_code, "weight": c.net_weight_kg|qty('kg'),
+              "source": c.supplier_name or c.source, "batch": c.batch_ref or "",
+              "received": c.received_date|longdate if c.received_date else ""}|tojson }};
+  var GOES = {{ {"Pass": pass_products|join(', '), "Failed": fail_products|join(', ')}|tojson }};
+  var ICON_OK = {{ icon('check', 26)|string|tojson }}, ICON_NO = {{ icon('x-circle', 26)|string|tojson }},
+      ICON_SM = {{ icon('check', 14)|string|tojson }};
+  var esc = window.IMS.esc;
+  function tile(label, value, extra, step) {
+    return '<div class="hq-tile"><div class="hq-tile-top"><span class="hq-tile-label">' + label + "</span>" +
+      '<a href="#" class="review-edit" data-wz-goto="' + step + '">Change</a></div>' +
+      '<div class="hq-tile-value">' + value + "</div>" + (extra || "") + "</div>";
+  }
+  document.getElementById("reviewStep").addEventListener("wz:enter", function () {
+    var box = this.querySelector(".review");
+    if (!box) return;
+    var r = val("result"), pass = r === "Pass", m = parseFloat(moist.value), a = val("appearance");
+    var over = m > LIMIT, odd = m < ODD_LOW || m > ODD_HIGH, sign = FAIL_SIGNS.indexOf(a) !== -1;
+    var guide = !suggested ? "" : suggested === r
+      ? '<span class="hq-guide is-match">' + ICON_SM + " Matches the guide</span>"
+      : '<span class="hq-guide is-differ">Differs from the guide (it suggests ' + (suggested === "Pass" ? "PASS" : "FAILED") + ")</span>";
+    var html = '<div class="hq-verdict ' + (pass ? "is-pass" : "is-fail") + '">' +
+      '<span class="hq-verdict-icon">' + (pass ? ICON_OK : ICON_NO) + "</span>" +
+      '<div class="hq-verdict-main"><div class="hq-verdict-label">Result</div>' +
+      '<div class="hq-verdict-value">' + (pass ? "PASS" : "FAILED") + "</div>" +
+      '<div class="hq-verdict-sub">' + (pass ? "For selling — joins sellable honey stock: " : "Not discarded — kept as honey for processing: ") +
+      esc(GOES[r] || "") + "</div></div>" + guide +
+      '<a href="#" class="review-edit hq-verdict-edit" data-wz-goto="1">Change</a></div>';
+    html += '<div class="hq-tiles">' +
+      tile("Container", esc(C.code) + ' <span class="hq-tile-dim">· ' + esc(C.weight) + "</span>",
+           '<div class="hq-tile-sub">' + esc([C.source, C.batch, C.received && "received " + C.received].filter(Boolean).join(" · ")) + "</div>", 0) +
+      tile("Moisture", esc(String(m)) + "%",
+           '<span class="hq-pill ' + (odd ? "is-odd" : over ? "is-bad" : "is-good") + '">' +
+           (odd ? "Unusual reading — check the meter" : over ? "Above the " + LIMIT + "% limit" : "Within the " + LIMIT + "% limit") + "</span>", 1) +
+      tile("Appearance", esc(a),
+           sign ? '<span class="hq-pill is-bad">Fail sign</span>' : '<span class="hq-pill is-good">No fail sign</span>', 1) +
+      "</div>";
+    var nt = notes.value.trim();
+    if (nt) html += '<div class="hq-notes"><span class="hq-tile-label">Notes</span><p>' + esc(nt) + "</p></div>";
+    box.innerHTML = html;
   });
 })();
 </script>

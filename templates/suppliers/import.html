@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Import suppliers from Excel{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('suppliers.index') }}">{{ icon('arrow-left', 15) }} Supplier Directory</a>
+
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Import from Excel</h1>
+    <p class="page-sub">Upload the latest Suppliers Directory spreadsheet. You'll see what it would add or change before anything is saved.</p>
+  </div>
+</div>
+
+<div class="card" style="max-width:720px">
+  <form method="post" enctype="multipart/form-data">
+    <div class="form-row">
+      <label class="form-label" for="workbook">Spreadsheet (.xlsx) <span class="req">*</span></label>
+      <input type="file" id="workbook" name="workbook" accept=".xlsx" required>
+      <div class="form-hint">The same layout as "SUPPLIERS DIRECTORY 2026.xlsx": No. · Name · Address · Mobile# · Contact Person · Supplier Category (the items) · email add · TIN · Reference (the supplier type).</div>
+    </div>
+    <ul class="muted small" style="margin:14px 0 18px;padding-left:18px">
+      <li>Rows are matched to the directory by name and address. A match only fills in what is blank in the directory; where the file and the directory disagree, you choose.</li>
+      <li>New suppliers are sent to the Super Admin for approval; they join the directory once approved.</li>
+      <li>Importing the same file again changes nothing.</li>
+    </ul>
+    <button class="btn btn-primary" type="submit">{{ icon('upload', 15) }} Upload and preview</button>
+    <a class="btn btn-ghost" href="{{ url_for('suppliers.index') }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

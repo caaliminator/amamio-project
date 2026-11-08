@@ -4,7 +4,7 @@
     "channel": "Shopee",
     "packer_id": 6,
     "packer_name": "Joy Aquino Salazar",
-    "pack_date": "2026-10-14",
+    "pack_date": "2026-11-06",
     "order_ref": "SHP-2610107KMYDDCQ",
     "sales_order_id": null,
     "status": "Handed to Courier",
@@ -13,7 +13,7 @@
     "stock_released": true,
     "dispatch_type": "Handed to Courier",
     "handed_to": "SPX rider — Ben",
-    "handed_at": "2026-10-16T05:39:35.555847+00:00",
+    "handed_at": "2026-11-08T13:02:48.820283+00:00",
     "courier": "SPX Express (Shopee)",
     "tracking_no": "PH269036210686A",
     "parcel_count": 2,
@@ -39,8 +39,8 @@
       }
     ],
     "created_by": 5,
-    "created_at": "2026-10-16T05:39:35.342681+00:00",
-    "packed_at": "2026-10-16T05:39:35.528856+00:00",
+    "created_at": "2026-11-08T13:02:48.611635+00:00",
+    "packed_at": "2026-11-08T13:02:48.797231+00:00",
     "id": 1
   },
   {
@@ -48,7 +48,7 @@
     "channel": "Lazada",
     "packer_id": 7,
     "packer_name": "Mark Anthony Reyes Gonzales",
-    "pack_date": "2026-10-14",
+    "pack_date": "2026-11-06",
     "order_ref": "LZD-1119715849296256",
     "sales_order_id": null,
     "status": "Handed to Courier",
@@ -57,7 +57,7 @@
     "stock_released": true,
     "dispatch_type": "Handed to Courier",
     "handed_to": "J&T rider — Al",
-    "handed_at": "2026-10-16T05:39:35.881776+00:00",
+    "handed_at": "2026-11-08T13:02:49.146772+00:00",
     "courier": "J&T Express",
     "tracking_no": "820165158961",
     "parcel_count": 2,
@@ -83,8 +83,8 @@
       }
     ],
     "created_by": 5,
-    "created_at": "2026-10-16T05:39:35.609589+00:00",
-    "packed_at": "2026-10-16T05:39:35.855609+00:00",
+    "created_at": "2026-11-08T13:02:48.879657+00:00",
+    "packed_at": "2026-11-08T13:02:49.120822+00:00",
     "id": 2
   },
   {
@@ -92,7 +92,7 @@
     "channel": "VIP",
     "packer_id": 6,
     "packer_name": "Joy Aquino Salazar",
-    "pack_date": "2026-10-15",
+    "pack_date": "2026-11-07",
     "order_ref": "VIP-Metro Grocers",
     "sales_order_id": null,
     "status": "Disbursed",
@@ -101,7 +101,7 @@
     "stock_released": true,
     "dispatch_type": "Disbursed",
     "handed_to": "Liza Tan (Metro Grocers)",
-    "handed_at": "2026-10-16T05:39:36.187064+00:00",
+    "handed_at": "2026-11-08T13:02:49.447301+00:00",
     "courier": "",
     "tracking_no": "",
     "parcel_count": 1,
@@ -127,8 +127,8 @@
       }
     ],
     "created_by": 5,
-    "created_at": "2026-10-16T05:39:35.945013+00:00",
-    "packed_at": "2026-10-16T05:39:36.160123+00:00",
+    "created_at": "2026-11-08T13:02:49.207591+00:00",
+    "packed_at": "2026-11-08T13:02:49.421840+00:00",
     "id": 3
   },
   {
@@ -136,7 +136,7 @@
     "channel": "TikTok",
     "packer_id": 7,
     "packer_name": "Mark Anthony Reyes Gonzales",
-    "pack_date": "2026-10-15",
+    "pack_date": "2026-11-07",
     "order_ref": "TTS-7694272255744952065",
     "sales_order_id": null,
     "status": "Packed",
@@ -171,8 +171,8 @@
       }
     ],
     "created_by": 5,
-    "created_at": "2026-10-16T05:39:36.243366+00:00",
-    "packed_at": "2026-10-16T05:39:36.455564+00:00",
+    "created_at": "2026-11-08T13:02:49.489197+00:00",
+    "packed_at": "2026-11-08T13:02:49.734005+00:00",
     "id": 4
   },
   {
@@ -180,7 +180,7 @@
     "channel": "Walk-in",
     "packer_id": 6,
     "packer_name": "Joy Aquino Salazar",
-    "pack_date": "2026-10-16",
+    "pack_date": "2026-11-08",
     "order_ref": "WI-0032",
     "sales_order_id": null,
     "status": "Disbursed",
@@ -189,7 +189,7 @@
     "stock_released": true,
     "dispatch_type": "Disbursed",
     "handed_to": "Walk-in buyer",
-    "handed_at": "2026-10-16T05:39:36.662643+00:00",
+    "handed_at": "2026-11-08T13:02:49.951104+00:00",
     "courier": "",
     "tracking_no": "",
     "parcel_count": 1,
@@ -207,8 +207,8 @@
       }
     ],
     "created_by": 5,
-    "created_at": "2026-10-16T05:39:36.487300+00:00",
-    "packed_at": "2026-10-16T05:39:36.633742+00:00",
+    "created_at": "2026-11-08T13:02:49.771191+00:00",
+    "packed_at": "2026-11-08T13:02:49.924074+00:00",
     "id": 5
   },
   {
@@ -216,7 +216,7 @@
     "channel": "Shopee",
     "packer_id": 5,
     "packer_name": "Angelica Torres Navarro",
-    "pack_date": "2026-10-16",
+    "pack_date": "2026-11-08",
     "order_ref": "SHP-batch-AM",
     "sales_order_id": null,
     "status": "Packed",
@@ -251,8 +251,8 @@
       }
     ],
     "created_by": 5,
-    "created_at": "2026-10-16T05:39:36.728940+00:00",
-    "packed_at": "2026-10-16T05:39:36.967302+00:00",
+    "created_at": "2026-11-08T13:02:50.011671+00:00",
+    "packed_at": "2026-11-08T13:02:50.233308+00:00",
     "id": 6
   }
 ]

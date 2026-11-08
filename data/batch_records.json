@@ -4,17 +4,17 @@
     "product_id": 28,
     "product_name": "Moringa Powder 100 g",
     "batch_size": 12.0,
-    "production_date": "2026-10-06",
-    "expiry_date": "2027-10-06",
-    "start_at": "2026-10-06T08:00",
-    "end_at": "2026-10-06T16:30",
+    "production_date": "2026-10-29",
+    "expiry_date": "2027-10-29",
+    "start_at": "2026-10-29T08:00",
+    "end_at": "2026-10-29T16:30",
     "theoretical_yield": 12.0,
     "actual_yield": 12.0,
-    "test_date": "2026-10-07",
-    "test_result_date": "2026-10-09",
+    "test_date": "2026-10-30",
+    "test_result_date": "2026-11-01",
     "disposition": "APPROVED",
     "qa_name": "Liza Ramos Fernandez",
-    "qa_date": "2026-10-09",
+    "qa_date": "2026-11-01",
     "remarks": "Passed QA — released for selling.",
     "status": "Completed",
     "stock_posted": true,
@@ -46,68 +46,68 @@
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:40.638051+00:00"
+        "done_at": "2026-11-08T13:02:53.069357+00:00"
       },
       {
         "process": "WASHING OF MORINGA LEAVES",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:40.667453+00:00"
+        "done_at": "2026-11-08T13:02:53.092328+00:00"
       },
       {
         "process": "DEHYDRATING MORINGA LEAVES",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:40.698870+00:00"
+        "done_at": "2026-11-08T13:02:53.121018+00:00"
       },
       {
         "process": "GRINDING",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:40.723012+00:00"
+        "done_at": "2026-11-08T13:02:53.147265+00:00"
       },
       {
         "process": "SIFTING",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:40.751857+00:00"
+        "done_at": "2026-11-08T13:02:53.172618+00:00"
       },
       {
         "process": "OVEN HEATING",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:40.777061+00:00"
+        "done_at": "2026-11-08T13:02:53.197026+00:00"
       },
       {
         "process": "PACKAGING",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:40.806899+00:00"
+        "done_at": "2026-11-08T13:02:53.224602+00:00"
       },
       {
         "process": "LABELING & MARKING",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:40.844342+00:00"
+        "done_at": "2026-11-08T13:02:53.251079+00:00"
       },
       {
         "process": "FINISHED PRODUCT",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:40.875048+00:00"
+        "done_at": "2026-11-08T13:02:53.274605+00:00"
       }
     ],
     "created_by": 4,
-    "created_at": "2026-10-06T08:30:00+00:00",
-    "completed_at": "2026-10-06T08:30:00+00:00",
+    "created_at": "2026-10-29T08:30:00+00:00",
+    "completed_at": "2026-10-29T08:30:00+00:00",
     "id": 1,
     "yield_conducted_by": "Maria Santos Dela Cruz",
     "yield_checked_by": "Liza Ramos Fernandez",
@@ -119,17 +119,17 @@
     "product_id": 9,
     "product_name": "Honey Lemon Ginger Concentrate 300 mL",
     "batch_size": 24.0,
-    "production_date": "2026-10-10",
-    "expiry_date": "2027-10-10",
-    "start_at": "2026-10-10T08:00",
-    "end_at": "2026-10-10T16:30",
+    "production_date": "2026-11-02",
+    "expiry_date": "2027-11-02",
+    "start_at": "2026-11-02T08:00",
+    "end_at": "2026-11-02T16:30",
     "theoretical_yield": 24.0,
     "actual_yield": 24.0,
-    "test_date": "2026-10-11",
-    "test_result_date": "2026-10-13",
+    "test_date": "2026-11-03",
+    "test_result_date": "2026-11-05",
     "disposition": "APPROVED",
     "qa_name": "Liza Ramos Fernandez",
-    "qa_date": "2026-10-13",
+    "qa_date": "2026-11-05",
     "remarks": "Passed QA — released for selling.",
     "status": "Completed",
     "stock_posted": true,
@@ -181,89 +181,89 @@
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:41.521653+00:00"
+        "done_at": "2026-11-08T13:02:53.886289+00:00"
       },
       {
         "process": "WASHING OF RAW MATERIALS",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:41.551206+00:00"
+        "done_at": "2026-11-08T13:02:53.916538+00:00"
       },
       {
         "process": "PEELING & SLICING",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:41.586417+00:00"
+        "done_at": "2026-11-08T13:02:53.944109+00:00"
       },
       {
         "process": "EXTRACTION / JUICING",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:41.617664+00:00"
+        "done_at": "2026-11-08T13:02:53.974184+00:00"
       },
       {
         "process": "MIXING WITH HONEY",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:41.647603+00:00"
+        "done_at": "2026-11-08T13:02:54.003460+00:00"
       },
       {
         "process": "HEATING / PASTEURIZATION",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:41.675080+00:00"
+        "done_at": "2026-11-08T13:02:54.035315+00:00"
       },
       {
         "process": "COOLING",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:41.707844+00:00"
+        "done_at": "2026-11-08T13:02:54.066478+00:00"
       },
       {
         "process": "BOTTLE SANITATION",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:41.736307+00:00"
+        "done_at": "2026-11-08T13:02:54.092968+00:00"
       },
       {
         "process": "FILLING / BOTTLING",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:41.782078+00:00"
+        "done_at": "2026-11-08T13:02:54.124338+00:00"
       },
       {
         "process": "CAPPING & SEALING",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:41.813766+00:00"
+        "done_at": "2026-11-08T13:02:54.156434+00:00"
       },
       {
         "process": "LABELING & MARKING",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:41.843449+00:00"
+        "done_at": "2026-11-08T13:02:54.187325+00:00"
       },
       {
         "process": "FINISHED PRODUCT",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:41.874140+00:00"
+        "done_at": "2026-11-08T13:02:54.218465+00:00"
       }
     ],
     "created_by": 4,
-    "created_at": "2026-10-10T08:30:00+00:00",
-    "completed_at": "2026-10-10T08:30:00+00:00",
+    "created_at": "2026-11-02T08:30:00+00:00",
+    "completed_at": "2026-11-02T08:30:00+00:00",
     "id": 2,
     "yield_conducted_by": "Maria Santos Dela Cruz",
     "yield_checked_by": "Liza Ramos Fernandez",
@@ -275,9 +275,9 @@
     "product_id": 18,
     "product_name": "Pure Tableya 200 g",
     "batch_size": 20.0,
-    "production_date": "2026-10-16",
-    "expiry_date": "2027-10-16",
-    "start_at": "2026-10-16T08:00",
+    "production_date": "2026-11-08",
+    "expiry_date": "2027-11-08",
+    "start_at": "2026-11-08T08:00",
     "end_at": "",
     "theoretical_yield": 20.0,
     "actual_yield": null,
@@ -317,14 +317,14 @@
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:42.739994+00:00"
+        "done_at": "2026-11-08T13:02:55.010663+00:00"
       },
       {
         "process": "SORTING",
         "conducted_by": "Maria Santos Dela Cruz",
         "checked_by": "Liza Ramos Fernandez",
         "done": true,
-        "done_at": "2026-10-16T05:39:42.771402+00:00"
+        "done_at": "2026-11-08T13:02:55.035387+00:00"
       },
       {
         "process": "ROASTING",
@@ -391,7 +391,7 @@
       }
     ],
     "created_by": 4,
-    "created_at": "2026-10-15T16:00:00+00:00",
+    "created_at": "2026-11-07T16:00:00+00:00",
     "completed_at": "",
     "id": 3
   }

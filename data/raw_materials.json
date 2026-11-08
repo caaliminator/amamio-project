@@ -5,13 +5,13 @@
     "subcategory": "Raw materials",
     "unit": "kg",
     "track_mode": "weight",
-    "stock_qty": 149.38,
+    "stock_qty": 176.88,
     "reorder_level": 25,
     "supplier_id": 1,
     "unit_cost": 420.0,
     "expiry_date": "",
     "storage_location": "Storage Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 1
   },
   {
@@ -20,13 +20,13 @@
     "subcategory": "Raw materials",
     "unit": "pc",
     "track_mode": "piece",
-    "stock_qty": 938.0,
+    "stock_qty": 788.0,
     "reorder_level": 250,
-    "supplier_id": 2,
+    "supplier_id": 3,
     "unit_cost": 12.0,
     "expiry_date": "",
     "storage_location": "Storage Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 2
   },
   {
@@ -35,13 +35,13 @@
     "subcategory": "Raw materials",
     "unit": "kg",
     "track_mode": "weight",
-    "stock_qty": 65.08,
+    "stock_qty": 80.08,
     "reorder_level": 20,
-    "supplier_id": 2,
+    "supplier_id": 5,
     "unit_cost": 95.0,
     "expiry_date": "",
     "storage_location": "Storage Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 3
   },
   {
@@ -50,13 +50,13 @@
     "subcategory": "Raw materials",
     "unit": "kg",
     "track_mode": "weight",
-    "stock_qty": 90.6,
+    "stock_qty": 63.35,
     "reorder_level": 10,
-    "supplier_id": 2,
+    "supplier_id": 5,
     "unit_cost": 120.0,
     "expiry_date": "",
     "storage_location": "Storage Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 4
   },
   {
@@ -65,13 +65,13 @@
     "subcategory": "Raw materials",
     "unit": "kg",
     "track_mode": "weight",
-    "stock_qty": 146.0,
+    "stock_qty": 79.0,
     "reorder_level": 8,
-    "supplier_id": 2,
+    "supplier_id": 4,
     "unit_cost": 80.0,
     "expiry_date": "",
     "storage_location": "Storage Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 5
   },
   {
@@ -82,11 +82,11 @@
     "track_mode": "weight",
     "stock_qty": 35.0,
     "reorder_level": 15,
-    "supplier_id": 3,
+    "supplier_id": 6,
     "unit_cost": 260.0,
     "expiry_date": "",
     "storage_location": "Storage Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 6
   },
   {
@@ -97,11 +97,11 @@
     "track_mode": "weight",
     "stock_qty": 1.7999999999999998,
     "reorder_level": 5,
-    "supplier_id": 2,
+    "supplier_id": null,
     "unit_cost": 150.0,
     "expiry_date": "",
     "storage_location": "Storage Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 7
   },
   {
@@ -110,13 +110,13 @@
     "subcategory": "Raw materials",
     "unit": "kg",
     "track_mode": "weight",
-    "stock_qty": 92.0,
+    "stock_qty": 49.0,
     "reorder_level": 3,
     "supplier_id": 1,
     "unit_cost": 600.0,
     "expiry_date": "",
     "storage_location": "Storage Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 8
   },
   {
@@ -127,11 +127,11 @@
     "track_mode": "unit",
     "stock_qty": 20.0,
     "reorder_level": 8,
-    "supplier_id": 2,
+    "supplier_id": null,
     "unit_cost": 90.0,
     "expiry_date": "",
     "storage_location": "Storage Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 9
   },
   {
@@ -140,13 +140,13 @@
     "subcategory": "Raw materials",
     "unit": "L",
     "track_mode": "unit",
-    "stock_qty": 108.0,
+    "stock_qty": 56.0,
     "reorder_level": 2,
-    "supplier_id": 2,
+    "supplier_id": null,
     "unit_cost": 450.0,
     "expiry_date": "",
     "storage_location": "Storage Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 10
   },
   {
@@ -155,13 +155,13 @@
     "subcategory": "Raw materials",
     "unit": "kg",
     "track_mode": "weight",
-    "stock_qty": 51.85,
+    "stock_qty": 40.6,
     "reorder_level": 10,
     "supplier_id": 2,
     "unit_cost": 330.0,
     "expiry_date": "",
     "storage_location": "Storage Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 11
   },
   {
@@ -172,11 +172,11 @@
     "track_mode": "weight",
     "stock_qty": 15.0,
     "reorder_level": 6,
-    "supplier_id": 2,
+    "supplier_id": 12,
     "unit_cost": 140.0,
     "expiry_date": "",
     "storage_location": "Storage Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 12
   },
   {
@@ -187,11 +187,11 @@
     "track_mode": "piece",
     "stock_qty": 320.0,
     "reorder_level": 100,
-    "supplier_id": 16,
+    "supplier_id": 13,
     "unit_cost": 9.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 13
   },
   {
@@ -202,11 +202,11 @@
     "track_mode": "piece",
     "stock_qty": 240.0,
     "reorder_level": 100,
-    "supplier_id": 16,
+    "supplier_id": 13,
     "unit_cost": 11.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 14
   },
   {
@@ -217,11 +217,11 @@
     "track_mode": "piece",
     "stock_qty": 180.0,
     "reorder_level": 80,
-    "supplier_id": 16,
+    "supplier_id": 13,
     "unit_cost": 11.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 15
   },
   {
@@ -232,11 +232,11 @@
     "track_mode": "piece",
     "stock_qty": 240.0,
     "reorder_level": 120,
-    "supplier_id": 16,
+    "supplier_id": 13,
     "unit_cost": 12.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 16
   },
   {
@@ -247,11 +247,11 @@
     "track_mode": "piece",
     "stock_qty": 790.0,
     "reorder_level": 150,
-    "supplier_id": 16,
+    "supplier_id": 13,
     "unit_cost": 10.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 17
   },
   {
@@ -262,11 +262,11 @@
     "track_mode": "piece",
     "stock_qty": 150.0,
     "reorder_level": 60,
-    "supplier_id": 16,
+    "supplier_id": 13,
     "unit_cost": 16.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 18
   },
   {
@@ -277,11 +277,11 @@
     "track_mode": "piece",
     "stock_qty": 90.0,
     "reorder_level": 40,
-    "supplier_id": 16,
+    "supplier_id": 13,
     "unit_cost": 24.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 19
   },
   {
@@ -292,11 +292,11 @@
     "track_mode": "piece",
     "stock_qty": 25.0,
     "reorder_level": 10,
-    "supplier_id": 16,
+    "supplier_id": 15,
     "unit_cost": 45.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 20
   },
   {
@@ -307,11 +307,11 @@
     "track_mode": "piece",
     "stock_qty": 140.0,
     "reorder_level": 50,
-    "supplier_id": 16,
+    "supplier_id": null,
     "unit_cost": 14.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 21
   },
   {
@@ -322,11 +322,11 @@
     "track_mode": "piece",
     "stock_qty": 110.0,
     "reorder_level": 40,
-    "supplier_id": 16,
+    "supplier_id": 13,
     "unit_cost": 12.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 22
   },
   {
@@ -337,11 +337,11 @@
     "track_mode": "piece",
     "stock_qty": 90.0,
     "reorder_level": 40,
-    "supplier_id": 16,
+    "supplier_id": 52,
     "unit_cost": 15.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 23
   },
   {
@@ -352,11 +352,11 @@
     "track_mode": "piece",
     "stock_qty": 788.0,
     "reorder_level": 150,
-    "supplier_id": 16,
+    "supplier_id": 36,
     "unit_cost": 6.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 24
   },
   {
@@ -367,11 +367,11 @@
     "track_mode": "piece",
     "stock_qty": 420.0,
     "reorder_level": 150,
-    "supplier_id": 16,
+    "supplier_id": null,
     "unit_cost": 7.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 25
   },
   {
@@ -382,11 +382,11 @@
     "track_mode": "piece",
     "stock_qty": 260.0,
     "reorder_level": 100,
-    "supplier_id": 16,
+    "supplier_id": 47,
     "unit_cost": 7.5,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 26
   },
   {
@@ -397,11 +397,11 @@
     "track_mode": "piece",
     "stock_qty": 200.0,
     "reorder_level": 60,
-    "supplier_id": 16,
+    "supplier_id": 30,
     "unit_cost": 8.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 27
   },
   {
@@ -412,11 +412,11 @@
     "track_mode": "piece",
     "stock_qty": 600.0,
     "reorder_level": 200,
-    "supplier_id": 16,
+    "supplier_id": 36,
     "unit_cost": 1.5,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 28
   },
   {
@@ -427,11 +427,11 @@
     "track_mode": "piece",
     "stock_qty": 400.0,
     "reorder_level": 120,
-    "supplier_id": 16,
+    "supplier_id": 14,
     "unit_cost": 0.8,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 29
   },
   {
@@ -442,11 +442,11 @@
     "track_mode": "piece",
     "stock_qty": 300.0,
     "reorder_level": 100,
-    "supplier_id": 16,
+    "supplier_id": 14,
     "unit_cost": 0.9,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 30
   },
   {
@@ -457,11 +457,11 @@
     "track_mode": "piece",
     "stock_qty": 270.0,
     "reorder_level": 120,
-    "supplier_id": 16,
+    "supplier_id": 14,
     "unit_cost": 1.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 31
   },
   {
@@ -472,11 +472,11 @@
     "track_mode": "piece",
     "stock_qty": 180.0,
     "reorder_level": 60,
-    "supplier_id": 16,
+    "supplier_id": 14,
     "unit_cost": 1.1,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 32
   },
   {
@@ -487,11 +487,11 @@
     "track_mode": "piece",
     "stock_qty": 220.0,
     "reorder_level": 60,
-    "supplier_id": 16,
+    "supplier_id": 66,
     "unit_cost": 0.6,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 33
   },
   {
@@ -502,11 +502,11 @@
     "track_mode": "piece",
     "stock_qty": 160.0,
     "reorder_level": 50,
-    "supplier_id": 16,
+    "supplier_id": 42,
     "unit_cost": 0.7,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 34
   },
   {
@@ -517,11 +517,11 @@
     "track_mode": "unit",
     "stock_qty": 4.0,
     "reorder_level": 2,
-    "supplier_id": 16,
+    "supplier_id": 32,
     "unit_cost": 380.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 35
   },
   {
@@ -532,11 +532,11 @@
     "track_mode": "unit",
     "stock_qty": 36.0,
     "reorder_level": 8,
-    "supplier_id": 16,
+    "supplier_id": 32,
     "unit_cost": 45.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 36
   },
   {
@@ -547,11 +547,11 @@
     "track_mode": "unit",
     "stock_qty": 5.0,
     "reorder_level": 2,
-    "supplier_id": 16,
+    "supplier_id": 32,
     "unit_cost": 290.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 37
   },
   {
@@ -562,11 +562,11 @@
     "track_mode": "unit",
     "stock_qty": 10.0,
     "reorder_level": 4,
-    "supplier_id": 16,
+    "supplier_id": 32,
     "unit_cost": 60.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 38
   },
   {
@@ -577,11 +577,11 @@
     "track_mode": "piece",
     "stock_qty": 120.0,
     "reorder_level": 40,
-    "supplier_id": 16,
+    "supplier_id": 32,
     "unit_cost": 22.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 39
   },
   {
@@ -592,11 +592,11 @@
     "track_mode": "piece",
     "stock_qty": 150.0,
     "reorder_level": 50,
-    "supplier_id": 16,
+    "supplier_id": 39,
     "unit_cost": 12.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 40
   },
   {
@@ -607,11 +607,11 @@
     "track_mode": "piece",
     "stock_qty": 90.0,
     "reorder_level": 30,
-    "supplier_id": 16,
+    "supplier_id": 39,
     "unit_cost": 18.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 41
   },
   {
@@ -622,11 +622,11 @@
     "track_mode": "piece",
     "stock_qty": 40.0,
     "reorder_level": 0,
-    "supplier_id": 16,
+    "supplier_id": null,
     "unit_cost": 0.0,
     "expiry_date": "",
     "storage_location": "Packing Area",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 42
   },
   {
@@ -637,11 +637,11 @@
     "track_mode": "unit",
     "stock_qty": 10.0,
     "reorder_level": 4,
-    "supplier_id": 35,
+    "supplier_id": 45,
     "unit_cost": 220.0,
     "expiry_date": "",
     "storage_location": "Utility Room",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 43
   },
   {
@@ -652,11 +652,11 @@
     "track_mode": "unit",
     "stock_qty": 36.0,
     "reorder_level": 12,
-    "supplier_id": 35,
+    "supplier_id": 23,
     "unit_cost": 18.0,
     "expiry_date": "",
     "storage_location": "Utility Room",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 44
   },
   {
@@ -667,11 +667,11 @@
     "track_mode": "unit",
     "stock_qty": 8.0,
     "reorder_level": 3,
-    "supplier_id": 35,
+    "supplier_id": null,
     "unit_cost": 150.0,
     "expiry_date": "",
     "storage_location": "Utility Room",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 45
   },
   {
@@ -682,11 +682,11 @@
     "track_mode": "unit",
     "stock_qty": 3.0,
     "reorder_level": 2,
-    "supplier_id": 35,
+    "supplier_id": 51,
     "unit_cost": 320.0,
     "expiry_date": "",
     "storage_location": "Utility Room",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 46
   },
   {
@@ -697,11 +697,11 @@
     "track_mode": "unit",
     "stock_qty": 3.0,
     "reorder_level": 2,
-    "supplier_id": 35,
+    "supplier_id": null,
     "unit_cost": 300.0,
     "expiry_date": "",
     "storage_location": "Utility Room",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 47
   },
   {
@@ -712,11 +712,11 @@
     "track_mode": "unit",
     "stock_qty": 3.0,
     "reorder_level": 2,
-    "supplier_id": 35,
+    "supplier_id": 51,
     "unit_cost": 340.0,
     "expiry_date": "",
     "storage_location": "Utility Room",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 48
   },
   {
@@ -727,11 +727,11 @@
     "track_mode": "unit",
     "stock_qty": 6.0,
     "reorder_level": 2,
-    "supplier_id": 35,
+    "supplier_id": 23,
     "unit_cost": 180.0,
     "expiry_date": "",
     "storage_location": "Utility Room",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 49
   },
   {
@@ -742,11 +742,11 @@
     "track_mode": "piece",
     "stock_qty": 20.0,
     "reorder_level": 8,
-    "supplier_id": 35,
+    "supplier_id": null,
     "unit_cost": 15.0,
     "expiry_date": "",
     "storage_location": "Utility Room",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 50
   },
   {
@@ -757,11 +757,11 @@
     "track_mode": "unit",
     "stock_qty": 4.0,
     "reorder_level": 2,
-    "supplier_id": 35,
+    "supplier_id": null,
     "unit_cost": 160.0,
     "expiry_date": "",
     "storage_location": "Utility Room",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 51
   },
   {
@@ -772,11 +772,11 @@
     "track_mode": "piece",
     "stock_qty": 15.0,
     "reorder_level": 5,
-    "supplier_id": 35,
+    "supplier_id": 45,
     "unit_cost": 12.0,
     "expiry_date": "",
     "storage_location": "Utility Room",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 52
   },
   {
@@ -787,11 +787,11 @@
     "track_mode": "unit",
     "stock_qty": 6.0,
     "reorder_level": 3,
-    "supplier_id": 46,
+    "supplier_id": 50,
     "unit_cost": 260.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 53
   },
   {
@@ -802,11 +802,11 @@
     "track_mode": "unit",
     "stock_qty": 5.0,
     "reorder_level": 2,
-    "supplier_id": 46,
+    "supplier_id": 50,
     "unit_cost": 290.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 54
   },
   {
@@ -817,11 +817,11 @@
     "track_mode": "unit",
     "stock_qty": 6.0,
     "reorder_level": 2,
-    "supplier_id": 46,
+    "supplier_id": 54,
     "unit_cost": 280.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 55
   },
   {
@@ -832,11 +832,11 @@
     "track_mode": "unit",
     "stock_qty": 4.0,
     "reorder_level": 2,
-    "supplier_id": 46,
+    "supplier_id": 49,
     "unit_cost": 320.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 56
   },
   {
@@ -847,11 +847,11 @@
     "track_mode": "piece",
     "stock_qty": 24.0,
     "reorder_level": 10,
-    "supplier_id": 46,
+    "supplier_id": 50,
     "unit_cost": 10.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 57
   },
   {
@@ -862,11 +862,11 @@
     "track_mode": "piece",
     "stock_qty": 12.0,
     "reorder_level": 5,
-    "supplier_id": 46,
+    "supplier_id": 50,
     "unit_cost": 10.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 58
   },
   {
@@ -877,11 +877,11 @@
     "track_mode": "piece",
     "stock_qty": 24.0,
     "reorder_level": 10,
-    "supplier_id": 46,
+    "supplier_id": 50,
     "unit_cost": 10.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 59
   },
   {
@@ -892,11 +892,11 @@
     "track_mode": "piece",
     "stock_qty": 10.0,
     "reorder_level": 4,
-    "supplier_id": 46,
+    "supplier_id": 50,
     "unit_cost": 45.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 60
   },
   {
@@ -907,11 +907,11 @@
     "track_mode": "piece",
     "stock_qty": 4.0,
     "reorder_level": 1,
-    "supplier_id": 46,
+    "supplier_id": 50,
     "unit_cost": 65.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 61
   },
   {
@@ -922,11 +922,11 @@
     "track_mode": "piece",
     "stock_qty": 3.0,
     "reorder_level": 1,
-    "supplier_id": 46,
+    "supplier_id": 50,
     "unit_cost": 180.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 62
   },
   {
@@ -937,11 +937,11 @@
     "track_mode": "unit",
     "stock_qty": 6.0,
     "reorder_level": 2,
-    "supplier_id": 46,
+    "supplier_id": 50,
     "unit_cost": 35.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 63
   },
   {
@@ -952,11 +952,11 @@
     "track_mode": "unit",
     "stock_qty": 3.0,
     "reorder_level": 1,
-    "supplier_id": 46,
+    "supplier_id": 50,
     "unit_cost": 60.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 64
   },
   {
@@ -967,11 +967,11 @@
     "track_mode": "piece",
     "stock_qty": 4.0,
     "reorder_level": 1,
-    "supplier_id": 46,
+    "supplier_id": 50,
     "unit_cost": 55.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 65
   },
   {
@@ -982,11 +982,11 @@
     "track_mode": "unit",
     "stock_qty": 5.0,
     "reorder_level": 2,
-    "supplier_id": 46,
+    "supplier_id": 50,
     "unit_cost": 40.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 66
   },
   {
@@ -997,11 +997,11 @@
     "track_mode": "piece",
     "stock_qty": 10.0,
     "reorder_level": 3,
-    "supplier_id": 46,
+    "supplier_id": 50,
     "unit_cost": 35.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 67
   },
   {
@@ -1012,11 +1012,11 @@
     "track_mode": "unit",
     "stock_qty": 2.0,
     "reorder_level": 1,
-    "supplier_id": 46,
+    "supplier_id": 41,
     "unit_cost": 380.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 68
   },
   {
@@ -1027,11 +1027,11 @@
     "track_mode": "unit",
     "stock_qty": 3.0,
     "reorder_level": 1,
-    "supplier_id": 46,
+    "supplier_id": 41,
     "unit_cost": 380.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 69
   },
   {
@@ -1042,11 +1042,11 @@
     "track_mode": "unit",
     "stock_qty": 2.0,
     "reorder_level": 1,
-    "supplier_id": 46,
+    "supplier_id": 41,
     "unit_cost": 380.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 70
   },
   {
@@ -1057,11 +1057,11 @@
     "track_mode": "unit",
     "stock_qty": 2.0,
     "reorder_level": 1,
-    "supplier_id": 46,
+    "supplier_id": 41,
     "unit_cost": 380.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 71
   },
   {
@@ -1072,11 +1072,11 @@
     "track_mode": "piece",
     "stock_qty": 30.0,
     "reorder_level": 10,
-    "supplier_id": 46,
+    "supplier_id": 50,
     "unit_cost": 8.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 72
   },
   {
@@ -1087,11 +1087,11 @@
     "track_mode": "unit",
     "stock_qty": 3.0,
     "reorder_level": 1,
-    "supplier_id": 46,
+    "supplier_id": 29,
     "unit_cost": 220.0,
     "expiry_date": "",
     "storage_location": "Office",
-    "created_at": "2026-10-16T05:39:30.026844+00:00",
+    "created_at": "2026-11-08T13:02:42.982084+00:00",
     "id": 73
   },
   {
@@ -1100,26 +1100,13 @@
     "subcategory": "Honey",
     "unit": "kg",
     "track_mode": "weight",
-    "stock_qty": 59.2,
+    "stock_qty": 54.2,
     "reorder_level": 0,
     "supplier_id": null,
     "unit_cost": 0.0,
     "expiry_date": "",
     "storage_location": "Production Area",
-    "created_at": "2026-10-16T05:39:34.693573+00:00",
+    "created_at": "2026-11-08T13:02:47.928019+00:00",
     "id": 74
-  },
-  {
-    "name": "qdw",
-    "category": "cleaning",
-    "subcategory": "",
-    "unit": "pc",
-    "track_mode": "piece",
-    "stock_qty": 0.0,
-    "reorder_level": 0,
-    "supplier_id": 5,
-    "unit_cost": 11111.0,
-    "created_at": "2026-10-31T17:26:57.027252+00:00",
-    "id": 75
   }
 ]

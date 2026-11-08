@@ -36,7 +36,7 @@
     <div class="qr-name">{{ box.material_name }}</div>
     <div class="qr-qty">{{ box.declared_qty|qty(box.unit) }}</div>
     <div class="qr-meta">
-      {% if box.lot_no %}Lot {{ box.lot_no }}{% endif %}{% if box.lot_no and box.expiry_date %} · {% endif %}{% if box.expiry_date %}Exp {{ box.expiry_date }}{% endif %}
+      {% if box.lot_no %}Batch {{ box.lot_no }}{% endif %}{% if box.lot_no and box.expiry_date %} · {% endif %}{% if box.expiry_date %}Exp {{ box.expiry_date }}{% endif %}
       {% if box.lot_no or box.expiry_date %}<br>{% endif %}
       {{ batch.ref_no }} · {{ batch.received_date }}<br>
       {{ batch.supplier_name }}

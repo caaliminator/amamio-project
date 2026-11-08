@@ -6,8 +6,9 @@
 
 <div class="record-head">
   <div>
-    <div class="record-code">{{ s.category|upper }}{% if s.tin %} · TIN {{ s.tin }}{% endif %}</div>
+    <div class="record-code">{% if s.ref_no %}NO. {{ s.ref_no }} · {% endif %}{{ s.category|upper }}{% if s.supplier_type %} · {{ s.supplier_type|upper }}{% endif %}{% if s.tin %} · TIN {{ s.tin }}{% endif %}</div>
     <h1 class="record-title">{{ s.name }}</h1>
+    {% if s.address %}<div class="small">{{ s.address }}</div>{% endif %}
     <div class="muted small">{{ hints.get(s.category, '') }}</div>
   </div>
   <div class="flex gap-sm wrap" style="align-items:center">
@@ -33,15 +34,21 @@
 
 <div class="card mb">
   <div class="card-title">Items supplied</div>
-  <p style="margin:0;white-space:pre-line">{{ s.materials_supplied or 'No items listed yet.' }}</p>
+  <p style="margin:0 0 10px;white-space:pre-line">{{ s.materials_supplied or 'No items listed yet.' }}</p>
+  <dl class="review-list">
+    <dt>Catalog items</dt>
+    <dd>{% if materials %}{% for m in materials %}{{ m.name }}{% if m.supplier_id == s.id %} <span class="muted small">(usual supplier)</span>{% endif %}{{ ', ' if not loop.last }}{% endfor %}
+      {% else %}<span class="muted">None linked — purchase requests won't offer this supplier for a particular item. <a href="{{ url_for('suppliers.edit', supplier_id=s.id) }}">Link items</a></span>{% endif %}</dd>
+  </dl>
 </div>
 
 <div class="card mb">
   <div class="card-title">Contact</div>
   <dl class="review-list">
+    <dt>Supplier type</dt><dd>{{ s.supplier_type or '—' }}</dd>
     <dt>TIN</dt><dd>{{ s.tin or '—' }}</dd>
     <dt>Contact person</dt><dd>{{ s.contact_person or '—' }}</dd>
-    <dt>Phone</dt><dd>{% if s.phone %}<a href="tel:{{ s.phone|replace('-', '')|replace(' ', '') }}">{{ s.phone }}</a>{% else %}—{% endif %}</dd>
+    <dt>Phone</dt><dd>{% for p in s.phones %}<div><a href="tel:{{ p|replace('-', '')|replace(' ', '') }}">{{ p }}</a></div>{% else %}—{% endfor %}</dd>
     <dt>Email</dt><dd>{% if s.email %}<a href="mailto:{{ s.email }}">{{ s.email }}</a>{% else %}—{% endif %}</dd>
     <dt>Address</dt><dd>{{ s.address or '—' }}</dd>
     <dt>Buy from</dt><dd>{{ s.buy_from or '—' }}</dd>
@@ -50,11 +57,10 @@
   </dl>
 </div>
 
-{% if materials or delivery_count %}
+{% if delivery_count %}
 <div class="card">
   <div class="card-title">In the system</div>
   <dl class="review-list">
-    {% if materials %}<dt>Stock items</dt><dd>{{ materials|map(attribute='name')|join(', ') }}</dd>{% endif %}
     {% if delivery_count %}
     <dt>Deliveries received</dt><dd>{{ delivery_count }}{% if deliveries %} · last {{ deliveries[0].received_date }}{% endif %}</dd>
     {% endif %}

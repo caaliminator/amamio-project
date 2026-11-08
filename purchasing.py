@@ -13,7 +13,8 @@ from flask import (Blueprint, abort, flash, redirect, render_template,
 import db
 import purchasing_service as pur
 import services
-from security import current_user, module_required
+import supplier_service as sups
+from security import can, current_user, module_required
 
 purchasing_bp = Blueprint("purchasing", __name__)
 
@@ -51,7 +52,12 @@ def _lines_from_form(form):
 
 
 def _suggested_supplier(items, suppliers):
-    """The directory entry matching the PR's preferred supplier, if any."""
+    """The directory entry the PR names as preferred supplier, if any (by
+    its id; older PRs only carry the name)."""
+    by_id = {s["id"]: s for s in suppliers}
+    for i in items:
+        if i.get("preferred_supplier_id") in by_id:
+            return by_id[i["preferred_supplier_id"]]
     wanted = {(i.get("preferred_supplier") or "").strip().lower()
               for i in items if i.get("preferred_supplier")}
     for s in suppliers:
@@ -71,13 +77,17 @@ def _po_from_form(request_id, user, form, save=True):
         {"id": f("supplier_id"),
          "address": f("supplier_address"), "contact": f("supplier_contact"),
          "tin": f("supplier_tin"), "contact_person": f("supplier_contact_person"),
-         "reference": f("supplier_reference")},
+         "type": f("supplier_type"), "reference": f("supplier_reference")},
         {"deliver_to": f("deliver_to"), "address": f("delivery_address"),
          "instructions": f("delivery_instructions"), "contact": f("delivery_contact")},
         _lines_from_form(form),
         {"discount": f("discount"), "freight": f("freight"),
-         "vat_rate": f("vat_rate"), "labor": f("labor"), "terms": f("terms")},
-        save=save)
+         "vat_rate": f("vat_rate"), "vat_type": f("vat_type"), "labor": f("labor"),
+         "other_fees": f("other_fees"), "other_fees_note": f("other_fees_note"),
+         "terms": f("terms")},
+        save=save,
+        save_to_directory=(f("save_to_directory") == "1"
+                           and can(user, "suppliers")))
 
 
 def _cancelled_po(req):
@@ -95,11 +105,13 @@ def _po_start_values(po):
         return ("%g" % v) if v else ""
     values = {k: po.get(k) or "" for k in (
         "supplier_tin", "supplier_address", "supplier_contact_person",
-        "supplier_contact", "supplier_reference", "expected_delivery",
+        "supplier_contact", "supplier_type", "supplier_reference",
+        "expected_delivery",
         "payment_terms", "deliver_to", "delivery_address", "delivery_contact",
-        "delivery_instructions", "terms")}
+        "delivery_instructions", "terms", "other_fees_note", "vat_type")}
     values.update({k: number(po.get(k)) for k in (
-        "advance_amount", "discount", "freight", "labor", "vat_rate")})
+        "advance_amount", "discount", "freight", "labor", "other_fees",
+        "vat_rate")})
     return values
 
 
@@ -160,15 +172,24 @@ def new():
         if directory and services.supplier_approved(directory):
             suggested = directory
     cards = [pur.supplier_card(s) for s in suppliers]
+    by_supplier = sups.links_by_supplier(sups.approved_links())
+    linked_materials = sorted(sups.links_by_material(sups.approved_links()))
     return render_template(
         "purchasing/new.html", req=req, pr_no=pur.pr_number(req), items=items, edits=edits,
         prev_po=prev, start_from=start_from, prev_lines=prev_lines,
         form=form, me=user, today=services.today_iso(),
         suppliers=cards, supplier_options=[
-            {"v": c["id"], "l": c["name"], "s": c["contact_person"] or c["address"],
+            {"v": c["id"], "l": c["label"],
+             "s": c["type"] or c["contact_person"] or c["address"],
              "d": {"address": c["address"], "contact": c["contact"],
-                   "tin": c["tin"], "person": c["contact_person"]}}
+                   "tin": c["tin"], "person": c["contact_person"],
+                   "type": c["type"],
+                   "items": sorted(by_supplier.get(c["id"], ())),
+                   "edit": url_for("suppliers.edit", supplier_id=c["id"])}}
             for c in cards if c["approved"]],
+        linked_materials=linked_materials,
+        supplier_types=sups.SUPPLIER_TYPES,
+        can_edit_suppliers=can(user, "suppliers"),
         suggested=pur.supplier_card(suggested) if suggested else None,
         payment_terms=pur.PAYMENT_TERMS, upfront_terms=pur.UPFRONT_TERMS,
         units=pur.units_for(catalog),

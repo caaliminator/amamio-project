@@ -68,12 +68,16 @@ SCHEMA = {
     },
 
     # --- Partners ----------------------------------------------------------
-    # Mirrors the paper Supplier Directory: supplier, TIN, items, contact,
-    # filed under Office / Production / Packing.
+    # The client's Supplier Directory spreadsheet: No., name, address,
+    # mobile numbers (several, " / "-separated), contact person, items
+    # supplied, email, TIN and supplier type ("Reference"), filed under
+    # Raw / Production / Packing / Office.  The same name may appear twice
+    # for two branches (different addresses).
     "suppliers": {
         "columns": {
-            "id": ID, "name": STR, "tin": SHORT, "category": SHORT,
-            "contact_person": STR, "phone": SHORT, "email": STR,
+            "id": ID, "ref_no": SHORT, "name": STR, "tin": SHORT,
+            "category": SHORT, "supplier_type": SHORT,
+            "contact_person": STR, "phone": STR, "email": STR,
             "address": TEXT, "materials_supplied": TEXT, "buy_from": STR,
             "lead_time_days": "INT NULL", "notes": TEXT,
             # On the Approved Supplier List (SOP AFP-WH-SOP-001 section 6)
@@ -81,6 +85,28 @@ SCHEMA = {
             "created_at": TS,
         },
         "foreign_keys": {"approved_by": "users"},
+    },
+    # New employees, suppliers, materials and supplies added by the Admin,
+    # waiting for (or decided by) the Super Admin.  ``payload`` holds what
+    # was filled in; ``record_id`` is the record created on approval, in the
+    # table for its ``kind`` (employees / suppliers / raw_materials).
+    "creation_requests": {
+        "columns": {
+            "id": ID, "kind": SHORT, "title": STR, "payload": TEXT,
+            "status": SHORT, "requested_by": FK, "requested_by_name": STR,
+            "decided_by": FK, "decided_by_name": STR, "decided_at": TS,
+            "remarks": TEXT, "record_id": "INT NULL", "created_at": TS,
+        },
+        "foreign_keys": {"requested_by": "users", "decided_by": "users"},
+    },
+    # Which catalog items each supplier supplies (many-to-many).  The item's
+    # usual supplier (raw_materials.supplier_id) is one of these.
+    "supplier_items": {
+        "columns": {
+            "id": ID, "supplier_id": FK, "material_id": FK, "created_at": TS,
+        },
+        "foreign_keys": {"supplier_id": "suppliers",
+                         "material_id": "raw_materials"},
     },
     "customers": {
         "columns": {
@@ -101,6 +127,9 @@ SCHEMA = {
             "unit": SHORT, "track_mode": SHORT, "stock_qty": NUM,
             "reorder_level": NUM, "supplier_id": FK, "unit_cost": MONEY,
             "expiry_date": DATE, "storage_location": STR, "created_at": TS,
+            # A stock line made in the plant (honey that failed QC): never
+            # bought, so not offered for purchasing or receiving.
+            "internal": BOOL,
         },
         "foreign_keys": {"supplier_id": "suppliers"},
     },
@@ -139,7 +168,9 @@ SCHEMA = {
             "received_date": DATE, "received_time": SHORT,
             "delivered_by": STR, "vehicle_plate": SHORT,
             "receiving_area": STR, "docs_checked": TEXT, "docs_other": STR,
-            "proof": STR,               # picture of the delivery receipt (uploads.py)
+            "proof": STR,               # picture / PDF of the delivery receipt (uploads.py)
+            "or_no": SHORT, "or_proof": STR,    # official receipt no. + its file
+            "ar_no": SHORT, "ar_proof": STR,    # acknowledgement receipt no. + its file
             "received_by": FK, "status": SHORT,
             "remarks": TEXT, "discrepancies": TEXT,
             "box_count": "INT NULL", "total_declared": NUM, "total_good": NUM,
@@ -162,7 +193,10 @@ SCHEMA = {
             "material_id": FK, "material_name": STR, "unit": SHORT,
             # The purchase-order line this box was delivered against, if any
             "po_id": FK, "po_line_no": "INT NULL",
-            "track_mode": SHORT, "declared_qty": NUM, "lot_no": SHORT,
+            "track_mode": SHORT, "declared_qty": NUM,
+            # lot_no: the batch no. the system gives (ITEM-YYYY-MM-NNN);
+            # supplier_lot: the supplier's own lot no., if one was written.
+            "lot_no": SHORT, "supplier_lot": SHORT, "mfg_date": DATE,
             "expiry_date": DATE, "packaging_condition": SHORT,
             "temperature_c": NUM,
             # Part 2 — inspection & cleaning
@@ -174,6 +208,7 @@ SCHEMA = {
             "verified_by_name": STR, "checked_by": FK, "checked_at": TS,
             # Incoming Material Inspection Checklist: {point: {result, remarks}}
             "inspection_no": SHORT, "checklist": TEXT,
+            "checklist_lane": SHORT,    # "raw" / "supplies": which checklist was used
             "visual_description": TEXT,
             "test_parameter": STR, "test_spec": STR, "test_result": STR,
             "test_method": STR,
@@ -367,6 +402,9 @@ SCHEMA = {
             "category": SHORT, "direction": SHORT, "qty": NUM, "unit": SHORT,
             "reason": SHORT, "person": STR, "reference": STR, "notes": TEXT,
             "balance_after": NUM, "recorded_by": FK, "moved_at": TS,
+            # The batch it came from / went to; batch_new = this IN started
+            # a batch of its own (stock that did not come through receiving).
+            "batch_no": SHORT, "batch_new": BOOL, "expiry_date": DATE,
         },
         "foreign_keys": {"material_id": "raw_materials", "recorded_by": "users"},
     },
@@ -571,13 +609,15 @@ SCHEMA = {
             "name": STR, "purpose_use": STR, "unit": SHORT,
             "category": SHORT, "description": TEXT, "material_id": FK,
             "requested_qty": NUM, "est_unit_cost": MONEY, "est_total": MONEY,
-            "preferred_supplier": STR, "budget_category": SHORT,
+            "preferred_supplier": STR, "preferred_supplier_id": FK,
+            "budget_category": SHORT,
             "remark": TEXT, "approved_qty": NUM, "received_qty": NUM,
             "status": SHORT, "note": TEXT, "qr_token": SHORT,
             "po_id": FK, "po_no": SHORT,
         },
         "foreign_keys": {"purchase_request_id": "purchase_requests",
                          "material_id": "raw_materials",
+                         "preferred_supplier_id": "suppliers",
                          "po_id": "purchase_orders"},
     },
     # Purchase Order (paper form), prepared from an approved PR.
@@ -589,10 +629,15 @@ SCHEMA = {
             "supplier_id": FK, "supplier_name": STR,
             "supplier_address": TEXT, "supplier_contact": STR,
             "supplier_tin": SHORT, "supplier_contact_person": STR,
-            "supplier_reference": STR, "deliver_to": STR,
+            # Supplier type from the directory; supplier_reference is the
+            # supplier's quotation / invoice no., typed on the PO.
+            "supplier_type": SHORT, "supplier_reference": STR,
+            "deliver_to": STR,
             "delivery_address": TEXT, "delivery_instructions": TEXT,
             "delivery_contact": STR, "subtotal": MONEY, "discount": MONEY,
-            "freight": MONEY, "labor": MONEY, "vat_rate": NUM, "tax": MONEY,
+            "freight": MONEY, "labor": MONEY, "other_fees": MONEY,
+            "other_fees_note": STR, "vat_type": SHORT,   # "VAT" / "NON VAT"
+            "vat_rate": NUM, "tax": MONEY,
             "grand_total": MONEY,
             "terms": TEXT, "prepared_by_name": STR, "prepared_at": DATE,
             "checked_by_name": STR, "checked_at": DATE, "approved_by_name": STR,
@@ -628,8 +673,19 @@ SCHEMA = {
             "account_id": FK,           # the cash / bank account it came from
             "account_name": STR,
         },
+        # More files: official receipt, invoice, deposit slip, check copy …
+        "children": {"attachments": "supplier_payment_attachments"},
         "foreign_keys": {"supplier_id": "suppliers", "po_id": "purchase_orders",
                          "recorded_by": "users", "account_id": "money_accounts"},
+    },
+    "supplier_payment_attachments": {
+        "columns": {
+            "id": ID, "supplier_payment_id": FK, "n": "INT NULL",
+            "kind": SHORT,              # "image" / "pdf"
+            "name": STR, "label": STR, "file": STR,
+            "added_by_name": STR, "added_at": TS,
+        },
+        "foreign_keys": {"supplier_payment_id": "supplier_payments"},
     },
     # Finance's cash, bank and e-wallet accounts — added by Finance, not fixed
     # (finance_service.py).  Balance = opening balance + money in − money out,

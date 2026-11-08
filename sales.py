@@ -20,7 +20,7 @@ def index():
     role = normalize_role(user.get("role"))
     all_reqs = sorted(db.read("sales_requests"),
                       key=lambda r: r.get("created_at", ""), reverse=True)
-    if role == "packing_head":
+    if role == "sales_marketing_admin":
         reqs = [r for r in all_reqs if r.get("requestor_id") == user["id"]]
     elif role == "production_head":
         reqs = [r for r in all_reqs
@@ -50,7 +50,7 @@ def index():
 
 
 @sales_bp.route("/new", methods=["GET", "POST"])
-@role_required("packing_head")
+@role_required("sales_marketing_admin")
 def new():
     if request.method == "POST":
         product_id = request.form.get("product_id")

@@ -73,11 +73,17 @@ def _lines_from_form(form):
     return lines
 
 
+def _lane_endpoint(row):
+    """The inspection lane page a box belongs to (for the menu and links)."""
+    return services.INSPECTION_LANES[row.get("lane") or services.LANE_RAW]["endpoint"]
+
+
 def _checklist_from_form(form):
-    """The inspection checklist radios + remarks -> {point: {result, remarks}}."""
+    """The inspection checklist radios + remarks -> {point: {result, remarks}}
+    (points of either lane; the service keeps those of the box's lane)."""
     return {key: {"result": form.get("chk_" + key) or "",
                   "remarks": form.get("chk_%s_remarks" % key) or ""}
-            for key, _, _ in services.INSPECTION_POINTS}
+            for key, _, _ in services.INSPECTION_POINTS + services.SUPPLY_INSPECTION_POINTS}
 
 
 def _ncr_or_404(ncr_id):
@@ -133,15 +139,13 @@ def new():
             return redirect(url_for("receiving.new"))
 
     if request.method == "POST":
-        # The receipt picture is checked first, so a bad file saves nothing.
-        picture, err = uploads.read_picture(request.files.get("proof"))
-        if err:
-            err = "Delivery receipt picture: " + err
-        else:
+        # The DR / OR / AR files are checked first, so a bad file saves nothing.
+        doc_files, err = _read_doc_files(request.files)
+        if not err:
             batch, boxes, err = _receive(form, po)
         if not err:
-            if picture:
-                _save_proof(batch, picture)
+            for key, att in doc_files.items():
+                _save_doc(batch, key, att)
             flash("Delivery %s recorded — %d box(es) labelled. Print the QR "
                   "labels and stick one on each box." % (batch.get("ref_no"),
                                                          len(boxes)), "success")
@@ -152,6 +156,42 @@ def new():
     return _new_form(form, po)
 
 
+# The delivery's documents: (key, label, number field, file field on the
+# record, file input on the receive form).  Each file is a picture or a PDF.
+DELIVERY_DOCS = [
+    ("dr", "Delivery receipt (DR)", "delivery_ref", "proof", "proof"),
+    ("or", "Official receipt (OR)", "or_no", "or_proof", "or_file"),
+    ("ar", "Acknowledgement receipt (AR)", "ar_no", "ar_proof", "ar_file"),
+]
+DOC_BY_KEY = {d[0]: d for d in DELIVERY_DOCS}
+
+
+def _read_doc_files(files):
+    """The DR / OR / AR files chosen on a form.  Returns ({key: attachment},
+    error); a bad file saves nothing."""
+    out = {}
+    for key, label, _, _, field in DELIVERY_DOCS:
+        att, err = uploads.read_attachment(files.get(field))
+        if err:
+            return None, "%s file: %s" % (label, err)
+        if att:
+            out[key] = att
+    return out, None
+
+
+def _save_doc(batch, key, att):
+    """Store (or replace) one delivery document's picture / PDF."""
+    _, _, _, field, _ = DOC_BY_KEY[key]
+    old = uploads.picture_path("deliveries", batch.get(field))
+    db.update("receiving_batches", batch["id"], {
+        field: uploads.save_attachment("deliveries", "delivery-%d-%s" % (batch["id"], key), att)})
+    if old:
+        try:
+            os.remove(old)
+        except OSError:
+            pass
+
+
 def _delivery_fields(form, po):
     """The receive form's fields, as receive_delivery / preview_delivery
     take them."""
@@ -160,6 +200,7 @@ def _delivery_fields(form, po):
         received_date=form.get("received_date") or services.today_iso(),
         lines=_lines_from_form(form), po_no=form.get("po_no") or "",
         delivery_ref=form.get("delivery_ref") or "",
+        or_no=form.get("or_no") or "", ar_no=form.get("ar_no") or "",
         remarks=form.get("remarks") or "", po_id=po["id"] if po else None,
         received_time=form.get("received_time") or "",
         delivered_by=form.get("delivered_by") or "",
@@ -188,26 +229,17 @@ def new_preview():
     return render_template("receiving/_mrr_document.html", batch=batch, lines=lines,
                            received_by=current_user().get("name") or "", inventory_by="",
                            docs=services.DOCS_CHECKED, preview=True,
-                           proof_name=request.form.get("proof_name") or "")
-
-
-def _save_proof(batch, picture):
-    """Store (or replace) the picture of a delivery's receipt."""
-    old = uploads.picture_path("deliveries", batch.get("proof"))
-    db.update("receiving_batches", batch["id"], {
-        "proof": uploads.save_picture("deliveries", "delivery-%d" % batch["id"], picture)})
-    if old:
-        try:
-            os.remove(old)
-        except OSError:
-            pass
+                           doc_names=[(label, request.form.get(field + "_name"))
+                                      for _, label, _, _, field in DELIVERY_DOCS
+                                      if request.form.get(field + "_name")])
 
 
 def _new_form(form, po):
     return render_template(
-        "receiving/new.html", suppliers=sorted(db.read("suppliers"),
+        "receiving/new.html", delivery_docs=DELIVERY_DOCS,
+        suppliers=sorted(db.read("suppliers"),
                                                key=lambda s: s.get("name") or ""),
-        materials=services.stocked_materials(),
+        materials=services.purchasable_materials(),
         categories=services.MATERIAL_CATEGORIES,
         category_of=services.material_category,
         track_labels=services.TRACK_MODE_LABELS,
@@ -230,6 +262,7 @@ def batch(batch_id):
     po = db.get("purchase_orders", record.get("po_id")) if record.get("po_id") else None
     return render_template(
         "receiving/batch.html", batch=record, boxes=boxes, po=po,
+        delivery_docs=DELIVERY_DOCS,
         badge=services.RECEIVING_BADGE.get(record.get("status"), "badge-muted"),
         received_by=services.user_name(record.get("received_by")),
         awaiting=[b for b in boxes if b["status"] == services.BOX_AWAITING],
@@ -255,28 +288,41 @@ def mrr(batch_id):
 @receiving_bp.route("/<int:batch_id>/proof", methods=["GET", "POST"])
 @login_required
 def delivery_proof(batch_id):
-    """The picture of a delivery's receipt: anyone on receiving or inspection
-    can view it; the receiving team can add or replace it."""
+    """A delivery document's picture / PDF (?doc=dr|or|ar, DR by default):
+    anyone on receiving or inspection can view it; the receiving team can add
+    or replace it, and fill in its number if it was left blank."""
     user = current_user()
     record = db.get("receiving_batches", batch_id)
     if not record:
         abort(404)
+    key = request.values.get("doc") or "dr"
+    if key not in DOC_BY_KEY:
+        abort(404)
+    _, label, number_field, file_field, _ = DOC_BY_KEY[key]
     if request.method == "POST":
         if not can(user, "receiving"):
             abort(403)
-        picture, err = uploads.read_picture(request.files.get("proof"))
-        if err or not picture:
-            flash(err or "Choose the picture of the delivery receipt.", "error")
+        att, err = uploads.read_attachment(request.files.get("proof"))
+        number = (request.form.get("number") or "").strip()[:40]
+        if err:
+            flash("%s file: %s" % (label, err), "error")
+        elif not att and not number:
+            flash("Enter the %s no. or choose its file." % label, "error")
         else:
-            _save_proof(record, picture)
-            flash("Delivery receipt picture saved.", "success")
+            if number:
+                db.update("receiving_batches", batch_id, {number_field: number})
+            if att:
+                _save_doc(record, key, att)
+            flash("%s saved." % label, "success")
         return redirect(url_for("receiving.batch", batch_id=batch_id))
     if not (can(user, "receiving") or can(user, "inspection")):
         abort(403)
-    path = uploads.picture_path("deliveries", record.get("proof"))
+    path = uploads.picture_path("deliveries", record.get(file_field))
     if not path:
         abort(404)
-    return send_file(path, max_age=3600)
+    is_pdf = path.lower().endswith(".pdf")
+    return send_file(path, max_age=3600,
+                     mimetype="application/pdf" if is_pdf else "image/jpeg")
 
 
 @receiving_bp.route("/<int:batch_id>/add", methods=["GET", "POST"])
@@ -304,7 +350,7 @@ def add_boxes(batch_id):
                                 only=",".join(str(b["id"]) for b in boxes)))
     return render_template(
         "receiving/add.html", batch=record,
-        materials=services.stocked_materials(),
+        materials=services.purchasable_materials(),
         categories=services.MATERIAL_CATEGORIES,
         category_of=services.material_category,
         track_labels=services.TRACK_MODE_LABELS,
@@ -387,7 +433,7 @@ def _box_or_404(box_id):
 @receiving_bp.route("/box/<int:box_id>")
 def box(box_id):
     row = _box_or_404(box_id)
-    g.nav_endpoint = ("receiving.inspection"
+    g.nav_endpoint = (_lane_endpoint(row)
                       if not can(current_user(), "receiving")
                       else "receiving.index")
     record = db.get("receiving_boxes", box_id)
@@ -411,7 +457,8 @@ def checklist(box_id):
         flash("Box %s hasn't been inspected yet." % row["box_code"], "error")
         return redirect(url_for("receiving.box", box_id=box_id))
     return render_template("receiving/checklist.html", box=row,
-                           points=services.INSPECTION_POINTS)
+                           points=services.points_for_box(row),
+                           lane=services.INSPECTION_LANES[row["lane"]])
 
 
 @receiving_bp.route("/box/<int:box_id>/ncr")
@@ -445,21 +492,76 @@ def move_box(box_id):
 @receiving_bp.route("/inspection")
 @module_required("inspection")
 def inspection():
-    waiting = services.receiving_box_rows(status=services.BOX_AWAITING)
-    held = services.receiving_box_rows(status=services.BOX_HOLD)
-    done = [r for r in services.receiving_box_rows(
-        status=(services.BOX_ACCEPTED, services.BOX_REJECTED))
-        if r["checked_at"]]
+    """Raw Material Inspection: ginger, lemon, calamansi, cacao, coffee …"""
+    return _lane_page(services.LANE_RAW)
+
+
+@receiving_bp.route("/inspection/supplies")
+@module_required("inspection")
+def inspection_supplies():
+    """Packaging & Supplies Check: jars, bottles, seals, pouches, labels,
+    boxes; cleaning, production and office supplies."""
+    return _lane_page(services.LANE_SUPPLIES)
+
+
+def _batch_dates(row):
+    """(mfg, expiry) to start the date pickers with: the box's own, else
+    those already recorded on another box of the same batch."""
+    mfg, exp = row.get("mfg_date") or "", row.get("expiry_date") or ""
+    if not (mfg and exp) and row.get("lot_no"):
+        for b in db.query("receiving_boxes", lot_no=row["lot_no"]):
+            mfg = mfg or b.get("mfg_date") or ""
+            exp = exp or b.get("expiry_date") or ""
+    return mfg, exp
+
+
+@receiving_bp.route("/batches")
+@module_required("inventory")
+def batches():
+    """Batches & Expiry: every batch no., what is left of it and when it
+    expires — the expired and expiring ones first to see."""
+    show = request.args.get("show") or "stock"
+    rows = services.batch_rows()
+    counts = {"expiring": sum(1 for r in rows if r["status"] in ("Expired", "Expiring soon")),
+              "stock": sum(1 for r in rows if r["remaining"] > 0.0005 or r["waiting"]),
+              "all": len(rows)}
+    if show == "expiring":
+        rows = sorted((r for r in rows if r["status"] in ("Expired", "Expiring soon")),
+                      key=lambda r: r["expiry_date"])
+    elif show == "stock":
+        rows = [r for r in rows if r["remaining"] > 0.0005 or r["waiting"]]
+    else:
+        show = "all"
+    q = (request.args.get("q") or "").strip()
+    return render_template("receiving/batches.html", rows=rows, show=show,
+                           counts=counts, q=q, soon=services.EXPIRING_SOON_DAYS)
+
+
+def _lane_page(lane):
+    rows = [r for r in services.receiving_box_rows(
+        status=(services.BOX_AWAITING, services.BOX_HOLD, services.BOX_ACCEPTED,
+                services.BOX_REJECTED))]
+    mine = [r for r in rows if r["lane"] == lane]
+    waiting = [r for r in mine if r["status"] == services.BOX_AWAITING]
+    held = [r for r in mine if r["status"] == services.BOX_HOLD]
+    done = [r for r in mine if r["status"] in (services.BOX_ACCEPTED, services.BOX_REJECTED)
+            and r["checked_at"]]
     done.sort(key=lambda r: r["checked_at"], reverse=True)
+    other = services.LANE_SUPPLIES if lane == services.LANE_RAW else services.LANE_RAW
+    other_waiting = sum(1 for r in rows if r["lane"] == other
+                        and r["status"] in (services.BOX_AWAITING, services.BOX_HOLD))
     return render_template("receiving/inspection.html", waiting=waiting,
-                           held=held, done=done[:8])
+                           held=held, done=done[:8], lane_key=lane,
+                           lane=services.INSPECTION_LANES[lane],
+                           other=services.INSPECTION_LANES[other],
+                           other_waiting=other_waiting)
 
 
 @receiving_bp.route("/box/<int:box_id>/inspect", methods=["GET", "POST"])
 @module_required("inspection")
 def inspect(box_id):
-    g.nav_endpoint = "receiving.inspection"
     row = _box_or_404(box_id)
+    g.nav_endpoint = _lane_endpoint(row)
     if row["status"] != services.BOX_AWAITING:
         flash("Box %s was already inspected." % row["box_code"], "error")
         return redirect(url_for("receiving.box", box_id=box_id))
@@ -487,7 +589,9 @@ def inspect(box_id):
                 test_method=form.get("test_method") or "",
                 nc_types=form.getlist("nc_types"),
                 nc_other=form.get("nc_other") or "",
-                visual_description=form.get("visual_description") or "")
+                visual_description=form.get("visual_description") or "",
+                mfg_date=form.get("mfg_date") or "",
+                expiry_date=form.get("expiry_date") or "")
         if not err:
             if pictures:
                 _add_photos(box_id, pictures)
@@ -495,7 +599,8 @@ def inspect(box_id):
                                               box.get("acceptance_status")),
                   "success" if box.get("acceptance_status") == "Accepted"
                   else "error")
-            nxt = services.receiving_box_rows(status=services.BOX_AWAITING)
+            nxt = [r for r in services.receiving_box_rows(status=services.BOX_AWAITING)
+                   if r["lane"] == row["lane"]]
             if nxt and request.form.get("then") == "next":
                 return redirect(url_for("receiving.inspect", box_id=nxt[0]["id"]))
             return redirect(url_for("receiving.box", box_id=box_id))
@@ -503,10 +608,12 @@ def inspect(box_id):
 
     return render_template(
         "receiving/inspect.html", box=row, form=form,
-        points=services.INSPECTION_POINTS, check_results=services.CHECK_RESULTS,
+        points=services.points_for_box(row), check_results=services.CHECK_RESULTS,
         point_types=services.NC_TYPE_FOR_POINT, nc_types=services.NC_TYPES,
-        waiting_count=len(services.receiving_box_rows(
-            status=services.BOX_AWAITING)),
+        lane_key=row["lane"], lane=services.INSPECTION_LANES[row["lane"]],
+        batch_dates=_batch_dates(row),
+        waiting_count=len([r for r in services.receiving_box_rows(
+            status=services.BOX_AWAITING) if r["lane"] == row["lane"]]),
         start=1 if request.method == "POST" else 0)
 
 
@@ -525,6 +632,8 @@ def inspect_preview(box_id):
                checked_at=services.today_iso(),
                checklist=_checklist_from_form(form),
                visual_description=form.get("visual_description") or "",
+               mfg_date=form.get("mfg_date") or "",
+               expiry_date=form.get("expiry_date") or row.get("expiry_date") or "",
                test_parameter=form.get("test_parameter") or "",
                test_spec=form.get("test_spec") or "",
                test_result=form.get("test_result") or "",
@@ -545,7 +654,8 @@ def inspect_preview(box_id):
             form.get("nc_other") or "", save=False))
     box["photo_names"] = request.form.getlist("photo_names")
     return render_template("receiving/_inspect_preview.html", box=box, ncr=ncr,
-                           points=services.INSPECTION_POINTS, preview=True,
+                           points=services.points_for_box(row), preview=True,
+                           lane=services.INSPECTION_LANES[row["lane"]],
                            nc_types=services.NC_TYPES, containment=services.NC_CONTAINMENT,
                            dispositions=services.NC_DISPOSITIONS)
 

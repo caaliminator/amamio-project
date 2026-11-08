@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}New Records{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">New Records</h1>
+    <p class="page-sub">{% if can_add %}Add a new employee, supplier, raw material or supply. Each one is sent to the Super Admin and becomes part of the system once approved.{% elif can_decide %}New employees, suppliers, raw materials and supplies added by the Admin. Each one joins the system only when you approve it.{% else %}New employees, suppliers, raw materials and supplies, added by the Admin and approved by the Super Admin.{% endif %}</p>
+  </div>
+</div>
+
+{% if can_add %}
+<div class="task-grid mb">
+  {% for label, hint, ico, url in [
+      ('Add new employee', 'Staff without a system account', 'customers', url_for('additions.new_employee')),
+      ('Add supplier', 'A store, farmer or company you buy from', 'suppliers', url_for('suppliers.new')),
+      ('Add new material', 'A raw material: honey, produce, cacao…', 'inventory', url_for('additions.new_item', kind='material')),
+      ('Add new supply', 'Packaging, production & cleaning, or office', 'swap', url_for('additions.new_item', kind='supply'))] %}
+  <a class="task-card" href="{{ url }}">
+    <span class="task-icon">{{ icon(ico, 22) }}</span>
+    <span><span class="task-title">{{ label }}</span><span class="task-sub">{{ hint }}</span></span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="tabs">
+  {% for key, label in [('waiting', 'Waiting for approval'), ('approved', 'Approved'), ('rejected', 'Rejected'), ('all', 'All')] %}
+  <a href="{{ url_for('additions.index', show=key) }}" class="{{ 'is-active' if show == key }}">{{ label }} <span class="muted">{{ counts[key] }}</span></a>
+  {% endfor %}
+</div>
+
+{% if rows %}
+<div class="queue">
+  {% for r in rows %}
+  <a class="queue-item" href="{{ url_for('additions.detail', req_id=r.id) }}">
+    <span class="code" style="min-width:110px">{{ r.kind_label }}</span>
+    <span class="queue-main">
+      <span class="queue-title">{{ r.title }}</span>
+      <span class="queue-sub">Added by {{ r.requested_by_name or '—' }} · {{ (r.created_at or '')[:10] }}{% if r.decided_by_name %} · {{ r.status|lower }} by {{ r.decided_by_name }}{% endif %}{% if r.remarks %} · “{{ r.remarks }}”{% endif %}</span>
+    </span>
+    <span class="badge {{ r.badge }}">{{ 'Waiting for approval' if r.status == 'Pending' else r.status }}</span>
+    <span class="queue-go">{{ ('Approve or reject' if can_decide and r.status == 'Pending' else 'Open') }} {{ icon('arrow-right', 14) }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card"><div class="empty">
+  <div class="empty-icon">{{ icon('plus', 30) }}</div>
+  <div class="empty-title">{{ 'Nothing waiting for approval' if show == 'waiting' else 'Nothing here yet' }}</div>
+  <p class="muted">{% if can_add %}Use the cards above to add a new record.{% else %}New records the Admin adds appear here.{% endif %}</p>
+</div></div>
+{% endif %}
+{% endblock %}

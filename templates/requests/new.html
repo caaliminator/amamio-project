@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}New purchase request{% endblock %}
 {% block content %}
+<style>
+  .sup-info { margin-top: 6px; padding: 6px 10px; border-radius: 8px; background: var(--raise-3); font-size: .8rem; color: var(--muted); }
+  .sup-info[hidden] { display: none; }
+</style>
 <a class="back-link" href="{{ url_for('requests.index') }}">{{ icon('arrow-left', 15) }} Purchase Requests</a>
 
 {% macro item_card(line) %}
@@ -47,12 +51,16 @@
   <div class="form-grid cols-2">
     <div class="form-row">
       <label class="form-label">Preferred supplier</label>
-      <div class="combo" data-combo="supplierOptions"
-           data-combo-new="“%s” isn't in the Supplier Directory — it will be noted as typed">
-        <input type="text" name="preferred_supplier" class="combo-input js-supplier" maxlength="120"
+      <div class="combo js-supplier-combo" data-combo="supplierOptions"
+           data-combo-new="“%s” isn't on the list — pick a supplier from the list, or leave it blank">
+        <input type="text" name="preferred_supplier" class="combo-input js-supplier" maxlength="160"
                autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false"
                value="{{ line.preferred_supplier if line else '' }}" placeholder="Type to search · blank = no preference">
+        <input type="hidden" name="preferred_supplier_id" class="combo-value js-supplier-id"
+               value="{{ line.preferred_supplier_id if line else '' }}">
       </div>
+      <div class="form-hint js-sup-note"></div>
+      <div class="sup-info js-sup-info" hidden></div>
     </div>
     <div class="form-row">
       <label class="form-label">Budget / category</label>
@@ -182,16 +190,94 @@
   });
   cards.addEventListener("input", update);
 
+  // Preferred supplier: picked from the Supplier Directory (approved
+  // suppliers only).  For an item picked from the materials list, only the
+  // suppliers that supply it are offered, its usual supplier first.
+  var SUPPLIERS = JSON.parse(document.getElementById("supplierOptions").textContent);
+  var byId = {};
+  SUPPLIERS.forEach(function (o) { byId[o.v] = o; });
+  function esc(v) { var d = document.createElement("div"); d.textContent = v; return d.innerHTML; }
+  function supplierChoice(card) {
+    var mid = parseInt(card.querySelector("[name=material_id]").value, 10);
+    var typed = card.querySelector("[name=description]").value.trim();
+    if (!mid) return { list: SUPPLIERS, note: typed ? "Not on the materials list — showing every approved supplier." : "" };
+    var usual = card.__usual;
+    var linked = SUPPLIERS.filter(function (o) { return o.d.items.indexOf(mid) !== -1; });
+    if (!linked.length) return { list: SUPPLIERS, note: "No supplier in the directory is linked to this item yet — showing every approved supplier." };
+    linked.sort(function (a, b) { return (a.v === usual ? 0 : 1) - (b.v === usual ? 0 : 1); });
+    linked = linked.map(function (o) { return o.v === usual ? Object.assign({}, o, { s: "usual supplier" }) : o; });
+    return { list: linked, note: linked.length === 1 ? "1 supplier in the directory supplies this item." : linked.length + " suppliers in the directory supply this item." };
+  }
+  function showInfo(card) {
+    var id = card.querySelector(".js-supplier-id").value, box = card.querySelector(".js-sup-info");
+    var o = byId[id];
+    if (!o) { box.hidden = true; box.innerHTML = ""; return; }
+    var bits = [o.d.type, o.d.person, o.d.phone].filter(Boolean);
+    box.innerHTML = bits.length ? esc(bits.join(" · ")) : "No contact details in the directory yet.";
+    box.hidden = false;
+  }
+  function setSupplier(card, o) {
+    var combo = card.querySelector(".js-supplier-combo");
+    card.querySelector(".js-supplier").value = o ? o.l : "";
+    card.querySelector(".js-supplier-id").value = o ? o.v : "";
+    combo.__picked = o ? o.v : null;
+    showInfo(card);
+  }
+  function refreshSuppliers(card, prefill) {
+    var choice = supplierChoice(card), combo = card.querySelector(".js-supplier-combo");
+    combo.__options = choice.list;
+    card.querySelector(".js-sup-note").textContent = choice.note;
+    var id = parseInt(card.querySelector(".js-supplier-id").value, 10);
+    var allowed = choice.list.some(function (o) { return o.v === id; });
+    if (id && !allowed) { setSupplier(card, null); id = 0; }
+    if (!id && prefill && card.__usual && byId[card.__usual]
+             && choice.list.some(function (o) { return o.v === card.__usual; })
+             && !card.querySelector(".js-supplier").value) setSupplier(card, byId[card.__usual]);
+    else showInfo(card);
+  }
+  var ITEMS = JSON.parse(document.getElementById("itemOptions").textContent), usualOf = {};
+  ITEMS.forEach(function (o) { usualOf[o.v] = o.d.sid; });
+  function itemChanged(card, prefill) {
+    var mid = parseInt(card.querySelector("[name=material_id]").value, 10);
+    card.__usual = mid ? usualOf[mid] : null;
+    refreshSuppliers(card, prefill);
+  }
+
   // Picking an item from the list fills in its unit and usual supplier (the
   // estimated cost starts at 0 — the requester types it); a typed name that
-  // isn't on the list is requested as is.
+  // isn't on the list is requested as is.  Picking a supplier shows its
+  // details from the directory.
   cards.addEventListener("combo:pick", function (e) {
-    if (!e.target.classList.contains("js-item")) return;
     var card = e.target.closest("[data-line]"), d = e.detail.d || {};
+    if (e.target.classList.contains("js-supplier-combo")) { showInfo(card); return; }
+    if (!e.target.classList.contains("js-item")) return;
     card.querySelector("[name=unit]").value = d.unit || "pc";
-    var sup = card.querySelector(".js-supplier");
-    if (d.supplier && !sup.value) sup.value = d.supplier;
+    itemChanged(card, true);
     update();
+  });
+  // Typing in a box: the combo sets its hidden value after this handler runs.
+  cards.addEventListener("input", function (e) {
+    var card = e.target.closest && e.target.closest("[data-line]");
+    if (!card) return;
+    setTimeout(function () {
+      if (e.target.name === "description") itemChanged(card, false);
+      else if (e.target.classList.contains("js-supplier")) showInfo(card);
+    }, 0);
+  });
+  cards.querySelectorAll("[data-line]").forEach(function (c) { itemChanged(c, false); });
+  document.getElementById("addLine").addEventListener("click", function () {
+    var c = cards.lastElementChild;
+    if (c) itemChanged(c, false);
+  });
+  step.addEventListener("wz:validate", function (e) {
+    var bad = Array.prototype.find.call(cards.querySelectorAll("[data-line]"), function (c) {
+      return c.querySelector(".js-supplier").value.trim() && !c.querySelector(".js-supplier-id").value;
+    });
+    if (bad) {
+      e.preventDefault();
+      e.detail.message = "Pick a supplier from the list, or leave it blank.";
+      bad.querySelector(".js-supplier").focus();
+    }
   });
   update();
 

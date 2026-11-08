@@ -1,9 +1,9 @@
 [
   {
-    "period": "2026-09",
+    "period": "2026-10",
     "category": "packaging",
     "counted_by": 8,
-    "counted_at": "2026-10-01T01:30:00+00:00",
+    "counted_at": "2026-11-01T01:30:00+00:00",
     "notes": "Counted at the packing area storage.",
     "adjusted": false,
     "lines": [
@@ -41,8 +41,8 @@
         "material_id": 16,
         "name": "Hexagonal Jar 250 mL",
         "unit": "pc",
-        "system_qty": 290.0,
-        "physical_qty": 287.0,
+        "system_qty": 264.0,
+        "physical_qty": 261.0,
         "variance": -3.0,
         "id": 4,
         "month_end_count_id": 1
@@ -51,8 +51,8 @@
         "material_id": 17,
         "name": "Square Bottle 300 mL",
         "unit": "pc",
-        "system_qty": 633.0,
-        "physical_qty": 631.0,
+        "system_qty": 531.0,
+        "physical_qty": 529.0,
         "variance": -2.0,
         "id": 5,
         "month_end_count_id": 1
@@ -71,8 +71,8 @@
         "material_id": 19,
         "name": "Round Bottle 1 Liter",
         "unit": "pc",
-        "system_qty": 143.0,
-        "physical_qty": 143.0,
+        "system_qty": 114.0,
+        "physical_qty": 114.0,
         "variance": 0.0,
         "id": 7,
         "month_end_count_id": 1
@@ -131,8 +131,8 @@
         "material_id": 25,
         "name": "Matte Kraft Pouch (brown) 17x24 cm",
         "unit": "pc",
-        "system_qty": 482.0,
-        "physical_qty": 482.0,
+        "system_qty": 453.0,
+        "physical_qty": 453.0,
         "variance": 0.0,
         "id": 13,
         "month_end_count_id": 1
@@ -141,8 +141,8 @@
         "material_id": 26,
         "name": "Cacao Powder Pouch (black) 15x22 cm",
         "unit": "pc",
-        "system_qty": 314.0,
-        "physical_qty": 314.0,
+        "system_qty": 289.0,
+        "physical_qty": 289.0,
         "variance": 0.0,
         "id": 14,
         "month_end_count_id": 1
@@ -161,8 +161,8 @@
         "material_id": 28,
         "name": "Cookie Pouch 5.5x8.5 cm",
         "unit": "pc",
-        "system_qty": 651.0,
-        "physical_qty": 641.0,
+        "system_qty": 625.0,
+        "physical_qty": 615.0,
         "variance": -10.0,
         "id": 16,
         "month_end_count_id": 1
@@ -191,8 +191,8 @@
         "material_id": 31,
         "name": "63 mm Seal (250 mL)",
         "unit": "pc",
-        "system_qty": 470.0,
-        "physical_qty": 470.0,
+        "system_qty": 294.0,
+        "physical_qty": 294.0,
         "variance": 0.0,
         "id": 19,
         "month_end_count_id": 1
@@ -241,8 +241,8 @@
         "material_id": 36,
         "name": "Packaging Tape",
         "unit": "roll",
-        "system_qty": 24.0,
-        "physical_qty": 25.0,
+        "system_qty": 36.0,
+        "physical_qty": 37.0,
         "variance": 1.0,
         "id": 24,
         "month_end_count_id": 1

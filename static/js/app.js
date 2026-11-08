@@ -69,6 +69,33 @@
     writeGroups(state);
   });
 
+  /* ---- Minimised sidebar (computers) ----
+     "Collapse menu" folds the sidebar to a rail of icons; the choice is
+     remembered per browser (base.html sets the class before paint).  In the
+     rail each link shows its name on hover (the data-tip tooltip). */
+  var MINI_KEY = "amamio.navMini";
+  function syncMini() {
+    var mini = document.documentElement.classList.contains("nav-mini");
+    var btn = document.getElementById("navMini");
+    if (btn) {
+      btn.setAttribute("aria-pressed", mini ? "true" : "false");
+      btn.querySelector(".side-text").textContent = mini ? "Expand menu" : "Collapse menu";
+      btn.setAttribute("aria-label", mini ? "Expand menu" : "Collapse menu");
+    }
+    document.querySelectorAll(".sidebar .side-link").forEach(function (a) {
+      var label = (a.querySelector(".side-text") || {}).textContent || "";
+      if (mini) a.setAttribute("data-tip", label.trim());
+      else a.removeAttribute("data-tip");
+    });
+  }
+  whenReady(syncMini);
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest("#navMini")) return;
+    var mini = document.documentElement.classList.toggle("nav-mini");
+    try { window.localStorage.setItem(MINI_KEY, mini ? "1" : "0"); } catch (err) { /* optional */ }
+    syncMini();
+  });
+
   /* ---- Confirm dialogs on [data-confirm] elements/forms ---- */
   document.addEventListener("click", function (e) {
     var el = e.target.closest("[data-confirm]");
@@ -143,8 +170,8 @@
 
   /* ---- Table paging ----
      Every .table — and every report .doc-table marked data-paginate — with
-     more than 10 rows shows 10 at a time, with Previous / Next and "Page x
-     of y".  Rows are only hidden, never removed, so forms inside a table
+     more than 10 rows shows 10 at a time, with "Show 10 / 25 / 50 / All
+     entries" (remembered per browser), Previous / Next and "Page x of y".  Rows are only hidden, never removed, so forms inside a table
      still submit every row and printing shows the whole table.  Opt out
      with data-no-paginate. */
   var PAGE_SIZE = 10;
@@ -156,12 +183,16 @@
     var rows = Array.prototype.slice.call(body.rows);
     if (rows.length <= PAGE_SIZE) return;
     table.dataset.paged = "1";
-    var page = 0;
+    var page = 0, size = PAGE_SIZE;
+    try { size = parseInt(localStorage.getItem("amamio.pageSize"), 10) || PAGE_SIZE; } catch (e) {}
 
     var bar = document.createElement("div");
     bar.className = "pager no-print";
     bar.innerHTML =
-      '<span class="pager-info" aria-live="polite"></span>' +
+      '<span class="pager-left"><label class="pager-size">Show <select aria-label="Rows per page">' +
+        '<option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="100000">All</option>' +
+        "</select> entries</label>" +
+      '<span class="pager-info" aria-live="polite"></span></span>' +
       '<span class="pager-controls">' +
         '<button type="button" class="pager-btn" data-dir="-1" aria-label="Previous page">&lsaquo; Previous</button>' +
         '<span class="pager-page"></span>' +
@@ -175,12 +206,21 @@
     var label = bar.querySelector(".pager-page");
     var prev = bar.querySelector('[data-dir="-1"]');
     var next = bar.querySelector('[data-dir="1"]');
+    var sizeBox = bar.querySelector(".pager-size select");
+    if (!sizeBox.querySelector('option[value="' + size + '"]')) size = PAGE_SIZE;
+    sizeBox.value = String(size);
+    sizeBox.addEventListener("change", function () {
+      size = parseInt(sizeBox.value, 10) || PAGE_SIZE;
+      try { localStorage.setItem("amamio.pageSize", String(size)); } catch (e) {}
+      page = 0;
+      render();
+    });
 
     function render() {
-      var pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+      var pages = Math.max(1, Math.ceil(rows.length / size));
       page = Math.min(Math.max(page, 0), pages - 1);
-      var start = page * PAGE_SIZE;
-      var end = Math.min(start + PAGE_SIZE, rows.length);
+      var start = page * size;
+      var end = Math.min(start + size, rows.length);
       rows.forEach(function (row, i) {
         row.classList.toggle("is-paged-out", i < start || i >= end);
       });
@@ -274,6 +314,12 @@
       return t ? t.textContent.trim() : el.value;
     }
     if (el.type === "checkbox") return el.checked ? "Yes" : "No";
+    if (el.type === "date") {
+      // As the |longdate filter writes it: "Nov. 8, 2026".
+      var dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(el.value);
+      var MON = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "June", "July", "Aug.", "Sept.", "Oct.", "Nov.", "Dec."];
+      return dm ? MON[+dm[2] - 1] + " " + (+dm[3]) + ", " + dm[1] : el.value;
+    }
     if (el.type === "file") return !el.files || !el.files.length ? ""
       : el.files.length === 1 ? el.files[0].name : el.files.length + " files";
     var unit = el.closest(".big-field") && el.closest(".big-field").querySelector(".unit");
@@ -671,17 +717,22 @@
          [<input type="hidden" class="combo-value" name="…" data-other="other">]
        </div>
      Options: <script type="application/json" id="optionsId"> holding
-     [{"v": value, "l": label, "g": group, "s": side note, "d": {…}}].
+     [{"v": value, "l": label, "g": group, "s": side note, "d": {…}}];
+     a page script can give one box its own list by setting
+     combo.__options (e.g. only the suppliers of the item on that line).
      Every typed word must appear in the label (or in the group too, with
      data-combo-search-group on the .combo).  The hidden value is the
      option's value when the text matches a label exactly, else data-other
      (typed text allowed) or "".  Choosing an option — or typing one exactly —
      fires "combo:pick" on the .combo with the option as detail.
-     The list opens only once something is typed (or on ↓ to browse it all),
-     never just because the box got the focus. */
+     The list opens when the box is clicked / tapped (the whole list, the
+     current choice marked), when something is typed (only the matches), or
+     on ↓ — never just because the box got the focus with Tab. */
   (function () {
     var cache = {};
     function options(combo) {
+      // A page script may narrow one box's list: combo.__options = [...].
+      if (combo.__options) return combo.__options;
       var id = combo.getAttribute("data-combo");
       if (!cache[id]) {
         var el = document.getElementById(id);
@@ -718,31 +769,44 @@
       });
       return out + esc(label.slice(pos));
     }
-    function open(combo) {
+    // ``browse``: opened by a click — show the whole list (unless the box
+    // holds part of a name, which still narrows it) with the current choice
+    // marked, rather than only the option already in the box.
+    function open(combo, browse) {
       var input = inputOf(combo), typed = input.value.trim();
-      var q = norm(typed), words = q ? q.split(" ") : [];
-      var all = options(combo), html = "", group = null, shown = 0, exact = false;
+      var all = options(combo), current = norm(typed);
+      var chosen = browse && all.some(function (o) { return norm(o.l) === current; });
+      var q = chosen ? "" : current, words = q ? q.split(" ") : [];
+      var limit = browse ? 400 : 80;
+      var html = "", group = null, shown = 0, more = 0, exact = false, activeAt = -1;
       var byGroup = combo.hasAttribute("data-combo-search-group");
       all.forEach(function (o, i) {
         var l = norm(o.l), hay = byGroup && o.g ? l + " " + norm(o.g) : l;
-        if (shown >= 80 || !words.every(function (w) { return hay.indexOf(w) > -1; })) return;
+        if (!words.every(function (w) { return hay.indexOf(w) > -1; })) return;
+        if (shown >= limit) { more++; return; }
         if (l === q) exact = true;
         if (o.g && o.g !== group) {
           group = o.g;
           html += '<div class="combo-group">' + esc(group) + "</div>";
         }
-        html += '<div class="combo-opt" role="option" data-i="' + i + '"><span>' +
+        var isCurrent = chosen && l === current;
+        if (isCurrent) activeAt = shown;
+        html += '<div class="combo-opt' + (isCurrent ? " is-active" : "") + '" role="option" data-i="' + i + '"' +
+          (isCurrent ? ' aria-selected="true"' : "") + "><span>" +
           highlight(o.l, words) + "</span>" + (o.s ? "<small>" + esc(o.s) + "</small>" : "") + "</div>";
         shown++;
       });
       var note = combo.getAttribute("data-combo-new");
       if (q && !exact && note) html += '<div class="combo-note">' + esc(note.replace("%s", typed)) + "</div>";
       else if (!shown) html += '<div class="combo-note">No matches</div>';
+      if (more) html += '<div class="combo-note">' + more + " more — type to narrow the list</div>";
       var list = listOf(combo);
       list.innerHTML = html;
       list.hidden = false;
       input.setAttribute("aria-expanded", "true");
-      combo.__active = -1;
+      combo.__active = activeAt;
+      list.scrollTop = 0;
+      if (activeAt > -1) list.querySelectorAll(".combo-opt")[activeAt].scrollIntoView({ block: "nearest" });
     }
     function close(combo) {
       listOf(combo).hidden = true;
@@ -786,6 +850,14 @@
       if (e.target.value.trim()) open(combo);
       else close(combo);
     });
+    // A click / tap on the box opens the list; a second click closes it.
+    document.addEventListener("click", function (e) {
+      if (!e.target.classList || !e.target.classList.contains("combo-input")) return;
+      if (e.target.disabled || e.target.readOnly) return;
+      var combo = comboOf(e.target);
+      if (listOf(combo).hidden) open(combo, true);
+      else close(combo);
+    });
     document.addEventListener("focusout", function (e) {
       if (!e.target.classList.contains("combo-input")) return;
       var combo = comboOf(e.target);
@@ -821,6 +893,336 @@
     }, true);
   })();
 
+  /* ---- Calendar for every <input type="date"> ----
+     The browser's own date popup can't be styled, so date fields open this
+     calendar instead (themed, light and dark).  The field stays a real date
+     field: its value is still YYYY-MM-DD, typing a date still works, and
+     required / min / max are respected (days outside them can't be picked).
+     Picking a day sets the value and fires "input" and "change".
+     Click the field (or press Alt+↓ / Space in it) to open; ‹ › change the
+     month; the title switches to months, then years.  In the calendar:
+     arrows move a day / week, Page Up / Down a month, Enter picks, Esc
+     closes.  Phones and tablets keep their own (touch-friendly) picker. */
+  (function () {
+    var touch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+    if (touch) return;
+    var gecko = "MozAppearance" in document.documentElement.style;
+    var MONTHS = ["January", "February", "March", "April", "May", "June", "July",
+                  "August", "September", "October", "November", "December"];
+    var MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    var DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+    // As the |longdate filter writes them: "Sept. 21, 2026", "May 4, 2026".
+    var LONG_MON = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "June", "July", "Aug.", "Sept.", "Oct.", "Nov.", "Dec."];
+    var DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    var pop = null, field = null, view = null, mode = "days", cursor = null;
+
+    function pad(n) { return (n < 10 ? "0" : "") + n; }
+    function iso(y, m, d) { return y + "-" + pad(m + 1) + "-" + pad(d); }
+    function parse(v) {
+      var p = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || "");
+      return p ? { y: +p[1], m: +p[2] - 1, d: +p[3] } : null;
+    }
+    function today() { var t = new Date(); return iso(t.getFullYear(), t.getMonth(), t.getDate()); }
+    function addDays(v, n) {
+      var p = parse(v), t = new Date(p.y, p.m, p.d + n);
+      return iso(t.getFullYear(), t.getMonth(), t.getDate());
+    }
+    function addMonths(v, n) {
+      var p = parse(v), last = new Date(p.y, p.m + n + 1, 0).getDate();
+      var t = new Date(p.y, p.m + n, Math.min(p.d, last));
+      return iso(t.getFullYear(), t.getMonth(), t.getDate());
+    }
+    function allowed(v) {
+      var lo = field.getAttribute("min"), hi = field.getAttribute("max");
+      return !(lo && v < lo) && !(hi && v > hi);
+    }
+    function clampToRange(v) {
+      var lo = field.getAttribute("min"), hi = field.getAttribute("max");
+      if (lo && v < lo) return lo;
+      if (hi && v > hi) return hi;
+      return v;
+    }
+    function build() {
+      pop = document.createElement("div");
+      pop.className = "cal-pop";
+      pop.setAttribute("role", "dialog");
+      pop.setAttribute("aria-label", "Choose a date");
+      pop.hidden = true;
+      document.body.appendChild(pop);
+      pop.addEventListener("mousedown", function (e) { e.preventDefault(); });   // keep focus where it is
+      pop.addEventListener("click", onClick);
+      pop.addEventListener("keydown", onKey);
+    }
+    function btn(cls, label, attrs, html) {
+      return '<button type="button" class="' + cls + '" aria-label="' + label + '"' + (attrs || "") + ">" + html + "</button>";
+    }
+    var CHEV_L = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    var CHEV_R = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 18l6-6-6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    var CARET = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    function render() {
+      var value = field.value, now = today(), html = "";
+      var title = mode === "days" ? MONTHS[view.m] + " " + view.y
+                : mode === "months" ? String(view.y)
+                : (view.y - view.y % 12) + " – " + (view.y - view.y % 12 + 11);
+      var sel = parse(value);
+      html += '<div class="cal-head">' +
+        btn("cal-title", mode === "years" ? "Years" : "Choose the " + (mode === "days" ? "month" : "year"),
+            ' data-act="zoom"' + (mode === "years" ? " disabled" : ""), "<span>" + title + "</span>" + (mode === "years" ? "" : CARET)) +
+        '<div class="cal-nav">' +
+        btn("cal-arrow", mode === "days" ? "Previous month" : mode === "months" ? "Previous year" : "Previous years", ' data-act="prev"', CHEV_L) +
+        btn("cal-arrow", mode === "days" ? "Next month" : mode === "months" ? "Next year" : "Next years", ' data-act="next"', CHEV_R) +
+        "</div></div>";
+      if (sel) {
+        var sd = new Date(sel.y, sel.m, sel.d);
+        html += '<div class="cal-picked">' + DAY_NAMES[sd.getDay()] + ", " + LONG_MON[sel.m] + " " + sel.d + ", " + sel.y + "</div>";
+      }
+      if (mode === "days") {
+        html += '<div class="cal-grid cal-week" aria-hidden="true">' +
+          DAYS.map(function (d, i) { return '<span class="' + (i === 0 || i === 6 ? "is-weekend" : "") + '">' + d + "</span>"; }).join("") + "</div>";
+        html += '<div class="cal-grid cal-days" role="grid" aria-label="' + MONTHS[view.m] + " " + view.y + '">';
+        var first = new Date(view.y, view.m, 1).getDay();
+        for (var i = 0; i < 42; i++) {
+          var t = new Date(view.y, view.m, 1 - first + i);
+          var v = iso(t.getFullYear(), t.getMonth(), t.getDate());
+          var cls = ["cal-day"];
+          if (t.getMonth() !== view.m) cls.push("is-other");
+          if (v === now) cls.push("is-today");
+          if (v === value) cls.push("is-selected");
+          if (v === cursor) cls.push("is-cursor");
+          var ok = allowed(v);
+          html += '<button type="button" class="' + cls.join(" ") + '" data-date="' + v + '"' +
+            ' tabindex="' + (v === cursor ? "0" : "-1") + '"' +
+            ' aria-label="' + DAY_NAMES[t.getDay()] + ", " + MONTHS[t.getMonth()] + " " + t.getDate() + ", " + t.getFullYear() + '"' +
+            (v === value ? ' aria-selected="true"' : "") + (v === now ? ' aria-current="date"' : "") +
+            (ok ? "" : " disabled") + ">" + t.getDate() + "</button>";
+        }
+        html += "</div>";
+      } else if (mode === "months") {
+        html += '<div class="cal-grid cal-big">';
+        var thisMonth = now.slice(0, 7), selMonth = (value || "").slice(0, 7);
+        MON.forEach(function (name, m) {
+          var key = view.y + "-" + pad(m + 1);
+          var lo = (field.getAttribute("min") || "").slice(0, 7), hi = (field.getAttribute("max") || "").slice(0, 7);
+          var ok = !(lo && key < lo) && !(hi && key > hi);
+          html += '<button type="button" class="cal-cell' + (key === thisMonth ? " is-today" : "") + (key === selMonth ? " is-selected" : "") +
+            '" data-month="' + m + '"' + (ok ? "" : " disabled") + ">" + name + "</button>";
+        });
+        html += "</div>";
+      } else {
+        html += '<div class="cal-grid cal-big">';
+        var start = view.y - view.y % 12, thisYear = +now.slice(0, 4), selYear = sel ? sel.y : null;
+        var loY = +(field.getAttribute("min") || "0").slice(0, 4), hiY = +(field.getAttribute("max") || "9999").slice(0, 4);
+        for (var y = start; y < start + 12; y++) {
+          html += '<button type="button" class="cal-cell' + (y === thisYear ? " is-today" : "") + (y === selYear ? " is-selected" : "") +
+            '" data-year="' + y + '"' + (y < loY || y > hiY ? " disabled" : "") + ">" + y + "</button>";
+        }
+        html += "</div>";
+      }
+      var canToday = allowed(now);
+      html += '<div class="cal-foot">' +
+        (field.required ? "<span></span>" : '<button type="button" class="cal-link" data-act="clear">Clear</button>') +
+        '<button type="button" class="cal-link is-strong" data-act="today"' + (canToday ? "" : " disabled") + ">Today</button></div>";
+      pop.innerHTML = html;
+    }
+    function place() {
+      if (!field || pop.hidden) return;
+      var r = field.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+      var vw = document.documentElement.clientWidth, vh = window.innerHeight;
+      var left = Math.min(Math.max(8, r.left), vw - w - 8);
+      var top = r.bottom + 6;
+      if (top + h > vh - 8 && r.top - h - 6 > 8) top = r.top - h - 6;      // no room below: open above
+      pop.style.left = (left + window.scrollX) + "px";
+      pop.style.top = (top + window.scrollY) + "px";
+    }
+    function open(el, focusGrid) {
+      if (!pop) build();
+      if (el.disabled || el.readOnly) return;
+      field = el;
+      var base = parse(el.value) ? el.value : clampToRange(today());
+      var p = parse(base);
+      view = { y: p.y, m: p.m };
+      cursor = base;
+      mode = "days";
+      render();
+      pop.hidden = false;
+      el.setAttribute("aria-expanded", "true");
+      place();
+      if (focusGrid) focusCursor();
+    }
+    function close(refocus) {
+      if (!pop || pop.hidden) return;
+      pop.hidden = true;
+      if (field) {
+        field.setAttribute("aria-expanded", "false");
+        if (refocus) field.focus();
+      }
+      field = null;
+    }
+    function focusCursor() {
+      var b = pop.querySelector('.cal-day[data-date="' + cursor + '"]');
+      if (b) b.focus();
+    }
+    function choose(v) {
+      var el = field;
+      el.value = v;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      close(true);
+    }
+    function moveCursor(v) {
+      cursor = v;
+      var p = parse(v);
+      if (p.y !== view.y || p.m !== view.m) { view = { y: p.y, m: p.m }; }
+      render();
+      focusCursor();
+    }
+    function onClick(e) {
+      var b = e.target.closest("button");
+      if (!b || b.disabled) return;
+      var act = b.getAttribute("data-act");
+      if (b.hasAttribute("data-date")) return choose(b.getAttribute("data-date"));
+      if (b.hasAttribute("data-month")) { view.m = +b.getAttribute("data-month"); mode = "days"; cursor = iso(view.y, view.m, 1); return render(); }
+      if (b.hasAttribute("data-year")) { view.y = +b.getAttribute("data-year"); mode = "months"; return render(); }
+      if (act === "zoom") { mode = mode === "days" ? "months" : "years"; return render(); }
+      var step = act === "prev" ? -1 : act === "next" ? 1 : 0;
+      if (step) {
+        if (mode === "days") { var t = new Date(view.y, view.m + step, 1); view = { y: t.getFullYear(), m: t.getMonth() }; }
+        else view.y += step * (mode === "months" ? 1 : 12);
+        return render();
+      }
+      if (act === "today") return choose(today());
+      if (act === "clear") return choose("");
+    }
+    function onKey(e) {
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); return close(true); }
+      if (e.key === "Tab") return close(false);
+      if (mode !== "days" || !e.target.classList.contains("cal-day")) return;
+      var moves = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
+      if (moves[e.key]) { e.preventDefault(); return moveCursor(addDays(cursor, moves[e.key])); }
+      if (e.key === "PageUp" || e.key === "PageDown") { e.preventDefault(); return moveCursor(addMonths(cursor, e.key === "PageUp" ? -1 : 1)); }
+      if (e.key === "Home" || e.key === "End") {
+        e.preventDefault();
+        var p = parse(cursor), wd = new Date(p.y, p.m, p.d).getDay();
+        return moveCursor(addDays(cursor, e.key === "Home" ? -wd : 6 - wd));
+      }
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); if (allowed(cursor)) choose(cursor); }
+    }
+    function isDate(el) { return el && el.tagName === "INPUT" && el.type === "date"; }
+
+    // Firefox opens its own popup on a click: stop it, keep the focus.
+    document.addEventListener("mousedown", function (e) {
+      if (!isDate(e.target)) return;
+      if (gecko) { e.preventDefault(); e.target.focus(); }
+    });
+    document.addEventListener("click", function (e) {
+      if (isDate(e.target)) {
+        if (pop && !pop.hidden && field === e.target) close(false);
+        else open(e.target, false);
+      }
+    });
+    document.addEventListener("keydown", function (e) {
+      if (!isDate(e.target)) return;
+      if ((e.altKey && e.key === "ArrowDown") || e.key === " " || e.key === "F4") {
+        e.preventDefault();
+        open(e.target, true);
+      } else if (e.key === "Escape" && pop && !pop.hidden) {
+        e.stopPropagation();
+        close(false);
+      } else if (e.key === "Tab") close(false);
+    }, true);
+    // Typing a date into the field moves the open calendar to it.
+    document.addEventListener("input", function (e) {
+      if (!pop || pop.hidden || e.target !== field) return;
+      var p = parse(field.value);
+      if (p) { view = { y: p.y, m: p.m }; cursor = field.value; mode = "days"; render(); place(); }
+    });
+    document.addEventListener("mousedown", function (e) {
+      if (pop && !pop.hidden && !pop.contains(e.target) && e.target !== field) close(false);
+    });
+    window.addEventListener("resize", place);
+    document.addEventListener("scroll", place, true);
+  })();
+
+  /* ---- Number-only fields ----
+     Every <input type="number"> takes digits only: one decimal point when
+     its step allows decimals (step="1" = whole numbers), a minus sign only
+     when its min is below zero — never letters, "e", "+" or other symbols.
+     Text fields that hold a number say what they allow with data-chars:
+       phone   — digits, + - and spaces (a textarea also takes line breaks)
+       tin     — digits and dashes          account — digits, dashes, spaces
+     Typing a character that isn't allowed is refused (the box flashes);
+     pasted text is cleaned, e.g. "₱1,250.50" → 1250.50. */
+  (function () {
+    var CHARS = { phone: /[0-9+\- ]/, tin: /[0-9\-]/, account: /[0-9\- ]/ };
+    function ruleFor(el) {
+      if (!el || !el.tagName) return null;
+      if (el.tagName === "INPUT" && el.type === "number") {
+        var step = el.getAttribute("step"), min = parseFloat(el.getAttribute("min"));
+        var s = parseFloat(step);
+        return { number: true, dot: !step || step === "any" || isNaN(s) || s !== Math.round(s),
+                 minus: !isNaN(min) && min < 0 };
+      }
+      var kind = el.getAttribute("data-chars");
+      if (kind && CHARS[kind]) return { re: CHARS[kind], lines: el.tagName === "TEXTAREA" };
+      return null;
+    }
+    function ok(rule, ch) {
+      if (rule.number) return /[0-9]/.test(ch) || (rule.dot && ch === ".") || (rule.minus && ch === "-");
+      return rule.re.test(ch) || (rule.lines && (ch === "\n" || ch === "\r"));
+    }
+    function clean(rule, text) {
+      text = String(text || "");
+      if (rule.number) {
+        var out = "", seenDot = false;
+        text.replace(/,/g, "").split("").forEach(function (ch, i) {
+          if (/[0-9]/.test(ch)) out += ch;
+          else if (ch === "." && rule.dot && !seenDot) { out += ch; seenDot = true; }
+          else if (ch === "-" && rule.minus && !out) out += ch;
+        });
+        return out;
+      }
+      return text.split("").filter(function (ch) { return ok(rule, ch); }).join("");
+    }
+    function flash(el) {
+      el.classList.remove("input-refused");
+      void el.offsetWidth;            // restart the animation
+      el.classList.add("input-refused");
+      clearTimeout(el.__refusedTimer);
+      el.__refusedTimer = setTimeout(function () { el.classList.remove("input-refused"); }, 600);
+    }
+    document.addEventListener("beforeinput", function (e) {
+      var el = e.target, rule = ruleFor(el);
+      if (!rule || !/^insert/.test(e.inputType || "")) return;
+      if (e.inputType === "insertLineBreak" || e.inputType === "insertParagraph") {
+        if (!rule.lines) { e.preventDefault(); flash(el); }
+        return;
+      }
+      var text = e.data;
+      if (text == null && e.dataTransfer) text = e.dataTransfer.getData("text/plain");
+      if (text == null || text === "") return;
+      var bad = text.split("").some(function (ch) { return !ok(rule, ch); });
+      if (rule.number && rule.dot && text.indexOf(".") > -1 && String(el.value).indexOf(".") > -1) bad = true;
+      if (!bad) return;
+      e.preventDefault();
+      var fixed = clean(rule, text);
+      if (fixed && e.inputType !== "insertText") {
+        // Pasted / dropped: put in the cleaned text.
+        if (rule.number) el.value = fixed;
+        else if (typeof el.setRangeText === "function") el.setRangeText(fixed, el.selectionStart, el.selectionEnd, "end");
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      } else {
+        flash(el);
+      }
+    });
+    // Old browsers without beforeinput on number boxes: block the key itself.
+    document.addEventListener("keydown", function (e) {
+      var el = e.target, rule = ruleFor(el);
+      if (!rule || !rule.number || e.ctrlKey || e.metaKey || e.altKey || !e.key || e.key.length !== 1) return;
+      if (!ok(rule, e.key)) { e.preventDefault(); flash(el); }
+    });
+  })();
+
   /* ---- Photo drop box: <label class="dropzone" data-dropzone> around a file
      input; shows the chosen picture and its name before the form is saved. */
   document.addEventListener("change", function (e) {
@@ -836,13 +1238,21 @@
     if (thumbs) {                     // several pictures: a row of thumbnails
       thumbs.innerHTML = "";
       files.forEach(function (file) {
-        var img = document.createElement("img");
-        img.src = URL.createObjectURL(file);
-        img.alt = "";
-        thumbs.appendChild(img);
+        if (/^image\//.test(file.type)) {
+          var img = document.createElement("img");
+          img.src = URL.createObjectURL(file);
+          img.alt = "";
+          thumbs.appendChild(img);
+        } else {                      // a PDF or other document: a labelled tile
+          var tile = document.createElement("span");
+          tile.className = "dropzone-doc";
+          tile.textContent = (file.name.split(".").pop() || "file").toUpperCase();
+          thumbs.appendChild(tile);
+        }
       });
+      var allPics = files.every(function (x) { return /^image\//.test(x.type); });
       box.querySelector("[data-name]").textContent = files.length === 1 ? f.name
-        : files.length + " photos: " + files.map(function (x) { return x.name; }).join(", ");
+        : files.length + (allPics ? " photos: " : " files: ") + files.map(function (x) { return x.name; }).join(", ");
     } else {
       box.querySelector(".dropzone-chosen img").src = URL.createObjectURL(f);
       box.querySelector("[data-name]").textContent = f.name;

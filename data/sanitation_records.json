@@ -1,12 +1,12 @@
 [
   {
-    "record_date": "2026-10-09",
+    "record_date": "2026-11-02",
     "phase": "PRE-PRODUCTION",
     "conducted_by": "Ronaldo Garcia Mercado",
     "inspected_by": "Maria Santos Dela Cruz",
     "remarks": "",
     "recorded_by": 8,
-    "created_at": "2026-10-16T05:39:42.874971+00:00",
+    "created_at": "2026-11-08T13:02:55.126037+00:00",
     "areas": [
       {
         "location": "Locker Room",
@@ -47,13 +47,13 @@
     "id": 1
   },
   {
-    "record_date": "2026-10-09",
+    "record_date": "2026-11-02",
     "phase": "POST-PRODUCTION",
     "conducted_by": "Ronaldo Garcia Mercado",
     "inspected_by": "Maria Santos Dela Cruz",
     "remarks": "",
     "recorded_by": 8,
-    "created_at": "2026-10-16T05:39:42.898846+00:00",
+    "created_at": "2026-11-08T13:02:55.147076+00:00",
     "areas": [
       {
         "location": "Locker Room",
@@ -94,13 +94,13 @@
     "id": 2
   },
   {
-    "record_date": "2026-10-12",
+    "record_date": "2026-11-03",
     "phase": "PRE-PRODUCTION",
     "conducted_by": "Ronaldo Garcia Mercado",
     "inspected_by": "Maria Santos Dela Cruz",
     "remarks": "",
     "recorded_by": 8,
-    "created_at": "2026-10-16T05:39:42.925939+00:00",
+    "created_at": "2026-11-08T13:02:55.171987+00:00",
     "areas": [
       {
         "location": "Locker Room",
@@ -141,13 +141,13 @@
     "id": 3
   },
   {
-    "record_date": "2026-10-12",
+    "record_date": "2026-11-03",
     "phase": "POST-PRODUCTION",
     "conducted_by": "Ronaldo Garcia Mercado",
     "inspected_by": "Maria Santos Dela Cruz",
     "remarks": "",
     "recorded_by": 8,
-    "created_at": "2026-10-16T05:39:42.950897+00:00",
+    "created_at": "2026-11-08T13:02:55.196026+00:00",
     "areas": [
       {
         "location": "Locker Room",
@@ -167,7 +167,7 @@
         "location": "Washing Area",
         "current_status": "Needs cleaning",
         "action": "Scrub floor drain and wash basins with chlorine solution",
-        "date_undertaken": "2026-10-12",
+        "date_undertaken": "2026-11-03",
         "remarks": "Honey residue around the basins"
       },
       {
@@ -188,13 +188,13 @@
     "id": 4
   },
   {
-    "record_date": "2026-10-13",
+    "record_date": "2026-11-04",
     "phase": "PRE-PRODUCTION",
     "conducted_by": "Ronaldo Garcia Mercado",
     "inspected_by": "Maria Santos Dela Cruz",
     "remarks": "",
     "recorded_by": 8,
-    "created_at": "2026-10-16T05:39:42.975871+00:00",
+    "created_at": "2026-11-08T13:02:55.224232+00:00",
     "areas": [
       {
         "location": "Locker Room",
@@ -235,13 +235,13 @@
     "id": 5
   },
   {
-    "record_date": "2026-10-13",
+    "record_date": "2026-11-04",
     "phase": "POST-PRODUCTION",
     "conducted_by": "Ronaldo Garcia Mercado",
     "inspected_by": "Maria Santos Dela Cruz",
     "remarks": "",
     "recorded_by": 8,
-    "created_at": "2026-10-16T05:39:43.003936+00:00",
+    "created_at": "2026-11-08T13:02:55.253233+00:00",
     "areas": [
       {
         "location": "Locker Room",
@@ -282,13 +282,13 @@
     "id": 6
   },
   {
-    "record_date": "2026-10-14",
+    "record_date": "2026-11-05",
     "phase": "PRE-PRODUCTION",
     "conducted_by": "Ronaldo Garcia Mercado",
     "inspected_by": "Maria Santos Dela Cruz",
     "remarks": "",
     "recorded_by": 8,
-    "created_at": "2026-10-16T05:39:43.034139+00:00",
+    "created_at": "2026-11-08T13:02:55.285475+00:00",
     "areas": [
       {
         "location": "Locker Room",
@@ -329,13 +329,13 @@
     "id": 7
   },
   {
-    "record_date": "2026-10-14",
+    "record_date": "2026-11-05",
     "phase": "POST-PRODUCTION",
     "conducted_by": "Ronaldo Garcia Mercado",
     "inspected_by": "Maria Santos Dela Cruz",
     "remarks": "",
     "recorded_by": 8,
-    "created_at": "2026-10-16T05:39:43.067020+00:00",
+    "created_at": "2026-11-08T13:02:55.314076+00:00",
     "areas": [
       {
         "location": "Locker Room",
@@ -376,13 +376,13 @@
     "id": 8
   },
   {
-    "record_date": "2026-10-15",
+    "record_date": "2026-11-06",
     "phase": "PRE-PRODUCTION",
     "conducted_by": "Ronaldo Garcia Mercado",
     "inspected_by": "Maria Santos Dela Cruz",
     "remarks": "",
     "recorded_by": 8,
-    "created_at": "2026-10-16T05:39:43.098519+00:00",
+    "created_at": "2026-11-08T13:02:55.340128+00:00",
     "areas": [
       {
         "location": "Locker Room",
@@ -423,13 +423,13 @@
     "id": 9
   },
   {
-    "record_date": "2026-10-15",
+    "record_date": "2026-11-06",
     "phase": "POST-PRODUCTION",
     "conducted_by": "Ronaldo Garcia Mercado",
     "inspected_by": "Maria Santos Dela Cruz",
     "remarks": "Faucet repair reported to assets maintenance.",
     "recorded_by": 8,
-    "created_at": "2026-10-16T05:39:43.129887+00:00",
+    "created_at": "2026-11-08T13:02:55.371151+00:00",
     "areas": [
       {
         "location": "Locker Room",

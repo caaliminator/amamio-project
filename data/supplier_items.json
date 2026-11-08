@@ -1,0 +1,668 @@
+[
+  {
+    "supplier_id": 1,
+    "material_id": 1,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 1
+  },
+  {
+    "supplier_id": 1,
+    "material_id": 8,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 2
+  },
+  {
+    "supplier_id": 2,
+    "material_id": 11,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 3
+  },
+  {
+    "supplier_id": 3,
+    "material_id": 2,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 4
+  },
+  {
+    "supplier_id": 4,
+    "material_id": 5,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 5
+  },
+  {
+    "supplier_id": 5,
+    "material_id": 3,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 6
+  },
+  {
+    "supplier_id": 5,
+    "material_id": 4,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 7
+  },
+  {
+    "supplier_id": 6,
+    "material_id": 6,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 8
+  },
+  {
+    "supplier_id": 7,
+    "material_id": 4,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 9
+  },
+  {
+    "supplier_id": 8,
+    "material_id": 4,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 10
+  },
+  {
+    "supplier_id": 9,
+    "material_id": 4,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 11
+  },
+  {
+    "supplier_id": 10,
+    "material_id": 6,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 12
+  },
+  {
+    "supplier_id": 12,
+    "material_id": 12,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 13
+  },
+  {
+    "supplier_id": 13,
+    "material_id": 13,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 14
+  },
+  {
+    "supplier_id": 13,
+    "material_id": 14,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 15
+  },
+  {
+    "supplier_id": 13,
+    "material_id": 15,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 16
+  },
+  {
+    "supplier_id": 13,
+    "material_id": 16,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 17
+  },
+  {
+    "supplier_id": 13,
+    "material_id": 17,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 18
+  },
+  {
+    "supplier_id": 13,
+    "material_id": 18,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 19
+  },
+  {
+    "supplier_id": 13,
+    "material_id": 19,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 20
+  },
+  {
+    "supplier_id": 13,
+    "material_id": 22,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 21
+  },
+  {
+    "supplier_id": 14,
+    "material_id": 17,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 22
+  },
+  {
+    "supplier_id": 14,
+    "material_id": 19,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 23
+  },
+  {
+    "supplier_id": 14,
+    "material_id": 29,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 24
+  },
+  {
+    "supplier_id": 14,
+    "material_id": 30,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 25
+  },
+  {
+    "supplier_id": 14,
+    "material_id": 31,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 26
+  },
+  {
+    "supplier_id": 14,
+    "material_id": 32,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 27
+  },
+  {
+    "supplier_id": 15,
+    "material_id": 19,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 28
+  },
+  {
+    "supplier_id": 15,
+    "material_id": 20,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 29
+  },
+  {
+    "supplier_id": 16,
+    "material_id": 20,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 30
+  },
+  {
+    "supplier_id": 17,
+    "material_id": 13,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 31
+  },
+  {
+    "supplier_id": 17,
+    "material_id": 14,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 32
+  },
+  {
+    "supplier_id": 17,
+    "material_id": 15,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 33
+  },
+  {
+    "supplier_id": 17,
+    "material_id": 16,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 34
+  },
+  {
+    "supplier_id": 17,
+    "material_id": 17,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 35
+  },
+  {
+    "supplier_id": 17,
+    "material_id": 18,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 36
+  },
+  {
+    "supplier_id": 17,
+    "material_id": 19,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 37
+  },
+  {
+    "supplier_id": 17,
+    "material_id": 22,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 38
+  },
+  {
+    "supplier_id": 18,
+    "material_id": 17,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 39
+  },
+  {
+    "supplier_id": 18,
+    "material_id": 19,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 40
+  },
+  {
+    "supplier_id": 19,
+    "material_id": 17,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 41
+  },
+  {
+    "supplier_id": 19,
+    "material_id": 19,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 42
+  },
+  {
+    "supplier_id": 20,
+    "material_id": 17,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 43
+  },
+  {
+    "supplier_id": 20,
+    "material_id": 19,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 44
+  },
+  {
+    "supplier_id": 21,
+    "material_id": 17,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 45
+  },
+  {
+    "supplier_id": 21,
+    "material_id": 19,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 46
+  },
+  {
+    "supplier_id": 22,
+    "material_id": 17,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 47
+  },
+  {
+    "supplier_id": 22,
+    "material_id": 19,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 48
+  },
+  {
+    "supplier_id": 23,
+    "material_id": 44,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 49
+  },
+  {
+    "supplier_id": 23,
+    "material_id": 49,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 50
+  },
+  {
+    "supplier_id": 24,
+    "material_id": 13,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 51
+  },
+  {
+    "supplier_id": 24,
+    "material_id": 14,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 52
+  },
+  {
+    "supplier_id": 24,
+    "material_id": 15,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 53
+  },
+  {
+    "supplier_id": 24,
+    "material_id": 16,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 54
+  },
+  {
+    "supplier_id": 24,
+    "material_id": 18,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 55
+  },
+  {
+    "supplier_id": 24,
+    "material_id": 22,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 56
+  },
+  {
+    "supplier_id": 29,
+    "material_id": 73,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 57
+  },
+  {
+    "supplier_id": 30,
+    "material_id": 27,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 58
+  },
+  {
+    "supplier_id": 32,
+    "material_id": 36,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 59
+  },
+  {
+    "supplier_id": 32,
+    "material_id": 38,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 60
+  },
+  {
+    "supplier_id": 32,
+    "material_id": 35,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 61
+  },
+  {
+    "supplier_id": 32,
+    "material_id": 37,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 62
+  },
+  {
+    "supplier_id": 32,
+    "material_id": 39,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 63
+  },
+  {
+    "supplier_id": 36,
+    "material_id": 28,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 64
+  },
+  {
+    "supplier_id": 36,
+    "material_id": 24,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 65
+  },
+  {
+    "supplier_id": 37,
+    "material_id": 24,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 66
+  },
+  {
+    "supplier_id": 38,
+    "material_id": 13,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 67
+  },
+  {
+    "supplier_id": 38,
+    "material_id": 14,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 68
+  },
+  {
+    "supplier_id": 38,
+    "material_id": 15,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 69
+  },
+  {
+    "supplier_id": 38,
+    "material_id": 16,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 70
+  },
+  {
+    "supplier_id": 38,
+    "material_id": 17,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 71
+  },
+  {
+    "supplier_id": 38,
+    "material_id": 18,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 72
+  },
+  {
+    "supplier_id": 38,
+    "material_id": 19,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 73
+  },
+  {
+    "supplier_id": 38,
+    "material_id": 22,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 74
+  },
+  {
+    "supplier_id": 39,
+    "material_id": 40,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 75
+  },
+  {
+    "supplier_id": 39,
+    "material_id": 41,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 76
+  },
+  {
+    "supplier_id": 39,
+    "material_id": 39,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 77
+  },
+  {
+    "supplier_id": 41,
+    "material_id": 69,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 78
+  },
+  {
+    "supplier_id": 41,
+    "material_id": 68,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 79
+  },
+  {
+    "supplier_id": 41,
+    "material_id": 70,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 80
+  },
+  {
+    "supplier_id": 41,
+    "material_id": 71,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 81
+  },
+  {
+    "supplier_id": 42,
+    "material_id": 34,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 82
+  },
+  {
+    "supplier_id": 45,
+    "material_id": 43,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 83
+  },
+  {
+    "supplier_id": 45,
+    "material_id": 44,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 84
+  },
+  {
+    "supplier_id": 45,
+    "material_id": 52,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 85
+  },
+  {
+    "supplier_id": 47,
+    "material_id": 26,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 86
+  },
+  {
+    "supplier_id": 48,
+    "material_id": 32,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 87
+  },
+  {
+    "supplier_id": 49,
+    "material_id": 56,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 88
+  },
+  {
+    "supplier_id": 50,
+    "material_id": 53,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 89
+  },
+  {
+    "supplier_id": 50,
+    "material_id": 54,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 90
+  },
+  {
+    "supplier_id": 50,
+    "material_id": 57,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 91
+  },
+  {
+    "supplier_id": 50,
+    "material_id": 58,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 92
+  },
+  {
+    "supplier_id": 50,
+    "material_id": 59,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 93
+  },
+  {
+    "supplier_id": 50,
+    "material_id": 60,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 94
+  },
+  {
+    "supplier_id": 50,
+    "material_id": 61,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 95
+  },
+  {
+    "supplier_id": 50,
+    "material_id": 62,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 96
+  },
+  {
+    "supplier_id": 50,
+    "material_id": 63,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 97
+  },
+  {
+    "supplier_id": 50,
+    "material_id": 64,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 98
+  },
+  {
+    "supplier_id": 50,
+    "material_id": 65,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 99
+  },
+  {
+    "supplier_id": 50,
+    "material_id": 66,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 100
+  },
+  {
+    "supplier_id": 50,
+    "material_id": 67,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 101
+  },
+  {
+    "supplier_id": 50,
+    "material_id": 72,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 102
+  },
+  {
+    "supplier_id": 51,
+    "material_id": 46,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 103
+  },
+  {
+    "supplier_id": 51,
+    "material_id": 48,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 104
+  },
+  {
+    "supplier_id": 51,
+    "material_id": 49,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 105
+  },
+  {
+    "supplier_id": 52,
+    "material_id": 23,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 106
+  },
+  {
+    "supplier_id": 54,
+    "material_id": 55,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 107
+  },
+  {
+    "supplier_id": 55,
+    "material_id": 55,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 108
+  },
+  {
+    "supplier_id": 63,
+    "material_id": 3,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 109
+  },
+  {
+    "supplier_id": 64,
+    "material_id": 6,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 110
+  },
+  {
+    "supplier_id": 66,
+    "material_id": 33,
+    "created_at": "2026-11-08T13:02:42.990701+00:00",
+    "id": 111
+  }
+]

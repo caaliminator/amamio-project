@@ -11,10 +11,28 @@
 {{ typed if typed is not none else (start_from[key] if start_from.get(key) not in (none, '') else fallback) }}
 {%- endmacro %}
 
+{# A supplier field the directory has is filled from it and locked; a blank
+   one is typed (after a failed save / from a cancelled PO: as typed). #}
+{% macro lockable(picked, key, field, label, maxlen, placeholder='') -%}
+{% set locked = picked and picked[key] %}
+<div class="form-row">
+  <label class="form-label" for="{{ field }}">{{ label }} <span class="lock-ico js-lock" data-tip="From the Supplier Directory" title="From the Supplier Directory" {{ '' if locked else 'hidden' }}>{{ icon('lock', 13) }}</span></label>
+  <input type="text" id="{{ field }}" name="{{ field }}" maxlength="{{ maxlen }}" data-key="{{ key }}"
+         class="js-sup-field{{ ' locked-field' if locked }}" {{ 'readonly' if locked }} placeholder="{{ placeholder }}"
+         value="{{ picked[key] if locked else (sv(field) if picked else '') }}">
+</div>
+{%- endmacro %}
+
+<style>
+  .lock-ico { display: inline-flex; vertical-align: -2px; color: var(--muted); margin-left: 4px; }
+  #supplierStep [hidden], #totalsStep [hidden] { display: none !important; }
+  .sup-lock-note { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+</style>
+
 {% if prev_po %}
 <div class="next-action">
   <div class="next-action-text"><b>Filled in from PO {{ prev_po.po_no }}, which was cancelled</b>
-    <span>Its supplier, prices, discount, freight, labor, VAT and terms are the starting values — check them and change anything before preparing this PO. The PR's own details are shown on each item.</span></div>
+    <span>Its supplier, prices, discount, freight, labor, other fees, VAT and terms are the starting values — check them and change anything before preparing this PO. The PR's own details are shown on each item.</span></div>
 </div>
 {% endif %}
 
@@ -23,7 +41,7 @@
   <input type="hidden" name="request_id" value="{{ req.id }}">
 
   <section class="wz-step" id="supplierStep" data-title="Who is the supplier?"
-           data-hint="PO No. {{ po_no }} · from PR {{ pr_no }}. Type to search the Supplier Directory; its details fill in by themselves.">
+           data-hint="PO No. {{ po_no }} · from PR {{ pr_no }}. Type to search the Supplier Directory; the details it has fill in and are locked, the blank ones you can type.">
     <div class="wz-body">
       {% set picked = suppliers | selectattr('approved') | selectattr('id', 'equalto', chosen|int(0)) | first %}
       <div class="form-row">
@@ -32,33 +50,41 @@
              data-combo-new="“%s” isn't on the Approved Supplier List">
           <input type="text" id="supplier_search" class="combo-input" maxlength="120" data-review-label="Supplier"
                  autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false"
-                 value="{{ picked.name if picked else '' }}" placeholder="Type to search, e.g. packaging, farm">
+                 value="{{ picked.label if picked else '' }}" placeholder="Type to search, e.g. packaging, farm">
           <input type="hidden" id="supplier_id" name="supplier_id" class="combo-value" value="{{ picked.id if picked else '' }}">
         </div>
-        <p class="muted small">Only suppliers on the Approved Supplier List can be ordered from. Not listed? Add it to the <a href="{{ url_for('suppliers.index') }}">Supplier Directory</a> and approve it first, so its ledger can track the payments.</p>
+        <p class="muted small" id="supplierNote">Only suppliers on the Approved Supplier List can be ordered from. Not listed? Add it to the <a href="{{ url_for('suppliers.index') }}">Supplier Directory</a> and approve it first, so its ledger can track the payments.</p>
       </div>
+      <p class="muted small sup-lock-note js-lock-note" {{ '' if picked else 'hidden' }}>{{ icon('lock', 13) }} <span>Details marked with a lock come from the Supplier Directory and can't be changed here.</span>
+        {% if can_edit_suppliers %}<a class="js-edit-link" href="{{ url_for('suppliers.edit', supplier_id=picked.id) if picked else '#' }}" target="_blank" rel="noopener">Edit in directory</a>{% endif %}</p>
       <div class="form-grid cols-2">
+        {{ lockable(picked, 'tin', 'supplier_tin', 'TIN', 40) }}
+        {{ lockable(picked, 'address', 'supplier_address', 'Address', 300) }}
+        {{ lockable(picked, 'contact_person', 'supplier_contact_person', 'Contact person', 120) }}
+        {{ lockable(picked, 'contact', 'supplier_contact', 'Contact no. / email', 255) }}
+        {% set tlocked = picked and picked.type %}
         <div class="form-row">
-          <label class="form-label" for="supplier_tin">TIN</label>
-          <input type="text" id="supplier_tin" name="supplier_tin" maxlength="40" value="{{ sv('supplier_tin', suggested.tin if suggested else '') }}">
+          <label class="form-label" for="supplier_type">Supplier type <span class="lock-ico js-lock-type" data-tip="From the Supplier Directory" title="From the Supplier Directory" {{ '' if tlocked else 'hidden' }}>{{ icon('lock', 13) }}</span></label>
+          <input type="text" id="supplier_type_locked" class="locked-field js-type-locked" readonly data-review-label="Supplier type"
+                 {% if tlocked %}name="supplier_type"{% else %}hidden{% endif %} value="{{ picked.type if tlocked else '' }}">
+          <select id="supplier_type" class="js-type-select" data-review-label="Supplier type"
+                  {% if tlocked %}hidden{% else %}name="supplier_type"{% endif %}>
+            <option value="">—</option>
+            {% set typed_type = sv('supplier_type')|trim if picked else '' %}
+            {% for t in supplier_types %}<option {{ 'selected' if typed_type == t }}>{{ t }}</option>{% endfor %}
+          </select>
         </div>
         <div class="form-row">
-          <label class="form-label" for="supplier_address">Address</label>
-          <input type="text" id="supplier_address" name="supplier_address" maxlength="200" value="{{ sv('supplier_address', suggested.address if suggested else '') }}">
-        </div>
-        <div class="form-row">
-          <label class="form-label" for="supplier_contact_person">Contact person</label>
-          <input type="text" id="supplier_contact_person" name="supplier_contact_person" maxlength="80" value="{{ sv('supplier_contact_person', suggested.contact_person if suggested else '') }}">
-        </div>
-        <div class="form-row">
-          <label class="form-label" for="supplier_contact">Contact no. / email</label>
-          <input type="text" id="supplier_contact" name="supplier_contact" maxlength="120" value="{{ sv('supplier_contact', suggested.contact if suggested else '') }}">
-        </div>
-        <div class="form-row">
-          <label class="form-label" for="supplier_reference">Supplier reference</label>
-          <input type="text" id="supplier_reference" name="supplier_reference" maxlength="80" value="{{ sv('supplier_reference') }}" placeholder="Quotation / invoice no., if any">
+          <label class="form-label" for="supplier_reference">Quotation / invoice no.</label>
+          <input type="text" id="supplier_reference" name="supplier_reference" maxlength="80" value="{{ sv('supplier_reference') }}" placeholder="The supplier's quotation or invoice no., if any">
         </div>
       </div>
+      {% if can_edit_suppliers %}
+      <label class="flex gap-sm js-save-dir" style="align-items:center;margin-top:4px" hidden>
+        <input type="checkbox" name="save_to_directory" value="1" {{ 'checked' if form.save_to_directory == '1' }}>
+        <span class="small">Also save what I type in the blank fields to the Supplier Directory</span>
+      </label>
+      {% endif %}
     </div>
   </section>
 
@@ -132,7 +158,7 @@
         {% set pr_date = pl.requested_delivery or pr_date %}
         {% set pr_remarks = pl.remarks or pr_remarks %}
       {% endif %}
-      <div class="line-card" data-line>
+      <div class="line-card" data-line data-material="{{ it.material_id or '' }}">
         <div class="line-card-head">
           <label class="flex gap-sm" style="align-items:center;margin:0">
             <input type="checkbox" class="js-include" data-review-skip {{ '' if e and e.include == '0' else 'checked' }}>
@@ -228,13 +254,39 @@
           <input type="number" id="labor" name="labor" min="0" step="0.01" value="{{ sv('labor') }}" placeholder="0.00" class="js-adj">
         </div>
         <div class="form-row">
+          <label class="form-label" for="other_fees">Other / misc. fees (₱) <span class="muted small">optional</span></label>
+          <input type="number" id="other_fees" name="other_fees" min="0" step="0.01" value="{{ sv('other_fees') }}" placeholder="0.00" class="js-adj">
+        </div>
+        <div class="form-row" id="otherNoteRow">
+          <label class="form-label" for="other_fees_note">What the other / misc. fees are for</label>
+          <input type="text" id="other_fees_note" name="other_fees_note" maxlength="120" value="{{ sv('other_fees_note') }}" placeholder="e.g. Handling fee, insurance, permit">
+        </div>
+      </div>
+      {# VAT or NON VAT.  A rate of 0 is recorded as NON VAT. #}
+      {% set typed_rate = sv('vat_rate')|trim %}
+      {% set typed_type = sv('vat_type')|trim %}
+      {% set vat_now = typed_type if typed_type in ('VAT', 'NON VAT') else ('VAT' if typed_rate not in ('', '0', '0.0', '0.00') else 'NON VAT') %}
+      <div class="form-row">
+        <div class="form-label">VAT</div>
+        <div class="chip-choices" data-review-label="VAT">
+          <label class="chip-choice"><input type="radio" name="vat_type" value="VAT" {{ 'checked' if vat_now == 'VAT' }}><span>VAT</span></label>
+          <label class="chip-choice"><input type="radio" name="vat_type" value="NON VAT" {{ 'checked' if vat_now == 'NON VAT' }}><span>NON VAT</span></label>
+        </div>
+      </div>
+      <div class="form-grid cols-2">
+        <div class="form-row" id="vatRateRow">
           <label class="form-label" for="vat_rate">VAT (%)</label>
           <div class="input-suffix">
             <input type="number" id="vat_rate" name="vat_rate" min="0" max="100" step="0.01" inputmode="decimal"
-                   value="{{ sv('vat_rate') }}" placeholder="0" class="js-adj">
+                   value="{{ typed_rate or '12' }}" placeholder="12" class="js-adj">
             <span aria-hidden="true">%</span>
           </div>
-          <div class="form-hint" id="vatHint">Of the items after the discount — e.g. 12 for 12% VAT; leave blank or 0 if VAT-exempt.</div>
+          <div class="form-hint">Of the items after the discount. 0% is recorded as NON VAT.</div>
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="vat_amount">VAT amount (₱)</label>
+          <input type="text" id="vat_amount" class="locked-field" readonly tabindex="-1" data-review-skip value="">
+          <div class="form-hint" id="vatHint">Worked out from the items and the discount.</div>
         </div>
       </div>
       <div class="tally is-even" id="grandTotal"></div>
@@ -270,18 +322,89 @@
 <script>
 (function () {
   var cards = document.getElementById("lineCards");
-  // Picking a supplier fills in its details; only a supplier from the list
-  // (approved ones) can be ordered from.
+  // Picking a supplier fills in its details: each one the directory has is
+  // locked, a blank one stays open to type.  Picking another supplier clears
+  // them all and locks again.  Only a supplier from the list (approved ones)
+  // can be ordered from.
+  var SUPPLIERS = JSON.parse(document.getElementById("supplierOptions").textContent);
+  var byId = {};
+  SUPPLIERS.forEach(function (o) { byId[o.v] = o; });
   var fields = { address: "supplier_address", contact: "supplier_contact",
                  tin: "supplier_tin", person: "supplier_contact_person" };
+  var typeLocked = document.querySelector(".js-type-locked"), typeSelect = document.querySelector(".js-type-select");
+  var saveDir = document.querySelector(".js-save-dir");
+  function applySupplier(o) {
+    var d = (o && o.d) || {}, open = 0;
+    Object.keys(fields).forEach(function (k) {
+      var el = document.getElementById(fields[k]), v = d[k] || "";
+      el.value = v;
+      el.readOnly = !!v;
+      el.classList.toggle("locked-field", !!v);
+      el.closest(".form-row").querySelector(".js-lock").hidden = !v;
+      if (!v) open++;
+    });
+    var t = d.type || "";
+    typeLocked.value = t;
+    typeLocked.hidden = !t;
+    typeSelect.hidden = !!t;
+    if (t) { typeLocked.name = "supplier_type"; typeSelect.removeAttribute("name"); }
+    else { typeSelect.name = "supplier_type"; typeLocked.removeAttribute("name"); typeSelect.value = ""; open++; }
+    document.querySelector(".js-lock-type").hidden = !t;
+    document.querySelector(".js-lock-note").hidden = !o;
+    var link = document.querySelector(".js-edit-link");
+    if (link && d.edit) link.href = d.edit;
+    if (saveDir) saveDir.hidden = !o || !open;
+  }
+  function countOpen() {
+    var n = Object.keys(fields).filter(function (k) { return !document.getElementById(fields[k]).readOnly; }).length;
+    return n + (typeSelect.hidden ? 0 : 1);
+  }
+  if (saveDir) saveDir.hidden = !document.getElementById("supplier_id").value || !countOpen();
   document.getElementById("supplierCombo").addEventListener("combo:pick", function (e) {
-    var d = e.detail.d || {};
-    Object.keys(fields).forEach(function (k) { document.getElementById(fields[k]).value = d[k] || ""; });
+    applySupplier(byId[e.detail.v] || null);
   });
   document.getElementById("supplierStep").addEventListener("wz:validate", function (e) {
     if (document.getElementById("supplier_id").value) return;
     e.preventDefault();
     e.detail.message = "Choose the supplier from the list — type part of its name and pick it.";
+  });
+
+  // The supplier list follows the ticked items: suppliers that supply all
+  // of them first, then those that supply some, then suppliers with no
+  // catalog items linked.  A supplier that supplies none of them is left out.
+  var LINKED = {{ linked_materials|tojson }};
+  var combo = document.getElementById("supplierCombo");
+  function tickedItems() {
+    var out = [];
+    document.querySelectorAll("#lineCards [data-line]").forEach(function (c) {
+      var m = parseInt(c.getAttribute("data-material"), 10);
+      if (m && c.querySelector(".js-include").checked && LINKED.indexOf(m) !== -1 && out.indexOf(m) === -1) out.push(m);
+    });
+    return out;
+  }
+  function rankSuppliers() {
+    var want = tickedItems(), n = want.length;
+    if (!n) { combo.__options = null; return; }
+    var groups = [[], [], []];
+    var labels = [n === 1 ? "Supplies the ticked item" : "Supplies all " + n + " ticked items",
+                  "Supplies some of the ticked items", "Other approved suppliers"];
+    SUPPLIERS.forEach(function (o) {
+      var mine = o.d.items || [];
+      var has = want.filter(function (m) { return mine.indexOf(m) !== -1; }).length;
+      if (!mine.length) groups[2].push(Object.assign({}, o, { g: labels[2] }));
+      else if (has === n) groups[0].push(Object.assign({}, o, { g: labels[0] }));
+      else if (has) groups[1].push(Object.assign({}, o, { g: labels[1], s: "supplies " + has + " of " + n + " items" }));
+    });
+    combo.__options = groups[0].concat(groups[1], groups[2]);
+  }
+  function supplierFits() {
+    var id = parseInt(document.getElementById("supplier_id").value, 10);
+    if (!id || !combo.__options) return true;
+    return combo.__options.some(function (o) { return o.v === id; });
+  }
+  rankSuppliers();
+  cards.addEventListener("change", function (e) {
+    if (e.target.classList && e.target.classList.contains("js-include")) rankSuppliers();
   });
 
   // Advance / partial payment asks how much is paid up front.
@@ -311,8 +434,14 @@
     });
     return sum;
   }
-  // VAT is a percentage of the items after the discount (same as the server).
+  // VAT is a percentage of the items after the discount (same as the
+  // server).  NON VAT — or a rate of 0 — means no VAT, recorded as NON VAT.
+  function isVat() {
+    var t = document.querySelector("[name=vat_type]:checked");
+    return !!t && t.value === "VAT" && num(document.getElementById("vat_rate")) > 0;
+  }
   function vatAmount(sub) {
+    if (!isVat()) return 0;
     var rate = Math.min(100, Math.max(0, num(document.getElementById("vat_rate"))));
     return Math.round(Math.max(0, sub - num(document.getElementById("discount"))) * rate) / 100;
   }
@@ -320,12 +449,19 @@
     var sub = subtotal(), vat = vatAmount(sub);
     var adj = function (id) { return num(document.getElementById(id)); };
     var rate = num(document.getElementById("vat_rate"));
-    document.getElementById("subtotal").innerHTML = "<span>Subtotal</span><b>" + peso(sub) + "</b>";
-    document.getElementById("vatHint").textContent = rate
+    var t = document.querySelector("[name=vat_type]:checked");
+    var nonVat = !t || t.value !== "VAT";
+    var rateRow = document.getElementById("vatRateRow"), rateBox = document.getElementById("vat_rate");
+    rateRow.hidden = nonVat;
+    rateBox.disabled = nonVat;
+    document.getElementById("vat_amount").value = isVat() ? peso(vat) : "NON VAT";
+    document.getElementById("vatHint").textContent = isVat()
       ? "VAT " + rate + "% of " + peso(Math.max(0, sub - adj("discount"))) + " = " + peso(vat)
-      : "Of the items after the discount — e.g. 12 for 12% VAT; leave blank or 0 if VAT-exempt.";
+      : (nonVat ? "No VAT on this PO — it prints as NON VAT." : "0% VAT — recorded as NON VAT.");
+    document.getElementById("otherNoteRow").hidden = !(adj("other_fees") > 0);
+    document.getElementById("subtotal").innerHTML = "<span>Subtotal</span><b>" + peso(sub) + "</b>";
     document.getElementById("grandTotal").innerHTML = "<span>Grand total</span><b>" +
-      peso(sub - adj("discount") + adj("freight") + adj("labor") + vat) + "</b>";
+      peso(sub - adj("discount") + adj("freight") + adj("labor") + adj("other_fees") + vat) + "</b>";
   }
   document.getElementById("poForm").addEventListener("input", update);
   document.getElementById("poForm").addEventListener("change", update);
@@ -382,6 +518,10 @@
   step.addEventListener("wz:validate", function (e) {
     if (!cards.querySelector(".js-include:checked")) {
       e.preventDefault(); e.detail.message = "Keep at least one item on this PO.";
+    } else if (!supplierFits()) {
+      e.preventDefault();
+      e.detail.message = document.getElementById("supplier_search").value +
+        " doesn't supply any of the ticked items in the Supplier Directory — go back to the first step and pick another supplier.";
     }
   });
 

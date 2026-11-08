@@ -660,7 +660,7 @@ def import_file(path, template_id, user_id, filename=None, skip_duplicates=True)
     db.insert_many("platform_sales", imported)
     if imported or updated:
         services.notify_team(
-            {"packing_head"}, "%s sales uploaded (%s): %s"
+            {"sales_marketing_admin"}, "%s sales uploaded (%s): %s"
             % (platform, record["filename"], record["message"]),
             link="/platforms/?platform=%s" % platform)
     return record, None

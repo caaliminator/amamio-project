@@ -32,7 +32,8 @@
           <td class="nowrap">{% if e.po_id and e.credit %}<a href="{{ url_for('purchasing.detail', po_id=e.po_id) }}">{{ e.ref }}</a>{% else %}{{ e.ref }}{% endif %}</td>
           <td>{{ e.particulars }}{% if e.recorded_by %}<div class="muted small">recorded by {{ e.recorded_by }}</div>{% endif %}
             {% if e.proof %}<a class="proof-link" href="{{ url_for('ledger.proof', payment_id=e.payment_id) }}" target="_blank" rel="noopener">
-              <img src="{{ url_for('ledger.proof', payment_id=e.payment_id) }}" alt="Proof of payment" loading="lazy"><span>Proof of payment</span></a>{% endif %}</td>
+              <img src="{{ url_for('ledger.proof', payment_id=e.payment_id) }}" alt="Proof of payment" loading="lazy"><span>Proof of payment</span></a>{% endif %}
+            {% if e.payment_id %}<div class="small mt-xs"><a href="{{ url_for('ledger.payment', payment_id=e.payment_id) }}">{{ icon('paperclip', 13) }} {{ e.attachments ~ ' attachment' ~ ('s' if e.attachments != 1 else '') if e.attachments else 'Attach files' }}</a></div>{% endif %}</td>
           <td class="num">{{ e.debit|peso if e.debit else '' }}</td>
           <td class="num">{{ e.credit|peso if e.credit else '' }}</td>
           <td class="num"><b>{{ e.balance|peso }}</b></td>
@@ -106,7 +107,7 @@
       {% endfor %}
     </select>
     {% else %}
-    <p class="muted small">No cash or bank accounts yet.{% if can('accounts') %} <a href="{{ url_for('finance.accounts') }}">Add your accounts</a> so each payment shows which one it came from.{% endif %}</p>
+    <p class="muted small">No cash or bank accounts yet.{% if can('accounts_transact') %} <a href="{{ url_for('finance.accounts') }}">Add your accounts</a> so each payment shows which one it came from.{% else %} The Super Admin adds them; then each payment shows which one it came from.{% endif %}</p>
     {% endif %}
   </div>
   <div class="form-row">
@@ -129,6 +130,17 @@
         <small>Receipt, deposit slip, check or transfer confirmation · JPG or PNG, under 10 MB</small></span></span>
       <span class="dropzone-chosen" hidden><img alt=""><span><b data-name></b><small>Click to choose a different picture</small></span></span>
     </label>
+  </div>
+  <div class="form-row">
+    <div class="form-label">Other attachments <span class="muted small">optional</span></div>
+    <label class="dropzone" data-dropzone>
+      <input type="file" name="attachments" accept="image/*,application/pdf,.pdf" multiple>
+      <span class="dropzone-empty">{{ icon('reports', 22) }}<span><b>Attach more files</b>
+        <small>Official receipt, invoice, deposit slip, check copy, statement · JPG, PNG or PDF, under 10 MB each · choose several at once</small></span></span>
+      <span class="dropzone-chosen" hidden><span class="dropzone-thumbs"></span><span><b data-name></b><small>Click to choose different files</small></span></span>
+    </label>
+    <input type="text" name="attachments_label" maxlength="80" placeholder="What are these? e.g. Official receipt and invoice (optional)" style="margin-top:8px">
+    <div class="form-hint">You can attach more later from the payment's page (the paperclip link in the ledger).</div>
   </div>
   <button class="btn btn-primary" type="submit">Record payment</button>
 </form>

@@ -8,7 +8,7 @@ from flask import (Blueprint, abort, flash, redirect, render_template,
 import db
 import finance_service as fin
 import services
-from security import current_user, module_required
+from security import can, current_user, module_required
 
 finance_bp = Blueprint("finance", __name__)
 
@@ -36,6 +36,8 @@ def due():
 def accounts():
     form = request.form
     if request.method == "POST":
+        if not can(current_user(), "accounts_transact"):
+            abort(403)          # adding an account is the Super Admin's
         account, err = fin.save_account(form, current_user())
         if not err:
             flash("Account %s added." % account["name"], "success")
@@ -45,7 +47,8 @@ def accounts():
     return render_template(
         "finance/accounts.html", rows=rows, form=form, kinds=fin.ACCOUNT_KINDS,
         total=round(sum(a["balance"] for a in rows if a.get("active", True)), 2),
-        today=services.today_iso(), adding=request.method == "POST" or not rows)
+        today=services.today_iso(),
+        adding=can(current_user(), "accounts_transact") and (request.method == "POST" or not rows))
 
 
 @finance_bp.route("/accounts/<int:account_id>")
@@ -62,7 +65,7 @@ def account(account_id):
 
 
 @finance_bp.route("/accounts/<int:account_id>/edit", methods=["POST"])
-@module_required("accounts")
+@module_required("accounts_transact")
 def edit_account(account_id):
     _account_or_404(account_id)
     account, err = fin.save_account(request.form, current_user(), account_id)
@@ -71,7 +74,7 @@ def edit_account(account_id):
 
 
 @finance_bp.route("/accounts/<int:account_id>/entry", methods=["POST"])
-@module_required("accounts")
+@module_required("accounts_transact")
 def entry(account_id):
     acc = _account_or_404(account_id)
     entries, err = fin.record_entry(acc, current_user(), request.form)
@@ -85,7 +88,7 @@ def entry(account_id):
 
 
 @finance_bp.route("/accounts/<int:account_id>/active", methods=["POST"])
-@module_required("accounts")
+@module_required("accounts_transact")
 def toggle_account(account_id):
     acc = _account_or_404(account_id)
     active = not acc.get("active", True)

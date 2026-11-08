@@ -57,7 +57,8 @@ def item(material_id):
         "supplies/item.html", m=m, low=services.is_low(m),
         cat=services.material_category(m),
         cat_label=services.MATERIAL_CATEGORY_LABELS.get(services.material_category(m)),
-        moves=svc.supply_movement_rows(material_id=material_id, limit=12))
+        moves=svc.supply_movement_rows(material_id=material_id, limit=12),
+        batches=services.batch_choices(material_id, m.get("stock_qty")))
 
 
 def _movement_filters():
@@ -95,11 +96,12 @@ def movements_download(fmt):
         summary.append([t["material_name"],
                         services.MATERIAL_CATEGORY_LABELS.get(t["category"], ""),
                         t["unit"], t["in"], t["out"]])
-    rows = [["Date", "Item", "IN / OUT", "Qty", "Unit", "Reason", "Person",
-             "Reference", "Balance after", "Notes", "Recorded by"]]
+    rows = [["Date", "Item", "IN / OUT", "Qty", "Unit", "Batch no.", "Expiry",
+             "Reason", "Person", "Reference", "Balance after", "Notes", "Recorded by"]]
     for m in sorted(moves, key=lambda m: m.get("moved_at") or ""):
         rows.append([m["when"], m.get("material_name"), m.get("direction"),
-                     m.get("qty"), m.get("unit"), m.get("reason"),
+                     m.get("qty"), m.get("unit"), m.get("batch_no") or "",
+                     m.get("expiry_date") or "", m.get("reason"),
                      m.get("person"), m.get("reference"), m.get("balance_after"),
                      m.get("notes"), m["recorded_by_name"]])
     return xlsx.download(
@@ -123,22 +125,49 @@ def move():
             form.get("material_id"), form.get("direction"), form.get("qty"),
             form.get("reason"), person=form.get("person") or "",
             reference=form.get("reference") or "", notes=form.get("notes") or "",
-            user_id=current_user()["id"])
+            user_id=current_user()["id"], batch_no=form.get("batch_no") or "",
+            expiry_date=form.get("expiry_date") or "")
         if not err:
-            flash("%s recorded: %s %s (%s). Now %s in stock." % (
+            flash("%s recorded: %s %s (%s%s). Now %s in stock." % (
                 movement["direction"], services.fmt_qty(movement["qty"], movement["unit"]),
                 movement["material_name"], movement["reason"],
+                (", batch %s" % movement["batch_no"]) if movement.get("batch_no") else "",
                 services.fmt_qty(movement["balance_after"], movement["unit"])), "success")
             return redirect(url_for("supplies.item", material_id=movement["material_id"]))
         flash(err, "error")
         start = 3
     elif preset and form.get("direction") in ("IN", "OUT"):
         start = 3       # from an item page: straight to "how much"
+    materials = svc.supplies()
     return render_template(
         "supplies/move.html", form=form, start=start, preset_cat=preset_cat or "",
-        materials=svc.supplies(), categories=services.MATERIAL_CATEGORIES,
+        materials=materials, categories=services.MATERIAL_CATEGORIES,
         category_of=services.material_category,
+        batches=_batch_data(materials),
+        new_stock_reason=services.NEW_STOCK_REASON,
+        expired_ok=list(svc.SUPPLY_EXPIRED_OK),
         in_reasons=svc.SUPPLY_IN_REASONS, out_reasons=svc.SUPPLY_OUT_REASONS)
+
+
+def _batch_data(materials):
+    """Per item, for the IN / OUT form: its batches (the one to use first on
+    top), the stock with no batch no., and the batch no. new stock would get."""
+    by_item, numbers = {}, services._all_batch_numbers()
+    for r in services.batch_rows():
+        if r["remaining"] > 0.0005 or r["consumed"] > 0.0005:
+            by_item.setdefault(r["material_id"], []).append(r)
+    out = {}
+    for m in materials:
+        rows = sorted(by_item.get(m["id"], []), key=services._fefo_key)
+        batched = sum(r["remaining"] for r in rows)
+        out[str(m["id"])] = {
+            "loose": round(max(0.0, services._to_float(m.get("stock_qty")) - batched), 3),
+            "next": services.next_batch_no(m.get("name"), numbers=numbers),
+            "batches": [{"no": r["batch_no"], "left": r["remaining"], "used": r["consumed"],
+                         "expiry": r["expiry_date"], "days": r["days_left"],
+                         "status": r["status"]} for r in rows],
+        }
+    return out
 
 
 @supplies_bp.route("/count", methods=["GET", "POST"])

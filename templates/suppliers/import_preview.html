@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Check the import{% endblock %}
+{% block content %}
+<style>
+  .imp-row { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; background: var(--raise-1, transparent); }
+  .imp-row.is-same { opacity: .7; }
+  .imp-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; justify-content: space-between; }
+  .imp-name { font-weight: 700; }
+  .imp-sub { color: var(--muted); font-size: .82rem; }
+  .imp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 16px; margin-top: 10px; }
+  .imp-conflict { border-top: 1px dashed var(--border); padding-top: 8px; margin-top: 8px; }
+  .imp-conflict label { display: flex; gap: 8px; align-items: flex-start; font-size: .86rem; margin: 4px 0; cursor: pointer; }
+  .imp-items label { display: inline-flex; gap: 6px; align-items: center; margin: 2px 12px 2px 0; font-size: .86rem; cursor: pointer; }
+  .imp-fills { font-size: .84rem; margin: 8px 0 0; padding-left: 18px; }
+  .imp-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+  .imp-row[hidden], .imp-row [hidden] { display: none !important; }
+</style>
+<a class="back-link" href="{{ url_for('suppliers.import_file') }}">{{ icon('arrow-left', 15) }} Upload another file</a>
+
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Check the import</h1>
+    <p class="page-sub">{{ filename }} · {{ rows|length }} supplier{{ 's' if rows|length != 1 }} read: <b>{{ counts.new }}</b> new, <b>{{ counts.changes }}</b> with changes, <b>{{ counts.same }}</b> already the same. Nothing is saved until you confirm.</p>
+  </div>
+</div>
+
+{% for p in problems %}<div class="flash flash-error">{{ p }}</div>{% endfor %}
+
+<form method="post" action="{{ url_for('suppliers.import_confirm') }}" id="impForm">
+  <input type="hidden" name="payload" value="{{ payload }}">
+
+  <div class="imp-filter" role="group" aria-label="Show">
+    <label class="chip-choice"><input type="radio" name="_show" value="todo" checked><span>New and changed</span></label>
+    <label class="chip-choice"><input type="radio" name="_show" value="all"><span>Every row</span></label>
+  </div>
+
+  {% for r in rows %}
+  {% set row = r.row %}
+  <div class="imp-row {{ 'is-same' if r.unchanged }}" data-same="{{ '1' if r.unchanged else '0' }}">
+    <div class="imp-head">
+      <div>
+        <span class="imp-name">{% if row.ref_no %}{{ row.ref_no }}. {% endif %}{{ row.name }}</span>
+        <div class="imp-sub">{{ row.address or 'No address' }}{% if row.supplier_type %} · {{ row.supplier_type }}{% endif %}{% if row.materials_supplied %} · {{ row.materials_supplied }}{% endif %}</div>
+      </div>
+      {% if r.unchanged %}<span class="badge badge-muted">No changes</span>
+      {% elif r.match %}<span class="badge badge-warn">Updates {{ r.match.label }}</span>
+      {% else %}<span class="badge badge-ok">New — sent for approval</span>{% endif %}
+    </div>
+
+    <div class="imp-grid">
+      <div class="form-row" style="margin:0">
+        <label class="form-label" for="match_{{ r.i }}">Is this supplier already in the directory?</label>
+        <select id="match_{{ r.i }}" name="match_{{ r.i }}" class="js-match" data-default="{{ r.match_id or 'new' }}">
+          <option value="new" {{ 'selected' if not r.match_id }}>No — add it as a new supplier</option>
+          {% for o in supplier_options %}
+          <option value="{{ o.id }}" {{ 'selected' if r.match_id == o.id }}>Yes — {{ o.label }}</option>
+          {% endfor %}
+        </select>
+        {% if r.reason %}<div class="form-hint">Matched by {{ r.reason }}.</div>{% endif %}
+      </div>
+      <div class="form-row js-new-only" style="margin:0" {{ 'hidden' if r.match_id }}>
+        <label class="form-label" for="category_{{ r.i }}">Filed under</label>
+        <select id="category_{{ r.i }}" name="category_{{ r.i }}">
+          {% for c in categories %}<option {{ 'selected' if row.category == c }}>{{ c }}</option>{% endfor %}
+        </select>
+        <div class="form-hint">Suggested from its items.</div>
+      </div>
+    </div>
+
+    {% if r.match_id %}
+      {% if r.fills %}
+      <ul class="imp-fills js-match-only">
+        {% for f in r.fills %}<li>Fills in <b>{{ f.label }}</b>: {{ f.value }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+      {% for c in r.conflicts %}
+      <div class="imp-conflict js-match-only">
+        <div class="small"><b>{{ c.label }}</b> differs</div>
+        <label><input type="radio" name="use_{{ r.i }}_{{ c.field }}" value="keep" checked><span>Keep the directory's: {{ c.current }}</span></label>
+        <label><input type="radio" name="use_{{ r.i }}_{{ c.field }}" value="file"><span>Use the file's: {{ c.incoming }}</span></label>
+      </div>
+      {% endfor %}
+      <p class="muted small js-new-only" hidden>Added as a new supplier. Choose its catalog items after the import, on its page.</p>
+      <p class="muted small js-other-match" hidden>Merged into the chosen supplier: fills in only what is blank there.</p>
+    {% else %}
+      <div class="imp-items js-new-only" style="margin-top:10px">
+        {% if r.suggested_items %}
+        <div class="small muted" style="margin-bottom:4px">Catalog items it may supply — tick the ones to link:</div>
+        {% for mid in r.suggested_items if mid in materials %}
+        <label><input type="checkbox" name="items_{{ r.i }}" value="{{ mid }}"><span>{{ materials[mid].name }}</span></label>
+        {% endfor %}
+        {% else %}
+        <div class="small muted">No catalog item matches its items — link items later on its page if needed.</div>
+        {% endif %}
+      </div>
+      <p class="muted small js-match-only" hidden>Merged into the chosen supplier: fills in only what is blank there.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <div class="card mt">
+    {% if counts.new %}
+    <label class="flex gap-sm" style="align-items:center;margin-bottom:12px">
+      <input type="checkbox" name="approve_new" value="1">
+      <span>Put the new suppliers on the Approved Supplier List once the Super Admin approves them</span>
+    </label>
+    {% endif %}
+    {% if counts.new %}<p class="muted small" style="margin:0 0 12px">The {{ counts.new }} new supplier{{ 's' if counts.new != 1 }} will be sent to the Super Admin; they join the directory only once approved. Changes to suppliers already in the directory are saved now.</p>{% endif %}
+    <button class="btn btn-primary" type="submit">Confirm the import</button>
+    <a class="btn btn-ghost" href="{{ url_for('suppliers.index') }}">Cancel</a>
+  </div>
+</form>
+
+<script>
+(function () {
+  var form = document.getElementById("impForm");
+  // Rows with no changes are hidden unless "Every row" is chosen.
+  function show() {
+    var all = form.querySelector('[name="_show"]:checked').value === "all";
+    form.querySelectorAll(".imp-row").forEach(function (row) {
+      row.hidden = !all && row.getAttribute("data-same") === "1" && row.querySelector(".js-match").value === row.querySelector(".js-match").getAttribute("data-default");
+    });
+  }
+  // Choosing "new" or another supplier shows what applies to that choice.
+  function sync(select) {
+    var row = select.closest(".imp-row"), isNew = select.value === "new";
+    row.querySelectorAll(".js-new-only").forEach(function (el) { el.hidden = !isNew; });
+    var moved = !isNew && select.value !== select.getAttribute("data-default");
+    row.querySelectorAll(".js-match-only").forEach(function (el) {
+      el.hidden = isNew || (moved && !el.matches("p"));
+    });
+    row.querySelectorAll(".js-other-match").forEach(function (el) { el.hidden = !moved; });
+  }
+  form.addEventListener("change", function (e) {
+    if (e.target.classList.contains("js-match")) sync(e.target);
+    if (e.target.name === "_show") show();
+  });
+  form.querySelectorAll(".js-match").forEach(sync);
+  show();
+})();
+</script>
+{% endblock %}

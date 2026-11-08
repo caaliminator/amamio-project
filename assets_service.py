@@ -66,7 +66,7 @@ RETURNABLE_OUT = (OUT_BORROWED, OUT_REPAIR, OUT_LENT)
 # IN reasons that close an earlier OUT (they lower qty_out).
 RETURN_IN = (IN_RETURNED, IN_REPAIRED)
 
-SUPPLY_IN_REASONS = ["Delivery / purchase", "Returned unused", "Count correction"]
+SUPPLY_IN_REASONS = [services.NEW_STOCK_REASON, "Returned unused", "Count correction"]
 SUPPLY_OUT_REASONS = ["Used in production", "Issued to a team", "Used for cleaning",
                       "Office use", "Damaged / expired", "Count correction"]
 
@@ -630,9 +630,76 @@ def low_supplies():
     return [m for m in supplies() if services.is_low(m)]
 
 
+# Reasons that may take an expired batch out, or leave stock without a
+# batch no. (a count correction is about the total, not one batch).
+SUPPLY_EXPIRED_OK = ("Damaged / expired", "Count correction")
+
+
+def _iso_date(value):
+    value = (value or "").strip()
+    if not value:
+        return ""
+    try:
+        return date.fromisoformat(value).isoformat()
+    except ValueError:
+        return None
+
+
+def supply_batch(material, direction, reason, qty, batch_no=None,
+                 expiry_date="", on_date=None):
+    """Which batch a Supplies IN / OUT belongs to.
+    Returns (batch_no, batch_new, expiry_date, error).
+
+    * IN for a delivery / purchase starts a new batch, numbered like
+      receiving (ITEM-YEAR-MONTH-NNN); its expiry date is optional.
+    * OUT names the batch it comes from — no more than is left of it, and an
+      expired batch only for "Damaged / expired".  Stock from before batch
+      numbers may go out with no batch no.
+    * IN for a return names the batch it goes back to (or none).
+    ``batch_no=None`` (older callers) skips the batch for OUT and returns."""
+    unit = material.get("unit") or ""
+    on_date = (on_date or services.today_iso())[:10]
+    if direction == "IN" and reason == services.NEW_STOCK_REASON:
+        expiry = _iso_date(expiry_date)
+        if expiry is None:
+            return None, False, "", "Pick the expiry date on the calendar."
+        if expiry and expiry < on_date:
+            return None, False, "", "That expiry date has already passed."
+        return services.next_batch_no(material.get("name"), on_date), True, expiry, None
+    if batch_no is None:
+        return "", False, "", None
+    wanted = (batch_no or "").strip().upper()
+    rows, loose = services.batch_choices(material["id"], material.get("stock_qty"))
+    if not wanted:
+        if direction == "OUT" and reason not in SUPPLY_EXPIRED_OK and qty > loose + 1e-9:
+            if loose > 0:
+                return None, False, "", (
+                    "Only %s of the stock has no batch no. — choose the batch it comes from."
+                    % services.fmt_qty(loose, unit))
+            return None, False, "", "Choose the batch it comes from."
+        return "", False, "", None
+    row = next((r for r in rows if r["batch_no"].upper() == wanted), None)
+    if not row:
+        return None, False, "", "Batch %s is not a batch of %s." % (wanted, material.get("name"))
+    if direction == "OUT":
+        if qty > row["remaining"] + 1e-9:
+            return None, False, "", (
+                "Batch %s has only %s left — issue the rest from the next batch in another entry."
+                % (row["batch_no"], services.fmt_qty(row["remaining"], unit)))
+        if row["status"] == "Expired" and reason not in SUPPLY_EXPIRED_OK:
+            return None, False, "", (
+                "Batch %s expired on %s — only \"Damaged / expired\" can take it out."
+                % (row["batch_no"], row["expiry_date"]))
+    elif qty > row["consumed"] + 1e-9:
+        return None, False, "", (
+            "Only %s of batch %s has gone out — that is the most that can come back to it."
+            % (services.fmt_qty(row["consumed"], unit), row["batch_no"]))
+    return row["batch_no"], False, "", None
+
+
 def record_supply_movement(material_id, direction, qty, reason, person="",
                            reference="", notes="", user_id=None, moved_at=None,
-                           notify=True):
+                           notify=True, batch_no=None, expiry_date=""):
     """Take a supply IN or issue it OUT.  Returns (movement, error)."""
     material = db.get("raw_materials", material_id)
     if not material or services.material_category(material) not in \
@@ -652,9 +719,14 @@ def record_supply_movement(material_id, direction, qty, reason, person="",
     if direction == "OUT" and qty > stock + 1e-9:
         return None, "Only %s in stock — you can't issue %s." % (
             services.fmt_qty(stock, unit), services.fmt_qty(qty, unit))
+    batch_no, batch_new, expiry, err = supply_batch(
+        material, direction, reason, qty, batch_no, expiry_date, moved_at)
+    if err:
+        return None, err
     delta = qty if direction == "IN" else -qty
     was_low = services.is_low(material)
     movement = db.insert("stock_movements", {
+        "batch_no": batch_no, "batch_new": batch_new, "expiry_date": expiry or None,
         "material_id": material["id"], "material_name": material.get("name"),
         "category": services.material_category(material),
         "direction": direction, "qty": qty, "unit": unit, "reason": reason,

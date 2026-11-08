@@ -10,7 +10,7 @@
     "stage": "Inspection & Cleaning",
     "reason": "Can't be used: Undersized roots",
     "recorded_by": 4,
-    "recorded_at": "2026-10-16T05:39:31.430609+00:00",
+    "recorded_at": "2026-11-08T13:02:44.408461+00:00",
     "id": 1
   },
   {
@@ -24,7 +24,7 @@
     "stage": "Inspection & Cleaning",
     "reason": "Damaged: Soft and bruised",
     "recorded_by": 4,
-    "recorded_at": "2026-10-16T05:39:31.435695+00:00",
+    "recorded_at": "2026-11-08T13:02:44.412527+00:00",
     "id": 2
   },
   {
@@ -38,7 +38,7 @@
     "stage": "Inspection & Cleaning",
     "reason": "Can't be used: Undersized roots",
     "recorded_by": 4,
-    "recorded_at": "2026-10-16T05:39:31.621585+00:00",
+    "recorded_at": "2026-11-08T13:02:44.626607+00:00",
     "id": 3
   },
   {
@@ -52,7 +52,7 @@
     "stage": "Inspection & Cleaning",
     "reason": "Damaged: Soft and bruised",
     "recorded_by": 4,
-    "recorded_at": "2026-10-16T05:39:31.645947+00:00",
+    "recorded_at": "2026-11-08T13:02:44.651464+00:00",
     "id": 4
   },
   {
@@ -66,7 +66,7 @@
     "stage": "Inspection & Cleaning",
     "reason": "Can't be used: Undersized roots",
     "recorded_by": 4,
-    "recorded_at": "2026-10-16T05:39:31.845660+00:00",
+    "recorded_at": "2026-11-08T13:02:44.853924+00:00",
     "id": 5
   },
   {
@@ -80,12 +80,12 @@
     "stage": "Inspection & Cleaning",
     "reason": "Damaged: Soft and bruised",
     "recorded_by": 4,
-    "recorded_at": "2026-10-16T05:39:31.873071+00:00",
+    "recorded_at": "2026-11-08T13:02:44.879921+00:00",
     "id": 6
   },
   {
     "source": "inspection",
-    "reference": "RB-4",
+    "reference": "RB-5",
     "item_type": "material",
     "item_id": 2,
     "item_name": "Lemon",
@@ -94,12 +94,12 @@
     "stage": "Inspection & Cleaning",
     "reason": "Can't be used: Overripe",
     "recorded_by": 4,
-    "recorded_at": "2026-10-16T05:39:32.067261+00:00",
+    "recorded_at": "2026-11-08T13:02:45.276814+00:00",
     "id": 7
   },
   {
     "source": "inspection",
-    "reference": "RB-4",
+    "reference": "RB-5",
     "item_type": "material",
     "item_id": 2,
     "item_name": "Lemon",
@@ -108,12 +108,12 @@
     "stage": "Inspection & Cleaning",
     "reason": "Damaged: Split skins in transit",
     "recorded_by": 4,
-    "recorded_at": "2026-10-16T05:39:32.095487+00:00",
+    "recorded_at": "2026-11-08T13:02:45.300499+00:00",
     "id": 8
   },
   {
     "source": "inspection",
-    "reference": "RB-5",
+    "reference": "RB-6",
     "item_type": "material",
     "item_id": 2,
     "item_name": "Lemon",
@@ -122,12 +122,12 @@
     "stage": "Inspection & Cleaning",
     "reason": "Can't be used: Overripe",
     "recorded_by": 4,
-    "recorded_at": "2026-10-16T05:39:32.292434+00:00",
+    "recorded_at": "2026-11-08T13:02:45.507734+00:00",
     "id": 9
   },
   {
     "source": "inspection",
-    "reference": "RB-5",
+    "reference": "RB-6",
     "item_type": "material",
     "item_id": 2,
     "item_name": "Lemon",
@@ -136,7 +136,7 @@
     "stage": "Inspection & Cleaning",
     "reason": "Damaged: Split skins in transit",
     "recorded_by": 4,
-    "recorded_at": "2026-10-16T05:39:32.312862+00:00",
+    "recorded_at": "2026-11-08T13:02:45.534320+00:00",
     "id": 10
   },
   {
@@ -150,7 +150,7 @@
     "stage": "Packing Area",
     "reason": "Cracked lid",
     "recorded_by": 5,
-    "recorded_at": "2026-10-16T05:39:35.828222+00:00",
+    "recorded_at": "2026-11-08T13:02:49.100535+00:00",
     "id": 11
   }
 ]

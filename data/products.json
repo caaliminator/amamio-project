@@ -12,7 +12,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 1,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 1
   },
   {
@@ -22,13 +22,13 @@
     "family": "Pure Honey",
     "variant": "250 mL",
     "unit": "bottle",
-    "stock_qty": 196.0,
+    "stock_qty": 115.0,
     "reorder_level": 24,
     "price": 399.0,
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 2,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 2
   },
   {
@@ -44,7 +44,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 3,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 3
   },
   {
@@ -54,13 +54,13 @@
     "family": "Pure Honey",
     "variant": "1 Liter",
     "unit": "bottle",
-    "stock_qty": 262.0,
+    "stock_qty": 143.0,
     "reorder_level": 10,
     "price": 1104.0,
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 4,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 4
   },
   {
@@ -76,7 +76,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 5,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 5
   },
   {
@@ -92,7 +92,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 6,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 6
   },
   {
@@ -108,7 +108,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 7,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 7
   },
   {
@@ -124,7 +124,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 8,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 8
   },
   {
@@ -134,13 +134,13 @@
     "family": "Honey Lemon Ginger Concentrate",
     "variant": "300 mL",
     "unit": "bottle",
-    "stock_qty": 233.0,
+    "stock_qty": 155.0,
     "reorder_level": 40,
     "price": 487.0,
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 9,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 9
   },
   {
@@ -156,7 +156,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 10,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 10
   },
   {
@@ -172,7 +172,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 11,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 11
   },
   {
@@ -188,7 +188,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 12,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 12
   },
   {
@@ -198,13 +198,13 @@
     "family": "Honey Infused Turmeric Ginger",
     "variant": "300 mL",
     "unit": "bottle",
-    "stock_qty": 354.0,
+    "stock_qty": 199.0,
     "reorder_level": 20,
     "price": 420.0,
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 13,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 13
   },
   {
@@ -220,7 +220,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 14,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 14
   },
   {
@@ -230,13 +230,13 @@
     "family": "Honey Infused Ginger",
     "variant": "300 mL",
     "unit": "bottle",
-    "stock_qty": 402.0,
+    "stock_qty": 232.0,
     "reorder_level": 20,
     "price": 399.0,
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 15,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 15
   },
   {
@@ -252,7 +252,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 16,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 16
   },
   {
@@ -268,7 +268,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 17,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 17
   },
   {
@@ -278,13 +278,13 @@
     "family": "Pure Tableya",
     "variant": "200 g",
     "unit": "pack",
-    "stock_qty": 300.0,
+    "stock_qty": 172.0,
     "reorder_level": 20,
     "price": 180.0,
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 18,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 18
   },
   {
@@ -300,7 +300,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 19,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 19
   },
   {
@@ -316,7 +316,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 20,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 20
   },
   {
@@ -332,7 +332,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 21,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 21
   },
   {
@@ -342,13 +342,13 @@
     "family": "Cacao Powder",
     "variant": "100 g",
     "unit": "pouch",
-    "stock_qty": 300.0,
+    "stock_qty": 169.0,
     "reorder_level": 15,
     "price": 140.0,
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 22,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 22
   },
   {
@@ -364,7 +364,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 23,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 23
   },
   {
@@ -380,7 +380,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 24,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 24
   },
   {
@@ -396,7 +396,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 25,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 25
   },
   {
@@ -406,13 +406,13 @@
     "family": "Robusta Coffee",
     "variant": "125 g",
     "unit": "pouch",
-    "stock_qty": 280.0,
+    "stock_qty": 160.0,
     "reorder_level": 15,
     "price": 160.0,
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 26,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 26
   },
   {
@@ -428,7 +428,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 27,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 27
   },
   {
@@ -444,7 +444,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 28,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 28
   },
   {
@@ -460,7 +460,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 29,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 29
   },
   {
@@ -476,7 +476,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 30,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 30
   },
   {
@@ -492,7 +492,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 31,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 31
   },
   {
@@ -508,7 +508,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 32,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 32
   },
   {
@@ -524,7 +524,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 33,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 33
   },
   {
@@ -540,7 +540,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 34,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 34
   },
   {
@@ -556,7 +556,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 35,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 35
   },
   {
@@ -572,7 +572,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 36,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 36
   },
   {
@@ -588,7 +588,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 37,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 37
   },
   {
@@ -604,7 +604,7 @@
     "location": "Finished Products Area",
     "category": "finished",
     "sort_order": 38,
-    "created_at": "2026-10-16T05:39:30.035659+00:00",
+    "created_at": "2026-11-08T13:02:42.997390+00:00",
     "id": 38
   }
 ]

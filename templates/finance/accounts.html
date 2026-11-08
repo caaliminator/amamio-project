@@ -30,9 +30,13 @@
 </div>
 {% endif %}
 
+{% if can('accounts_transact') %}
 <details class="card" {{ 'open' if adding }}>
   <summary class="card-title" style="cursor:pointer">{{ icon('plus', 15) }} Add an account</summary>
   {% if not rows %}<p class="muted">No accounts yet. Add each place money is kept, e.g. <b>Cash on hand</b>, <b>BDO Savings</b>, <b>GCash</b>.</p>{% endif %}
   {{ account_form(url_for('finance.accounts'), form, kinds, today, 'Add account') }}
 </details>
+{% else %}
+<div class="card"><p class="muted small" style="margin:0">{{ icon('lock', 14) }} View only. Only the Super Admin can add, change or close accounts and record money in, money out and transfers.{% if not rows %} No accounts have been added yet.{% endif %}</p></div>
+{% endif %}
 {% endblock %}

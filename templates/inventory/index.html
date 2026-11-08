@@ -32,7 +32,7 @@
           <td>{{ m.name }}</td>
           <td><span class="badge badge-muted">{{ m.category }}</span></td>
           <td>{{ m.unit }}</td>
-          <td class="text-right">{{ m.stock_qty }}</td>
+          <td class="text-right">{{ m.stock_qty|qty }}</td>
           <td class="text-right">{{ m.hold|qty if m.hold else '—' }}</td>
           <td class="text-right">{{ m.awaiting|qty if m.awaiting else '—' }}</td>
           <td class="text-right">{{ m.reorder_level }}</td>
@@ -76,7 +76,7 @@
           <td>{{ p.unit }}</td>
           <td class="text-right">
             {% if p.stock_qty and p.stock_qty > 0 %}
-              {{ p.stock_qty }}
+              {{ p.stock_qty|qty }}
             {% else %}
               <span class="badge badge-warn">0</span>
             {% endif %}

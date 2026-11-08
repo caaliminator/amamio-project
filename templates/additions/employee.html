@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% from "employees/_fields.html" import employee_fields %}
+{% block title %}Add new employee{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('additions.index') }}">{{ icon('arrow-left', 15) }} New Records</a>
+
+<form method="post" class="wizard" data-wizard data-submit-label="Send for approval"
+      data-cancel="{{ url_for('additions.index') }}">
+  <section class="wz-step" data-title="Who is the new employee?"
+           data-hint="Staff without a system account. Team heads pick these names as the requesting employee on a purchase request.">
+    <div class="wz-body">
+      {{ employee_fields(form, departments, suffixes) }}
+    </div>
+  </section>
+  <section class="wz-step" data-title="Check and send for approval" data-review
+           data-hint="The Super Admin approves the new employee; they join the employee list once approved.">
+    <div class="wz-body"></div>
+  </section>
+</form>
+{% endblock %}

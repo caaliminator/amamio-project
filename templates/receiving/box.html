@@ -5,7 +5,7 @@
 {% if can('receiving') %}
 <a class="back-link" href="{{ url_for('receiving.batch', batch_id=box.batch_id) }}">{{ icon('arrow-left', 15) }} {{ box.batch_ref }}</a>
 {% else %}
-<a class="back-link" href="{{ url_for('receiving.inspection') }}">{{ icon('arrow-left', 15) }} Inspection &amp; Cleaning</a>
+<a class="back-link" href="{{ url_for('receiving.inspection_supplies' if box.lane == 'supplies' else 'receiving.inspection') }}">{{ icon('arrow-left', 15) }} {{ 'Packaging & Supplies Check' if box.lane == 'supplies' else 'Raw Material Inspection' }}</a>
 {% endif %}
 
 <div class="record-head">
@@ -86,7 +86,9 @@
   <div class="card-title">Details</div>
   <dl class="review-list">
     <dt>Delivery</dt><dd>{{ box.batch_ref }}{% if box.po_no %} · PO {{ box.po_no }}{% endif %}{% if box.delivery_ref %} · DR {{ box.delivery_ref }}{% endif %}</dd>
-    <dt>Lot / batch no.</dt><dd>{{ box.lot_no or '—' }}</dd>
+    <dt>Batch no.</dt><dd>{% if box.lot_no %}<a href="{{ url_for('receiving.batches', show='all', q=box.lot_no) }}">{{ box.lot_no }}</a>{% else %}—{% endif %}{% if box.supplier_lot %} <span class="muted small">· supplier lot {{ box.supplier_lot }}</span>{% endif %}</dd>
+    {% if box.mfg_date %}<dt>Manufactured</dt><dd>{{ box.mfg_date|longdate }}</dd>{% endif %}
+    {% if box.expiry_date %}<dt>Expiry / best before</dt><dd>{{ box.expiry_date|longdate }}</dd>{% endif %}
     <dt>Expiry</dt><dd>{{ box.expiry_date or '—' }}</dd>
     <dt>Packaging condition</dt><dd>{{ box.packaging_condition or '—' }}</dd>
     <dt>Temperature</dt><dd>{{ box.temperature_c|qty('°C') if box.temperature_c not in (none, '') else '—' }}</dd>

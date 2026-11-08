@@ -60,7 +60,7 @@
         <td>{{ mv.unit }}</td>
         <td>{{ mv.reason }}{% if mv.notes %}<span class="sub-line">{{ mv.notes }}</span>{% endif %}</td>
         <td>{{ mv.person or '' }}</td>
-        <td>{{ mv.reference or '' }}</td>
+        <td>{{ mv.reference or '' }}{% if mv.batch_no %}<span class="sub-line">Batch {{ mv.batch_no }}{% if mv.batch_new %} (new){% endif %}</span>{% endif %}</td>
         <td class="num">{{ mv.balance_after|qty }}</td>
         <td>{{ mv.recorded_by_name }}</td>
       </tr>

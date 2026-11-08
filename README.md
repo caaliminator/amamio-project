@@ -29,9 +29,16 @@ created on first run. To start over, delete the `data/` folder.
 | Admin | `admin` / `admin123` | Approvals, reports, oversight of every module |
 | Receiving Team Head | `receiving` / `recv123` | Records deliveries, prints QR labels, logs honey containers |
 | Production Team Head | `production` / `prod123` | Inspection & cleaning, honey QC, batch records, cleaning checks |
-| Packing Team Head | `packing` / `pack123` | Packing & dispatch, sales uploads and reports |
+| Packing Team Head | `packing` / `pack123` | Packing & dispatch only |
 | Packing Team Member | `packer1` / `member123` (also `packer2`) | Records packing, disbursement and courier hand-over |
 | Assets Maintenance Head | `assets` / `assets123` | Equipment and supplies in/out, maintenance, sanitation, pest control |
+| Finance Admin | `finance` / `finance123` | Supplier ledger and payments, payments due; views cash & bank accounts |
+| Customer Service Admin | `service` / `service123` | Customers, sales orders (payments, returns), deliveries |
+| Sales Marketing Admin | `marketing` / `market123` | Marketplace sales uploads and reports, stock release requests |
+
+The Admin and Super Admin oversee everything. The three function admins
+(Finance, Customer Service, Sales Marketing) are role-based: each sees only
+the pages of its own job, and the server refuses the rest.
 
 **Change these passwords before real use** (Users → Reset password).
 
@@ -83,15 +90,25 @@ and save.
   Receiving Area.
 * Nothing joins stock yet.
 
-**Part 2: inspection & cleaning** (*Inspection & Cleaning*, or scan the
-box). The steps are: is this the right box? → clean the content → count what
-you found → why (only asked when something was lost) → quality checks →
-decision → check and save.
+**Part 2: inspection.** Received items are checked in one of three lanes,
+each with its own method:
+
+| Lane | What goes there | How it is checked |
+|---|---|---|
+| **Raw Material Inspection** | Ginger, lemon, calamansi, turmeric, cacao, coffee, banana chips… (category *raw*) | Clean the content → count → the full 11-point *Incoming Material Inspection Checklist* (AFP-WH-FRM-002) → lab test if done → decision |
+| **Packaging & Supplies Check** | Jars, bottles, seals, pouches, labels, boxes, tape; cleaning and production supplies; office supplies | Count → a 9-point checklist: identity, quantity, packaging, cleanliness, **defects** (cracks, chips, leaks, caps fit), pests, lot, expiry for chemicals, food-grade certificate → decision. No cleaning step, odor, temperature or lab test |
+| **Honey Inspection** | Honey containers (Module 2) | Moisture %, appearance, PASS / FAILED, then allocation to products |
+
+A box goes to its lane by its item's category. The packaging & supplies
+checklist is a **draft based on AFP-WH-FRM-002** for the client's QA to
+confirm; its points are in `services.SUPPLY_INSPECTION_POINTS`. Each lane
+lists its waiting boxes, boxes on hold and recent checks. Open a box (or
+scan its label) to inspect it.
 
 * *Count what you found* splits the box into **usable**, **can't be used**
   and **damaged**, with a live tally against the label.
-* *Quality checks* are visual / organoleptic, COA / documents and sampling /
-  test.
+* Every checklist point is Pass, Fail or N/A. A box that fails any point
+  can't be accepted.
 * The decision is **Accepted**, **Rejected** or **Hold**:
   * **Accepted:** only the *usable* quantity joins stock and the box moves to
     the Storage Area. "Can't be used" and "damaged" go to the damage ledger
@@ -103,6 +120,42 @@ decision → check and save.
 Each box keeps its location (Receiving → Storage → Production Area →
 Consumed). **Receiving Area → Inspection report** prints the client's *Raw
 Materials Receiving and Inspection Report* for any date range.
+
+**Batch numbers.** Every item received gets a batch no. made by the
+system, **ITEM-YEAR-MONTH-NNN**, e.g. `GINGER-2026-11-001`. The number runs
+per item and month. All boxes of an item in one delivery share it, and the
+next delivery of that item gets the next number. A supplier's own lot no.,
+if one is written, is kept beside it. The batch no. is on the QR label, the
+box page, the receiving report, the inspection checklist and the hold
+report. The receive form's preview shows it before anything is saved.
+
+**Date marking** on the inspection checklist is picked on calendars:
+manufactured and expiry / best-before. Marking it *Pass* needs the expiry
+date. The next box of the same batch starts with the dates already picked.
+
+**Batches & Expiry** (menu: Stock, and Receiving Reports) lists every batch:
+received, accepted, left in storage and in the production area, used, and
+its expiry, with the days left. Batches with stock that have expired or
+expire within 30 days are flagged and shown on the home page. Production
+dispensing fills in the batch no. and expiry to use first (earliest expiry,
+FEFO).
+
+**Supplies In / Out carries the batch too.** An OUT names the batch it comes
+from: the one that expires first is picked, it can't take more than that
+batch has left, and an expired batch only goes out as *Damaged / expired*.
+A delivery / purchase IN that didn't come through receiving gets a new batch
+no. of its own, with an optional expiry date on a calendar. A return goes
+back to the batch it came from. Stock from before batch numbers can still go
+out with no batch no. What a batch has left counts every Supplies OUT and
+finished production batch that named it.
+
+**Delivery documents.** *Delivered by* starts as the supplier's name (from
+the PO, or from the supplier picked) and can be changed. The delivery
+documents step records three documents, each with its number and its file
+(a picture or a PDF): the **delivery receipt (DR)**, the **official receipt
+(OR)** and the **acknowledgement receipt (AR)**. All three numbers print on
+the receiving report. A missing file or number can be added later on the
+delivery's page.
 
 ## Module 2: Honey
 
@@ -194,6 +247,126 @@ yearly · platform) and five tabs:
 > numbers, so `.gitignore` keeps them off GitHub. They live only on the
 > computer running the system.
 
+## Supplier Directory and purchasing
+
+**The directory is the client's spreadsheet** ("SUPPLIERS  DIRECTORY
+2026.xlsx", 66 suppliers). It was converted once into `seed_suppliers.py`
+and the app never reads the .xlsx at start-up. Each supplier has:
+
+* its No. from the sheet, name, address / branch, mobile numbers, contact
+  person, items supplied, email and TIN;
+* a **supplier type**, the sheet's "Reference" column: Direct Supplier /
+  Consolidator, Cooperative, Farmer, Retailer, Reseller, Online shop
+  (Shopee) or Other;
+* a category (Raw / Production / Packing / Office), which is not in the
+  sheet and was chosen from each supplier's items;
+* the **catalog items it supplies**: links to the materials list, ticked
+  on the supplier's form.
+
+The clean-up applied to the sheet (`supplier_service.clean_sheet`):
+
+* EASYHOME 168's extra item rows are merged into its items.
+* "-" is treated as blank.
+* Item text typed in the Contact Person column (#15, #16) moves to the
+  items.
+* Several numbers in one cell are split, and 11-digit mobiles are written
+  09xx-xxx-xxxx.
+
+The two *Metro Ace Packaging Corporation* rows are two branches. The same
+name is allowed when the address differs, and the address then shows
+wherever the supplier is picked.
+
+**Adding suppliers.** Only the Admin adds a supplier, by hand (*New
+Records → Add supplier*) or from a newer copy of the spreadsheet (*Supplier
+Directory → Import from Excel*: upload → preview → confirm). Either way the
+new supplier waits for the Super Admin's approval (see *New records* below).
+On import:
+
+* Rows are matched to the directory by name and address, and you can change
+  each match.
+* A match only fills in fields that are blank in the directory.
+* Where the directory and the file disagree, you choose per field; the
+  directory's value is kept by default.
+* New suppliers are sent to the Super Admin. Once approved they join the
+  directory, off the Approved Supplier List unless you ticked that on the
+  preview. Their suggested catalog items are linked only if you tick them.
+* Importing the same file again changes nothing.
+
+**Purchase request.** The *Preferred supplier* box only takes a supplier
+picked from the directory, and only approved suppliers are listed; it can
+also be left blank. For an item picked from the materials list, only the
+suppliers linked to that item are offered, with its usual supplier filled in
+first. For a typed item, or an item no supplier is linked to yet, every
+approved supplier is offered and a note says so. The server refuses a typed
+name, an unapproved supplier, or a supplier that doesn't supply the picked
+item. A line shows the picked supplier's type, contact person and numbers.
+
+**Purchase order.** The supplier list follows the items ticked on the PO:
+
+1. Suppliers that supply all of the ticked items.
+2. Suppliers that supply some of them, labelled "supplies 2 of 3 items".
+3. Approved suppliers with no catalog items linked.
+
+A supplier that supplies none of the ticked items is left out, and the
+server refuses it.
+
+Picking a supplier fills in TIN, address, contact person, contact no. /
+email and supplier type:
+
+* Every detail the directory has is **locked** (shown with a lock icon).
+  The server takes those details from the directory on save and ignores
+  what the browser sent.
+* Details the directory has blank stay open to type, and are saved on this
+  PO only.
+* Someone who may edit suppliers can tick *Also save to the Supplier
+  Directory* to fill those blanks in the directory as well.
+
+The PO keeps its own copy of these details, so later edits to the directory
+don't change past POs. *Quotation / invoice no.* stays a typed field. Both
+it and the supplier type print on the PO.
+
+**PO totals.** Discount, delivery / freight, optional labor cost and
+optional **other / misc. fees** (with what they are for) add up to the grand
+total. VAT is either **VAT**, a percentage of the items after the discount,
+with the VAT amount worked out as you type, or **NON VAT**. A VAT rate of 0
+is recorded as NON VAT, and the printed PO says "NON VAT".
+
+**Supplier payments.** A payment is recorded against one PO, or on account
+(not for one PO). Besides the optional proof-of-payment picture, it can
+carry **attachments**: the official receipt, invoice, deposit slip, check
+copy and the like, as pictures or PDFs, up to 10 per payment, with an
+optional note of what they are. More can be attached later from the
+payment's page (the paperclip link in the supplier's ledger or on the PO).
+Only ledger users (Finance and the admins) can open them.
+
+**Cash & Bank Accounts: only the Super Admin transacts.** Adding, changing,
+closing or reopening an account, and recording money in, money out and
+transfers between accounts, is the Super Admin's alone (`accounts_transact`).
+The Admin and the Finance Admin see the accounts, balances and statements,
+and can print them, but the forms are gone and the server refuses those
+actions. Supplier payments stay with Finance: a payment recorded on the
+Supplier Ledger still names the account it was paid from.
+
+## New records: the Admin adds, the Super Admin approves
+
+Four kinds of record join the system only this way: a **new employee**, a
+**supplier**, a **raw material** and a **supply** (packaging, production &
+cleaning, or office).
+
+1. The **Admin** opens *New Records* and fills in the form. No other role
+   can add these records: the team heads and the catalog page no longer add
+   suppliers or materials, and the Super Admin approves rather than adds.
+2. What was filled in waits in `creation_requests` and is **not part of the
+   system yet**: no list, dropdown or report shows it. The Super Admin is
+   notified, and it appears under *Approvals* and on the Employees page for
+   new employees.
+3. The **Super Admin** opens it and approves it, which creates the record
+   after checking it isn't a duplicate. Or they reject it with a reason. The
+   Admin is notified either way, and can withdraw a record while it waits.
+
+New materials and supplies start with no stock; stock comes in through
+receiving or a count. Editing existing records is unchanged.
+
 ## The client's paper forms in the system
 
 | Paper form | Where |
@@ -207,12 +380,14 @@ yearly · platform) and five tabs:
 | Month End Report (raw, packaging, cleaning, office) | Supplies In / Out → Month-end report |
 | General Cleaning & Sanitation Record | Cleaning & Sanitation (pre- and post-production, one area per step) |
 | Pest Control Monitoring Record (QMS-PCMR) | Pest Control (monthly; skipped months are flagged) |
-| Supplier Directory | Supplier Directory (by Raw / Production / Packing / Office) |
+| Supplier Directory | Supplier Directory (by Raw / Production / Packing / Office, and by supplier type) |
 
 The demo data comes from these forms: the product list of the Daily
-Production Report, the supplies on the month-end reports, the AFP asset
-register and the supplier directory (`seed_catalog.py`). Prices, stock
-levels and reorder levels are demo figures.
+Production Report, the supplies on the month-end reports and the AFP asset
+register (`seed_catalog.py`). The Supplier Directory is the client's
+spreadsheet (`seed_suppliers.py`), and the demo deliveries and honey come
+from its suppliers. No sample purchase request or purchase order is seeded.
+Prices, stock levels and reorder levels are demo figures.
 
 ---
 
@@ -249,14 +424,15 @@ guards.
 |---|:--:|:--:|:--:|:--:|:--:|:--:|
 | Home, QR scanner, stock on hand, notifications | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Receiving Area | ✅ | ✅ | — | — | — | — |
-| Inspection & Cleaning, Honey | ✅ | ✅ | ✅ | — | — | — |
+| Raw Material Inspection, Packaging & Supplies Check, Honey Inspection | ✅ | ✅ | ✅ | — | — | — |
 | Batch records, daily report, retention, recipes | ✅ | — | ✅ | — | — | — |
 | Packing & Dispatch | ✅ | — | — | ✅ | ✅ | — |
 | Sales uploads & reports, orders, deliveries | ✅ | — | — | ✅ | — | — |
 | Equipment & Assets | ✅ | — | — | — | — | ✅ |
 | Supplies In / Out | ✅ | ✅ | — | — | — | ✅ |
 | Cleaning & Sanitation, Pest Control | ✅ | — | ✅ | — | — | ✅ |
-| Supplier Directory | ✅ | ✅ | ✅ | — | — | ✅ |
+| Supplier Directory (view, edit) | ✅ | ✅ | ✅ | — | — | ✅ |
+| New Records: add employee / supplier / material / supply | Admin adds · Super Admin approves | — | — | — | — | — |
 | Requests | ✅ | ✅ | ✅ | ✅ | — | ✅ |
 | Approvals, Reports, Analytics, Users | ✅ | — | — | — | — | — |
 | MySQL export | Super Admin only | | | | | |
@@ -291,16 +467,19 @@ screen.
 | Module 5 — sales uploads & reports | `platforms.py`, `platform_service.py`, `charts.py`, `xlsx.py` |
 | Production records | `production.py`, `production_service.py`, `templates/production/` |
 | Sanitation, pest control | `facility.py`, `facility_service.py`, `templates/facility/` |
-| Supplier directory | `suppliers.py`, `templates/suppliers/` |
+| New records (Admin adds, Super Admin approves) | `additions.py`, `additions_service.py`, `templates/additions/` |
+| Supplier directory, import, item links | `suppliers.py`, `supplier_service.py`, `seed_suppliers.py`, `templates/suppliers/` |
+| Purchase requests and orders | `requests_bp.py`, `purchasing.py`, `purchasing_service.py`, `templates/requests/`, `templates/purchasing/` |
 | Business rules (stock, receiving, honey, packing) | `services.py`: all stock changes go through `adjust_stock` |
 | Step-by-step flows, shared UI | `static/js/app.js` (wizard, tooltips), `static/css/flow.css` |
 | Printable paper forms | `templates/_paper.html` |
 | Users & access | `auth.py`, `security.py` |
 | Storage & migration | `db.py`, `mysql_export.py` |
-| Demo data | `seed.py`, `seed_catalog.py` |
+| Demo data | `seed.py`, `seed_catalog.py`, `seed_suppliers.py` |
 
 `xlsx.py` reads `.xlsx` and `.csv` with the standard library only, so
-importing marketplace exports needs no pandas or openpyxl.
+importing marketplace exports and the supplier spreadsheet needs no pandas
+or openpyxl.
 
 ## Testing
 

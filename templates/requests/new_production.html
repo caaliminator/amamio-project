@@ -50,11 +50,11 @@
     <div class="form-grid cols-3">
       <div class="form-row">
         <label class="form-label" for="reason">Reason <span class="req">*</span></label>
-        <input type="text" id="reason" name="reason" list="reasonOptions" required
-               placeholder="Pick one or type your own">
-        <datalist id="reasonOptions">
-          {% for r in reasons %}<option value="{{ r }}">{% endfor %}
-        </datalist>
+        <div class="combo" data-combo="reasonOptions" data-combo-new="“%s” — your own reason">
+          <input type="text" id="reason" name="reason" class="combo-input" required autocomplete="off"
+                 placeholder="Pick one or type your own">
+        </div>
+        <script type="application/json" id="reasonOptions">[{% for r in reasons %}{"v": {{ r|tojson }}, "l": {{ r|tojson }}}{{ ',' if not loop.last }}{% endfor %}]</script>
       </div>
       <div class="form-row">
         <label class="form-label" for="urgency">Urgency</label>

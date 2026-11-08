@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Add new {{ kind_label|lower }}{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('additions.index') }}">{{ icon('arrow-left', 15) }} New Records</a>
+
+{% set chosen = form.category or (categories[0] if kind == 'material' else '') %}
+<form method="post" class="wizard" data-wizard data-submit-label="Send for approval"
+      data-cancel="{{ url_for('additions.index') }}" id="itemForm">
+  <section class="wz-step" data-title="{{ 'What raw material is it?' if kind == 'material' else 'What supply is it?' }}"
+           data-hint="{{ 'Honey, produce, cacao and other ingredients.' if kind == 'material' else 'Jars, bottles and packaging; production & cleaning supplies; or office supplies.' }} It joins the materials list once the Super Admin approves it.">
+    <div class="wz-body">
+      <div class="form-row">
+        <label class="form-label" for="name">Name <span class="req">*</span></label>
+        <input type="text" id="name" name="name" maxlength="120" required value="{{ form.name or '' }}"
+               placeholder="{{ 'e.g. Moringa leaves' if kind == 'material' else 'e.g. Square Bottle 500 mL' }}">
+        <div class="form-hint">As it should appear on requests, receiving and the month-end report — include the size.</div>
+      </div>
+      {% if kind == 'material' %}
+      <input type="hidden" name="category" value="raw">
+      {% else %}
+      <div class="form-row">
+        <div class="form-label">Kind of supply <span class="req">*</span></div>
+        <div class="chip-choices" data-review-label="Kind of supply">
+          {% for c in categories %}
+          <label class="chip-choice"><input type="radio" name="category" value="{{ c }}" required {{ 'checked' if chosen == c }}><span>{{ category_labels[c] }}</span></label>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      <div class="form-row">
+        <label class="form-label" for="subcategory">Group</label>
+        <div class="combo" data-combo="groupOptions" id="groupCombo"
+             data-combo-new="“%s” will be a new group">
+          <input type="text" id="subcategory" name="subcategory" class="combo-input" maxlength="60"
+                 autocomplete="off" value="{{ form.subcategory or '' }}"
+                 placeholder="{{ 'e.g. Raw materials' if kind == 'material' else 'e.g. Jars / Bottles, Pouches, Office Supplies' }}">
+        </div>
+        <script type="application/json" id="groupOptions">[]</script>
+        <div class="form-hint">Where it is listed on the month-end report. Pick an existing group or type a new one.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wz-step" data-title="How is it counted?"
+           data-hint="New items start with no stock — stock comes in through receiving or a stock count.">
+    <div class="wz-body">
+      <div class="form-grid cols-2">
+        <div class="form-row">
+          <label class="form-label" for="unit">Unit <span class="req">*</span></label>
+          <select id="unit" name="unit" required>
+            {% set unit_now = form.unit or ('kg' if kind == 'material' else 'pc') %}
+            {% for u in units %}<option {{ 'selected' if unit_now == u }}>{{ u }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-label">Counted</div>
+          <div class="chip-choices" data-review-label="Counted">
+            {% set track_now = form.track_mode or ('weight' if kind == 'material' else 'piece') %}
+            {% for key, label in track_modes %}
+            <label class="chip-choice"><input type="radio" name="track_mode" value="{{ key }}" {{ 'checked' if track_now == key }}><span>{{ label }}</span></label>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="reorder_level">Reorder level</label>
+          <input type="number" id="reorder_level" name="reorder_level" min="0" step="any" inputmode="decimal" value="{{ form.reorder_level or '' }}" placeholder="0">
+          <div class="form-hint">Flagged as low stock at or below this.</div>
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="unit_cost">Usual unit cost (₱)</label>
+          <input type="number" id="unit_cost" name="unit_cost" min="0" step="0.01" inputmode="decimal" value="{{ form.unit_cost or '' }}" placeholder="0.00">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wz-step" data-title="Where does it come from, and where is it kept?"
+           data-hint="Both are optional. The usual supplier is offered first when this item is requested.">
+    <div class="wz-body">
+      <div class="form-grid cols-2">
+        <div class="form-row">
+          <label class="form-label" for="supplier_id">Usual supplier</label>
+          <select id="supplier_id" name="supplier_id">
+            <option value="">— None yet —</option>
+            {% for s in suppliers %}<option value="{{ s.id }}" {{ 'selected' if form.supplier_id == s.id|string }}>{{ supplier_label(s, suppliers) }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="storage_location">Kept in</label>
+          <input type="text" id="storage_location" name="storage_location" maxlength="80" value="{{ form.storage_location or '' }}" placeholder="{{ storage[chosen] if chosen in storage else 'e.g. Storage Area' }}">
+          <div class="form-hint">Blank: the usual place for its kind.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wz-step" data-title="Check and send for approval" data-review
+           data-hint="The Super Admin approves it; it joins the materials list once approved.">
+    <div class="wz-body"></div>
+  </section>
+</form>
+
+<script>
+(function () {
+  var form = document.getElementById("itemForm");
+  var GROUPS = {{ groups|tojson }}, STORAGE = {{ storage|tojson }};
+  var combo = document.getElementById("groupCombo"), store = document.getElementById("storage_location");
+  function sync() {
+    var c = form.querySelector('[name="category"]:checked') || form.querySelector('[name="category"][type=hidden]');
+    var key = c ? c.value : "";
+    // The groups of the chosen kind, for the click-to-open list.
+    combo.__options = (GROUPS[key] || []).map(function (g) { return { v: g, l: g }; });
+    store.placeholder = STORAGE[key] || "e.g. Storage Area";
+  }
+  form.addEventListener("change", sync);
+  sync();
+})();
+</script>
+{% endblock %}

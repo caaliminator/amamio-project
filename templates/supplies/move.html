@@ -1,6 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Record supplies IN / OUT{% endblock %}
 {% block content %}
+<style>
+  .bt-list { display: grid; gap: 8px; }
+  .bt-list .choice-sub b { color: var(--ink); }
+  .bt-first { margin-left: 6px; }
+  .bt-expired .choice-sub { color: var(--danger-ink, var(--danger)); }
+  .bt-new { font-size: 1.05rem; }
+</style>
 {% set back = url_for('supplies.item', material_id=form.material_id) if form.material_id else url_for('supplies.index', cat=preset_cat or none) %}
 <a class="back-link" href="{{ back }}">{{ icon('arrow-left', 15) }} {{ 'Back to the item' if form.material_id else 'Supplies In / Out' }}</a>
 
@@ -84,6 +91,24 @@
     </div>
   </section>
 
+  <section class="wz-step" data-title="Which batch?" id="stepBatch">
+    <div class="wz-body">
+      <div id="batchNew">
+        <p class="bt-new">This stock gets its own batch no.: <b id="newBatchNo"></b></p>
+        <div class="form-row" style="max-width:280px">
+          <label class="form-label" for="expiry_date">Expiry / best before</label>
+          <input type="date" id="expiry_date" name="expiry_date" value="{{ form.expiry_date or '' }}">
+          <div class="form-hint">From the label, if it has one. Leave it empty for items that don't expire.</div>
+        </div>
+      </div>
+      <div id="batchPick">
+        <div class="form-label" id="batchPickLabel">Batch <span class="req">*</span></div>
+        <div class="bt-list" id="batchList" data-review-skip></div>
+        <div class="form-hint" id="batchHint"></div>
+      </div>
+    </div>
+  </section>
+
   <section class="wz-step" data-title="Who, and any reference?" id="stepWho" data-hint="Optional, but it helps at month end.">
     <div class="wz-body">
       <div class="form-row">
@@ -111,6 +136,15 @@
 (function () {
   var form = document.getElementById("supForm");
   var select = document.getElementById("material_id");
+  var BATCHES = {{ batches|tojson }}, NEW_STOCK = {{ new_stock_reason|tojson }},
+      EXPIRED_OK = {{ expired_ok|tojson }}, picked = {{ (form.batch_no or none)|tojson }};
+  // Same as the |longdate filter: 'Nov. 25, 2026'.
+  var MONTHS = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "June", "July", "Aug.", "Sept.", "Oct.", "Nov.", "Dec."];
+  function longdate(iso) {
+    var p = (iso || "").split("-");
+    return p.length === 3 ? MONTHS[parseInt(p[1], 10) - 1] + " " + parseInt(p[2], 10) + ", " + p[0] : iso;
+  }
+  function escHtml(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
   function val(name) { var r = form.querySelector("[name=" + name + "]:checked"); return r ? r.value : ""; }
   function n(v) { return Math.round(v * 1000) / 1000; }
   function item() {
@@ -158,13 +192,136 @@
     document.getElementById("refLabel").textContent = d === "OUT" ? "Request / batch no." : "DR / OR no.";
     document.getElementById("reference").placeholder = d === "OUT" ? "e.g. REQ-0420" : "e.g. DR-10233";
   }
+  // --- Which batch? ---------------------------------------------------
+  // OUT: the batch it comes from (the one to use first is picked for you).
+  // IN for a delivery / purchase: a new batch no. of its own.  IN for a
+  // return or a count: the batch it goes back to, or none.
+  var batchStep = document.getElementById("stepBatch"), list = document.getElementById("batchList");
+  function batchInfo() {
+    return (select.value && BATCHES[select.value]) || { loose: 0, next: "", batches: [] };
+  }
+  function batchOptions() {
+    var d = val("direction"), reason = val("reason"), info = batchInfo(), opts = [];
+    if (d === "OUT") {
+      info.batches.forEach(function (b) { if (b.left > 0.0005) opts.push(b); });
+      if (info.loose > 0.0005 || EXPIRED_OK.indexOf(reason) !== -1 || !opts.length)
+        opts.push({ no: "", left: info.loose, loose: true });
+    } else {
+      info.batches.forEach(function (b) { if (b.used > 0.0005) opts.push(b); });
+      opts.push({ no: "", loose: true });
+    }
+    return opts;
+  }
+  function defaultBatch(opts) {
+    var d = val("direction"), reason = val("reason");
+    if (d !== "OUT") return null;
+    var real = opts.filter(function (b) { return !b.loose; });
+    if (reason === "Damaged / expired") {
+      var gone = real.filter(function (b) { return b.status === "Expired"; });
+      if (gone.length) return gone[0].no;
+    }
+    var good = real.filter(function (b) { return b.status !== "Expired"; });
+    if (good.length) return good[0].no;
+    return opts.length ? opts[opts.length - 1].no : null;
+  }
+  function renderBatches() {
+    var d = val("direction"), it = item(), unit = it ? it.unit : "", info = batchInfo();
+    var isNew = d === "IN" && val("reason") === NEW_STOCK;
+    document.getElementById("batchNew").style.display = isNew ? "" : "none";
+    document.getElementById("expiry_date").disabled = !isNew;
+    document.getElementById("batchPick").style.display = isNew ? "none" : "";
+    document.getElementById("newBatchNo").textContent = info.next || "—";
+    batchStep.setAttribute("data-hint", isNew ? "Given by the system, like a delivery through receiving."
+      : d === "OUT" ? "Use the batch that expires first." : "Which batch is it going back to?");
+    document.getElementById("batchPickLabel").firstChild.textContent =
+      d === "OUT" ? "Taken from batch " : "Going back to batch ";
+    var current = form.querySelector("[name=batch_no]:checked");
+    if (current) picked = current.value;
+    if (isNew) { list.innerHTML = ""; return; }
+    var opts = batchOptions();
+    var have = opts.some(function (b) { return b.no === picked; });
+    var choose = have ? picked : defaultBatch(opts);
+    var firstGood = null;
+    opts.forEach(function (b) { if (!b.loose && b.status !== "Expired" && firstGood === null) firstGood = b.no; });
+    list.innerHTML = opts.map(function (b) {
+      var title, sub;
+      if (b.loose) {
+        title = "No batch no.";
+        sub = d === "OUT" ? (b.left > 0 ? n(b.left) + " " + unit + " of stock from before batch numbers"
+                                         : "Only for a count correction")
+                          : "Older stock, or not known";
+      } else {
+        title = escHtml(b.no) + (d === "OUT" && b.no === firstGood ? ' <span class="badge badge-ok bt-first">Use first</span>' : "")
+          + (b.status === "Expired" ? ' <span class="badge badge-danger bt-first">Expired</span>' : "");
+        var exp = b.expiry ? (b.days < 0 ? "expired " + longdate(b.expiry)
+                                         : "expires " + longdate(b.expiry) + " (" + b.days + " day" + (b.days === 1 ? "" : "s") + ")")
+                           : "no expiry recorded";
+        sub = d === "OUT" ? "<b>" + n(b.left) + " " + escHtml(unit) + " left</b> · " + exp
+                          : n(b.used) + " " + escHtml(unit) + " gone out so far · " + exp;
+      }
+      return '<label class="choice' + (b.status === "Expired" ? " bt-expired" : "") + '"><input type="radio" name="batch_no" value="' +
+        escHtml(b.no) + '"' + (b.no === choose ? " checked" : "") + ">" +
+        '<span class="choice-card"><span><span class="choice-title">' + title + '</span>' +
+        '<span class="choice-sub">' + sub + "</span></span></span></label>";
+    }).join("");
+    document.getElementById("batchHint").textContent = d === "OUT" && opts.length > 2
+      ? "More than one batch? Issue what you need from the first, then record another OUT for the rest." : "";
+  }
+  function chosenBatch() {
+    var r = form.querySelector("[name=batch_no]:checked");
+    if (!r) return null;
+    var info = batchInfo();
+    if (!r.value) return { no: "", loose: true, left: info.loose };
+    return info.batches.filter(function (b) { return b.no === r.value; })[0] || null;
+  }
+  batchStep.addEventListener("wz:enter", renderBatches);
+  batchStep.addEventListener("wz:validate", function (e) {
+    var d = val("direction"), reason = val("reason"), it = item(), unit = it ? it.unit : "";
+    var q = parseFloat(document.getElementById("qty").value) || 0;
+    if (d === "IN" && reason === NEW_STOCK) {
+      var exp = document.getElementById("expiry_date").value, today = new Date().toISOString().slice(0, 10);
+      if (exp && exp < today) { e.preventDefault(); e.detail.message = "That expiry date has already passed."; }
+      return;
+    }
+    var b = chosenBatch();
+    if (!b) { e.preventDefault(); e.detail.message = "Choose the batch."; return; }
+    if (d === "OUT") {
+      if (b.loose && EXPIRED_OK.indexOf(reason) === -1 && q > b.left + 1e-9) {
+        e.preventDefault();
+        e.detail.message = b.left > 0 ? "Only " + n(b.left) + " " + unit + " has no batch no. — choose the batch it comes from."
+                                      : "Choose the batch it comes from.";
+      } else if (!b.loose && q > b.left + 1e-9) {
+        e.preventDefault();
+        e.detail.message = "Batch " + b.no + " has only " + n(b.left) + " " + unit + " left — issue the rest from the next batch in another entry.";
+      } else if (!b.loose && b.status === "Expired" && EXPIRED_OK.indexOf(reason) === -1) {
+        e.preventDefault();
+        e.detail.message = "Batch " + b.no + " has expired — only \"Damaged / expired\" can take it out.";
+      }
+    } else if (!b.loose && q > b.used + 1e-9) {
+      e.preventDefault();
+      e.detail.message = "Only " + n(b.used) + " " + unit + " of batch " + b.no + " has gone out — that is the most that can come back to it.";
+    }
+  });
+  batchStep.reviewHtml = function () {
+    var d = val("direction");
+    if (d === "IN" && val("reason") === NEW_STOCK) {
+      var exp = document.getElementById("expiry_date").value;
+      return "<dt>Batch no.</dt><dd>" + escHtml(batchInfo().next) + " (new)</dd>" +
+        (exp ? "<dt>Expiry</dt><dd>" + escHtml(longdate(exp)) + "</dd>" : "");
+    }
+    var b = chosenBatch();
+    return "<dt>Batch no.</dt><dd>" + (b ? (b.loose ? "No batch no." : escHtml(b.no)) : "") + "</dd>";
+  };
+
   form.addEventListener("change", function (e) {
     if (e.target.name === "category") filterItems();
     sync();
+    if (e.target.name === "reason" || e.target.name === "material_id" || e.target.name === "direction") renderBatches();
   });
   form.addEventListener("input", sync);
   filterItems();
   sync();
+  renderBatches();
   document.getElementById("stepItem").addEventListener("wz:enter", function () { filterItems(); sync(); });
   document.getElementById("stepQty").addEventListener("wz:validate", function (e) {
     var it = item(), q = parseFloat(document.getElementById("qty").value) || 0;

@@ -47,6 +47,7 @@
   <p class="muted small mt">Supplier payments recorded on the Supplier Ledger come out of this account when it is chosen as "Paid from".</p>
 </div>
 
+{% if can('accounts_transact') %}
 {% if account.active %}
 <form class="card mb" method="post" action="{{ url_for('finance.entry', account_id=account.id) }}" id="entryForm">
   <div class="card-title">Record money in / out</div>
@@ -118,4 +119,7 @@
       {% if account.active %}data-confirm="Close {{ account.name }}? It stays on record, but payments can't be made from it."{% endif %}>
   <button class="btn btn-ghost btn-sm" type="submit">{{ 'Close this account' if account.active else 'Reopen this account' }}</button>
 </form>
+{% else %}
+<div class="card"><p class="muted small" style="margin:0">{{ icon('lock', 14) }} View only. Only the Super Admin can add, change or close accounts and record money in, money out and transfers.</p></div>
+{% endif %}
 {% endblock %}

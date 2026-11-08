@@ -12,6 +12,8 @@
     <div><span>Date &amp; time received</span><b>{{ batch.received_date|longdate }}{{ (' · ' ~ batch.received_time) if batch.received_time }}</b></div>
     <div><span>Purchase order (PO) No.</span><b>{{ batch.po_no or '—' }}</b></div>
     <div><span>Delivery receipt (DR) No.</span><b>{{ batch.delivery_ref or '—' }}</b></div>
+    <div><span>Official receipt (OR) No.</span><b>{{ batch.or_no or '—' }}</b></div>
+    <div><span>Acknowledgement receipt (AR) No.</span><b>{{ batch.ar_no or '—' }}</b></div>
     <div><span>Receiving area</span><b>{{ batch.receiving_area or 'Receiving Area' }}</b></div>
     {{ edit(0) }}
   </div>
@@ -62,8 +64,8 @@
   {% for d in docs %}{% set _ = checks.append((d ~ (' (if required)' if d == 'Certificate of Analysis' else ''), d in (batch.docs_checked or []))) %}{% endfor %}
   {% set _ = checks.append(('Other: ' ~ (batch.docs_other or '__________'), batch.docs_other)) %}
   {{ doc_checks(checks) }}
-  {% if pv and proof_name %}<p class="doc-note">Picture of the delivery receipt attached: {{ proof_name }}</p>
-  {% elif not pv and batch.proof %}<p class="doc-note no-print">A picture of the delivery receipt is on file with this delivery.</p>{% endif %}
+  {% if pv and doc_names %}<p class="doc-note">Files attached: {% for label, name in doc_names %}{{ label }} — {{ name }}{{ '; ' if not loop.last }}{% endfor %}</p>
+  {% elif not pv and (batch.proof or batch.or_proof or batch.ar_proof) %}<p class="doc-note no-print">On file with this delivery: {{ [('the delivery receipt' if batch.proof else ''), ('the official receipt' if batch.or_proof else ''), ('the acknowledgement receipt' if batch.ar_proof else '')]|select|join(', ') }}.</p>{% endif %}
 
   {{ head('C. Receiving remarks / discrepancies', 1) }}
   {{ doc_lines([batch.remarks] + (batch.discrepancies or [])) }}

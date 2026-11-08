@@ -43,12 +43,14 @@ def login():
 
 
 THEMES = ("light", "dark", "system")
+DEFAULT_THEME = "light"     # until a user picks one (topbar sun / moon menu)
 
 
 def theme_of(user):
-    """A user's colour theme: light, dark, or system (match the device)."""
+    """A user's colour theme: light, dark, or system (match the device);
+    light until they choose."""
     theme = (user or {}).get("theme")
-    return theme if theme in THEMES else "dark"
+    return theme if theme in THEMES else DEFAULT_THEME
 
 
 @auth_bp.route("/settings/theme", methods=["POST"])

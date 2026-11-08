@@ -43,8 +43,10 @@
         </div>
         <div class="form-row">
           <label class="form-label" for="delivered_by">Delivered by</label>
-          <input type="text" id="delivered_by" name="delivered_by" maxlength="80"
-                 value="{{ form.delivered_by or '' }}" placeholder="Driver / delivery person">
+          <input type="text" id="delivered_by" name="delivered_by" maxlength="120"
+                 value="{{ form.delivered_by if form.delivered_by is defined and form.delivered_by is not none else (po.supplier_name if po else '') }}"
+                 placeholder="Name of the supplier">
+          <div class="form-hint">The supplier's name, filled in for you.</div>
         </div>
         <div class="form-row">
           <label class="form-label" for="vehicle_plate">Vehicle / plate no.</label>
@@ -89,22 +91,31 @@
               <input type="text" id="po_no" name="po_no" maxlength="40" value="{{ form.po_no or '' }}" placeholder="If the paperwork shows one">
               {% endif %}
             </div>
-            <div class="form-row">
-              <label class="form-label" for="delivery_ref">DR / delivery receipt no.</label>
-              <input type="text" id="delivery_ref" name="delivery_ref" maxlength="40" value="{{ form.delivery_ref or '' }}" placeholder="e.g. DR-88412">
-            </div>
           </div>
         </div>
 
+        {# Delivery receipt, official receipt and acknowledgement receipt:
+           each with its number and a picture or PDF as proof. #}
+        {% set placeholders = {'dr': 'e.g. DR-88412', 'or': 'e.g. OR-10234', 'ar': 'e.g. AR-5521'} %}
+        {% for key, label, number_field, file_field, input_name in delivery_docs %}
         <div class="step-block">
-          <div class="form-label">Picture of the delivery receipt / DR <span class="muted small">optional</span></div>
-          <label class="dropzone" data-dropzone>
-            <input type="file" name="proof" accept="image/*" data-review-label="Receipt picture">
-            <span class="dropzone-empty">{{ icon('camera', 22) }}<span><b>Add a photo of the receipt</b>
-              <small>JPG or PNG, under 10 MB · on a phone you can take the photo directly{% if form %} · choose it again if the save didn't go through{% endif %}</small></span></span>
-            <span class="dropzone-chosen" hidden><img alt=""><span><b data-name></b><small>Click to choose a different picture</small></span></span>
-          </label>
+          <div class="form-grid cols-2">
+            <div class="form-row">
+              <label class="form-label" for="{{ number_field }}">{{ label }} no.</label>
+              <input type="text" id="{{ number_field }}" name="{{ number_field }}" maxlength="40" value="{{ form[number_field] or '' }}" placeholder="{{ placeholders[key] }}">
+            </div>
+            <div class="form-row">
+              <div class="form-label">{{ label }} file <span class="muted small">optional</span></div>
+              <label class="dropzone dropzone-compact" data-dropzone>
+                <input type="file" name="{{ input_name }}" accept="image/*,application/pdf,.pdf" data-review-label="{{ label }} file">
+                <span class="dropzone-empty">{{ icon('camera', 20) }}<span><b>Add a photo or PDF</b>
+                  <small>JPG, PNG or PDF, under 10 MB{% if form %} · choose it again if the save didn't go through{% endif %}</small></span></span>
+                <span class="dropzone-chosen" hidden><span class="dropzone-thumbs"></span><span><b data-name></b><small>Click to choose a different file</small></span></span>
+              </label>
+            </div>
+          </div>
         </div>
+        {% endfor %}
 
         <div class="step-block">
           <label class="form-label" for="remarks">Receiving remarks / discrepancies</label>
@@ -207,6 +218,21 @@
   });
   renumber();
 
+  // Delivered by: the supplier's name, kept in step with the supplier picked
+  // (a delivery without a PO) unless someone typed another name.
+  var supSel = document.querySelector("select#supplier_id"), byBox = document.getElementById("delivered_by");
+  if (supSel && byBox) {
+    var auto = byBox.value;
+    var nameOf = function () {
+      var o = supSel.options[supSel.selectedIndex];
+      return o && supSel.value ? o.textContent.replace(/\s*\(not approved\)\s*$/, "").trim() : "";
+    };
+    if (!byBox.value) { auto = nameOf(); byBox.value = auto; }
+    supSel.addEventListener("change", function () {
+      if (byBox.value === auto) { auto = nameOf(); byBox.value = auto; }
+    });
+  }
+
   // Last step: the Material Receiving Report this delivery makes, built by
   // the server from the fields so far (the same template as the saved MRR).
   // The photo itself isn't sent for the preview — only its name.
@@ -216,9 +242,11 @@
   reviewStep.addEventListener("wz:enter", function () {
     var box = reviewStep.querySelector(".review"), mine = ++seq;
     var data = new FormData(document.getElementById("receiveForm"));
-    var photo = data.get("proof");
-    data.delete("proof");
-    if (photo && photo.name) data.append("proof_name", photo.name);
+    ["proof", "or_file", "ar_file"].forEach(function (field) {
+      var file = data.get(field);
+      data.delete(field);
+      if (file && file.name) data.append(field + "_name", file.name);
+    });
     box.innerHTML = '<p class="muted">Preparing the receiving report…</p>';
     fetch(previewUrl, { method: "POST", body: data, headers: { "X-Requested-With": "fetch" } })
       .then(function (r) { return r.text(); })

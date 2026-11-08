@@ -19,6 +19,11 @@
       if (mq.addEventListener) mq.addEventListener("change", apply);
     })();
   </script>
+  <script>
+    /* The sidebar folded to icons (remembered per browser): set before the
+       page paints so it doesn't jump on every load. */
+    try { if (localStorage.getItem("amamio.navMini") === "1") document.documentElement.classList.add("nav-mini"); } catch (e) {}
+  </script>
   <title>{% block title %}Sales & Inventory{% endblock %} · Amamio</title>
   <link rel="icon" href="{{ url_for('static', filename='img/amamio-logo.jpg') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -90,6 +95,10 @@
   <div class="sidebar-foot">
     {# The AI Assistant link is hidden while the sidebar shows only the
        purchasing flow; the floating button still opens it. #}
+    <button type="button" class="side-link side-link-btn side-collapse" id="navMini" aria-pressed="false">
+      <span class="side-ico">{{ icon('chevron-down', 18, 'side-collapse-ico') }}</span>
+      <span class="side-text">Collapse menu</span>
+    </button>
     <a class="side-link" href="{{ url_for('auth.logout') }}">
       <span class="side-ico">{{ icon('logout', 18) }}</span>
       <span class="side-text">Log out</span>

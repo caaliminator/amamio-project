@@ -70,7 +70,7 @@
       </div>
       <div class="form-row">
         <label class="form-label" for="phone">Phone</label>
-        <input type="text" id="phone" name="phone">
+        <input type="tel" inputmode="tel" data-chars="phone" id="phone" name="phone" maxlength="30">
       </div>
     </div>
     {% if can_manage_super %}<p class="form-hint">Position, gender, birthdate, photo and e-signature are added on the user's profile after creating the account.</p>{% endif %}

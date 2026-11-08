@@ -1,20 +1,30 @@
 {% extends "base.html" %}
-{% from "employees/_fields.html" import employee_fields %}
 {% block title %}Employees{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
     <h1 class="page-title">Employees</h1>
-    <p class="page-sub">Staff without a system account. Team heads pick these names as the requesting employee on a purchase request.</p>
+    <p class="page-sub">Staff without a system account. Team heads pick these names as the requesting employee on a purchase request. New employees are added by the Admin and join the list once you approve them.</p>
   </div>
 </div>
 
 <div class="card mb">
-  <div class="card-title">Add an employee</div>
-  <form method="post" class="form">
-    {{ employee_fields(form, departments, suffixes) }}
-    <button class="btn btn-primary" type="submit">Add to the list</button>
-  </form>
+  <div class="card-title">New employees waiting for your approval · {{ pending|length }}</div>
+  {% if pending %}
+  <div class="queue">
+    {% for r in pending %}
+    <a class="queue-item" href="{{ url_for('additions.detail', req_id=r.id) }}">
+      <span class="queue-main">
+        <span class="queue-title">{{ r.title }}</span>
+        <span class="queue-sub">Added by {{ r.requested_by_name or '—' }} · {{ (r.created_at or '')[:10] }}</span>
+      </span>
+      <span class="queue-go">Approve or reject {{ icon('arrow-right', 14) }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted" style="margin:0">None right now. The Admin adds new employees under New Records.</p>
+  {% endif %}
 </div>
 
 <div class="card">
@@ -51,7 +61,7 @@
   </div>
   <p class="muted small" id="empNone" hidden>No employee matches.</p>
   {% else %}
-  <p class="muted">No employees yet — add the first one above.</p>
+  <p class="muted">No employees yet — the Admin adds them under New Records.</p>
   {% endif %}
 </div>
 

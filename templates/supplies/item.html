@@ -31,6 +31,33 @@
   </div>
 </div>
 
+{% set b_rows, b_loose = batches %}
+<div class="section-label">Batches <span class="muted small">— the one to use first is on top</span></div>
+{% set b_left = b_rows|selectattr('remaining', 'gt', 0.0005)|list %}
+{% if b_left %}
+<div class="card mb"><div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>Batch no.</th><th class="num">Left</th><th>Expiry</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for r in b_left %}
+      <tr>
+        <td class="nowrap"><b>{{ r.batch_no }}</b><div class="muted small">{{ r.received_date|longdate }} · {{ r.supplier_name or r.source }}</div></td>
+        <td class="num">{{ r.remaining|qty(r.unit) }}</td>
+        <td class="nowrap">{% if r.expiry_date %}{{ r.expiry_date|longdate }}{% else %}<span class="muted">Not recorded</span>{% endif %}</td>
+        <td><span class="badge {{ r.badge }}">{{ r.status }}</span></td>
+      </tr>
+      {% endfor %}
+      {% if b_loose > 0 %}
+      <tr><td class="muted">No batch no. <div class="small">stock from before batch numbers</div></td>
+        <td class="num">{{ b_loose|qty(m.unit) }}</td><td></td><td></td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div></div>
+{% else %}
+<p class="muted small mb">No batch of this item has stock left{% if b_loose > 0 %} — the {{ b_loose|qty(m.unit) }} in stock is from before batch numbers{% endif %}.</p>
+{% endif %}
+
 <div class="section-label">Last movements</div>
 {% if moves %}
 <div class="queue">
@@ -38,7 +65,7 @@
   <div class="queue-item">
     <span class="badge {{ 'badge-gold' if mv.direction == 'IN' else 'badge-muted' }}" style="min-width:44px;text-align:center">{{ mv.direction }}</span>
     <span class="queue-main">
-      <span class="queue-title">{{ '+' if mv.direction == 'IN' else '−' }}{{ mv.qty|qty(mv.unit) }} · {{ mv.reason }}</span>
+      <span class="queue-title">{{ '+' if mv.direction == 'IN' else '−' }}{{ mv.qty|qty(mv.unit) }} · {{ mv.reason }}{% if mv.batch_no %} · <span class="nowrap">batch {{ mv.batch_no }}</span>{% endif %}</span>
       <span class="queue-sub">{{ mv.when }}{% if mv.person %} · {{ mv.person }}{% endif %}{% if mv.reference %} · {{ mv.reference }}{% endif %}{% if mv.notes %} · {{ mv.notes }}{% endif %} · by {{ mv.recorded_by_name }}</span>
     </span>
     <span class="muted small nowrap">left {{ mv.balance_after|qty(mv.unit) }}</span>

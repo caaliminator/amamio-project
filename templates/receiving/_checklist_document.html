@@ -6,16 +6,18 @@
 {% macro edit(step) %}{% if pv %}<a href="#" class="doc-edit no-print" data-wz-goto="{{ step }}">Edit</a>{% endif %}{% endmacro %}
 {% macro head(title, step) %}<div class="doc-section-head"><h3>{{ title }}</h3>{{ edit(step) }}</div>{% endmacro %}
 
-{% call doc('Incoming Material Inspection Checklist', no=box.inspection_no,
+{% set lane_form = lane.form if lane is defined and lane else 'Incoming Material Inspection Checklist' %}
+{% set is_supplies = lane is defined and lane and lane.form != 'Incoming Material Inspection Checklist' %}
+{% call doc(lane_form, no=box.inspection_no,
             status=('Preview · not saved yet' if pv else box.acceptance_status), mark=('Preview' if pv else ''),
             doc_no='AFP-WH-FRM-002', revision='00',
             meta=[('Inspection date', box.checked_at|longdate), ('MRR No.', box.batch_ref),
-                  ('Lot / batch', box.lot_no), ('Quantity', box.declared_qty|qty(box.unit))]) %}
+                  ('Batch no.', box.lot_no), ('Quantity', box.declared_qty|qty(box.unit))]) %}
   {{ doc_fields([('Supplier', box.supplier_name), ('Material / item', box.material_name ~ ' · ' ~ box.box_code),
                  ('Inspector', box.checked_by)]
                 + ([('Visual / organoleptic description', box.visual_description, 'wide')] if box.visual_description else [])) }}
 
-  {{ head('A. Inspection checklist', 4) }}
+  {{ head('A. Inspection checklist', 3 if is_supplies else 4) }}
   <table class="doc-table">
     <thead><tr><th>Inspection point</th><th>Acceptable requirement / check</th><th class="c">Pass</th><th class="c">Fail</th><th class="c">N/A</th><th>Remarks</th></tr></thead>
     <tbody>
@@ -25,18 +27,22 @@
         <td class="doc-item">{{ point }}</td>
         <td>{{ requirement }}</td>
         {% for r in ('Pass', 'Fail', 'N/A') %}<td class="c"><span class="doc-box{{ ' is-on' if entry.result == r }}">{{ icon('check', 11) if entry.result == r }}</span></td>{% endfor %}
-        <td>{{ entry.remarks or '' }}</td>
+        <td>{% if key == 'lot' and box.lot_no %}Batch {{ box.lot_no }}{{ ' · ' if entry.remarks }}{% endif %}{% if key == 'dates' and (box.mfg_date or box.expiry_date) %}{% if box.mfg_date %}MFG {{ box.mfg_date|longdate }}{% endif %}{{ ' · ' if box.mfg_date and box.expiry_date }}{% if box.expiry_date %}EXP {{ box.expiry_date|longdate }}{% endif %}{{ ' · ' if entry.remarks }}{% endif %}{{ entry.remarks or '' }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
   {% if not box.checklist %}<p class="doc-note">Inspected before the checklist was introduced — results: visual {{ box.visual_inspection or '—' }}, COA {{ box.coa_check or '—' }}, sampling {{ box.sampling_test or '—' }}.</p>{% endif %}
 
+  {% if is_supplies %}
+  <p class="doc-note">Packaging &amp; supplies checklist (draft based on AFP-WH-FRM-002, for QA confirmation) — no cleaning, odor, temperature or lab test.</p>
+  {% else %}
   {{ head('B. Test results (if applicable)', 5) }}
   {{ doc_fields([('Parameter', box.test_parameter), ('Specification', box.test_spec),
                  ('Actual result', box.test_result), ('Instrument / method', box.test_method)], cols=4) }}
+  {% endif %}
 
-  {{ head('C. Inspection decision', 6) }}
+  {{ head('B. Inspection decision' if is_supplies else 'C. Inspection decision', 4 if is_supplies else 6) }}
   {{ doc_checks([('Accepted — meets requirements', box.acceptance_status == 'Accepted'),
                  ('Hold / quarantine — pending evaluation', box.acceptance_status == 'Hold'),
                  ('Rejected — does not meet requirements', box.acceptance_status == 'Rejected')]) }}
@@ -44,7 +50,7 @@
                  ('Usable', box.good_qty|qty(box.unit)), ("Can't be used", box.unusable_qty|qty(box.unit)), ('Damaged', box.damaged_qty|qty(box.unit))]) }}
 
   {% if pv and box.photo_names %}
-  {{ head('Photos', 4) }}
+  {{ head('Photos', 3 if is_supplies else 4) }}
   <p class="doc-note">{{ box.photo_names|length }} photo{{ 's' if box.photo_names|length != 1 }} attached: {{ box.photo_names|join(', ') }} — saved with the inspection.</p>
   {% elif not pv and box.photos %}
   <div class="doc-section-head"><h3>Photos</h3></div>

@@ -12,7 +12,7 @@
       Received {{ batch.received_date }}{% if batch.received_time %} {{ batch.received_time }}{% endif %} by {{ received_by }}
       {% if po and can('purchasing') %} · <a href="{{ url_for('purchasing.detail', po_id=po.id) }}">PO {{ po.po_no }}</a>
       {% elif batch.po_no %} · PO {{ batch.po_no }}{% endif %}
-      {% if batch.delivery_ref %} · DR {{ batch.delivery_ref }}{% endif %}
+      {% if batch.delivery_ref %} · DR {{ batch.delivery_ref }}{% endif %}{% if batch.or_no %} · OR {{ batch.or_no }}{% endif %}{% if batch.ar_no %} · AR {{ batch.ar_no }}{% endif %}
       {% if batch.delivered_by %}<br>Delivered by {{ batch.delivered_by }}{% if batch.vehicle_plate %} · {{ batch.vehicle_plate }}{% endif %}{% endif %}
     </div>
   </div>
@@ -22,19 +22,30 @@
   </div>
 </div>
 
-{# The picture of the delivery receipt: shown, or added / replaced here. #}
+{# The delivery documents (DR, OR, AR): number and picture / PDF of each,
+   shown here and added or replaced. #}
 <div class="card mb proof-card">
-  <div class="card-title">Delivery receipt picture</div>
-  {% if batch.proof %}
-  <a class="proof-link" href="{{ url_for('receiving.delivery_proof', batch_id=batch.id) }}" target="_blank" rel="noopener">
-    <img src="{{ url_for('receiving.delivery_proof', batch_id=batch.id) }}" alt="Delivery receipt" loading="lazy" class="proof-large"><span>Open full size</span></a>
-  {% else %}<p class="muted small" style="margin:0 0 8px">No picture of the receipt yet.</p>{% endif %}
-  {% if can('receiving') %}
-  <form method="post" enctype="multipart/form-data" action="{{ url_for('receiving.delivery_proof', batch_id=batch.id) }}" class="flex gap-sm wrap mt-sm" style="align-items:center">
-    <input type="file" name="proof" accept="image/*" required style="max-width:320px">
-    <button class="btn btn-ghost btn-sm" type="submit">{{ 'Replace picture' if batch.proof else 'Add picture' }}</button>
-  </form>
-  {% endif %}
+  <div class="card-title">Delivery documents</div>
+  <div class="doc-files">
+    {% for key, label, number_field, file_field, _ in delivery_docs %}
+    {% set file = batch[file_field] %}
+    <div class="doc-file">
+      <div class="small"><b>{{ label }}</b>{% if batch[number_field] %} · No. {{ batch[number_field] }}{% endif %}</div>
+      {% if file %}
+        {% set url = url_for('receiving.delivery_proof', batch_id=batch.id, doc=key) %}
+        <a class="proof-link" href="{{ url }}" target="_blank" rel="noopener">
+          {% if file.endswith('.pdf') %}<span class="doc-pdf">{{ icon('reports', 26) }}<span>PDF</span></span>{% else %}<img src="{{ url }}" alt="{{ label }}" loading="lazy" class="proof-large">{% endif %}<span>Open</span></a>
+      {% else %}<p class="muted small" style="margin:4px 0 0">No file yet.</p>{% endif %}
+      {% if can('receiving') %}
+      <form method="post" enctype="multipart/form-data" action="{{ url_for('receiving.delivery_proof', batch_id=batch.id, doc=key) }}" class="doc-file-form">
+        {% if not batch[number_field] %}<input type="text" name="number" maxlength="40" placeholder="{{ label }} no.">{% endif %}
+        <input type="file" name="proof" accept="image/*,application/pdf,.pdf">
+        <button class="btn btn-ghost btn-sm" type="submit">{{ 'Replace file' if file else 'Save' }}</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
 </div>
 
 {% if batch.status == 'For Closing' %}
@@ -114,7 +125,7 @@
       <span class="queue-title">{{ box.material_name }} — {{ box.declared_qty|qty(box.unit) }}</span>
       <span class="queue-sub">
         {% if box.status == 'Awaiting Inspection' %}
-          At the {{ box.stage }}{% if box.lot_no %} · Lot {{ box.lot_no }}{% endif %}
+          At the {{ box.stage }}{% if box.lot_no %} · Batch {{ box.lot_no }}{% endif %}
         {% else %}
           {{ box.good_qty|qty(box.unit) }} usable
           {% if box.unusable_qty %} · {{ box.unusable_qty|qty(box.unit) }} can't be used{% endif %}

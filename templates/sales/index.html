@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Stock Release{% endblock %}
 {% block content %}
-{% set show_requester = role != 'packing_head' %}
+{% set show_requester = role != 'sales_marketing_admin' %}
 {% set show_actions = is_manager or role == 'production_head' %}
 
 <div class="page-head">
   <div>
     <h1 class="page-title">
-      {% if role == 'packing_head' %}My stock release requests
+      {% if role == 'sales_marketing_admin' %}My stock release requests
       {% elif role == 'production_head' %}Approved releases to fulfil
       {% else %}Stock release{% endif %}
     </h1>
@@ -17,7 +17,7 @@
       Production Team Head.
     </p>
   </div>
-  {% if role == 'packing_head' or is_manager %}
+  {% if role == 'sales_marketing_admin' or is_manager %}
   <div class="page-head-actions">
     <a class="btn btn-primary btn-sm" href="{{ url_for('sales.new') }}">New request</a>
   </div>
@@ -31,7 +31,7 @@
       <div class="empty-title">Nothing here yet</div>
       <p class="muted">
         {% if role == 'production_head' %}No approved stock releases are waiting to be fulfilled.
-        {% elif role == 'packing_head' %}You have not submitted any stock release requests yet.
+        {% elif role == 'sales_marketing_admin' %}You have not submitted any stock release requests yet.
         {% else %}No stock release requests yet.{% endif %}
       </p>
     </div>

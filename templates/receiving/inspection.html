@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Inspection &amp; Cleaning{% endblock %}
+{% block title %}{{ lane.label }}{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1 class="page-title">Inspection &amp; Cleaning</h1>
-    <p class="page-sub">Boxes that arrived at the receiving area and are waiting to be cleaned and checked.</p>
+    <h1 class="page-title">{{ lane.label }}</h1>
+    <p class="page-sub">{% if lane_key == 'raw' %}Raw materials that arrived — ginger, lemon, calamansi, turmeric, cacao, coffee and the like — waiting to be cleaned and checked against the full checklist.{% else %}Jars, bottles, seals, pouches, labels, boxes, cleaning and production supplies, and office supplies that arrived — checked with the packaging &amp; supplies checklist.{% endif %}</p>
   </div>
   <div class="page-head-actions">
     <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.ncr_list') }}">{{ icon('shield', 15) }} Hold &amp; rejection reports</a>
@@ -12,6 +12,13 @@
     <a class="btn btn-primary" href="{{ url_for('qr.scan') }}">{{ icon('qr', 16) }} Scan a box</a>
   </div>
 </div>
+
+{% if other_waiting %}
+<div class="next-action mb">
+  <div class="next-action-text"><b>{{ other_waiting }} waiting in {{ other.label }}</b><span>{{ other.short }} are checked there.</span></div>
+  <a class="btn btn-ghost btn-sm" href="{{ url_for(other.endpoint) }}">Open {{ other.label }}</a>
+</div>
+{% endif %}
 
 <div class="section-label" style="margin-top:0">Waiting for you ({{ waiting|length }})</div>
 {% if waiting %}
@@ -31,7 +38,7 @@
 <div class="card"><div class="empty">
   <div class="empty-icon">{{ icon('check', 30) }}</div>
   <div class="empty-title">Nothing waiting</div>
-  <p class="muted">You'll get a notification when the receiving area records a new delivery.</p>
+  <p class="muted">No {{ lane.short|lower }} waiting. You'll get a notification when the receiving area records a new delivery.</p>
 </div></div>
 {% endif %}
 

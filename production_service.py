@@ -229,8 +229,11 @@ def default_dispensing(product_id, batch_size):
     """BOM x batch size as editable dispensing lines."""
     rows = []
     for r in services.requirements_for(product_id, batch_size):
+        # The batch to use first (FEFO) fills the lot no. and expiry.
+        first = services.fefo_batch(r["material_id"]) or {}
         rows.append({"material_id": r["material_id"], "ingredient": r["material_name"],
-                     "lot_no": "", "expiry_date": "",
+                     "lot_no": first.get("batch_no") or "",
+                     "expiry_date": first.get("expiry_date") or "",
                      "theoretical_qty": round(r["required"], 3), "unit": r["unit"] or ""})
     return rows
 

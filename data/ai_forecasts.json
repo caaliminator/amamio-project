@@ -3,7 +3,7 @@
     "id": 1,
     "product_id": 15,
     "product_name": "Honey Infused Ginger 300 mL",
-    "generated_at": "2026-10-16T05:39:43.998028+00:00",
+    "generated_at": "2026-11-08T13:02:56.219448+00:00",
     "horizon_weeks": 4,
     "model": "linear-trend",
     "forecast": [
@@ -13,17 +13,17 @@
       34.637529
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 2,
     "product_id": 22,
     "product_name": "Cacao Powder 100 g",
-    "generated_at": "2026-10-16T05:39:43.998066+00:00",
+    "generated_at": "2026-11-08T13:02:56.219484+00:00",
     "horizon_weeks": 4,
     "model": "linear-trend",
     "forecast": [
@@ -33,17 +33,17 @@
       28.707459
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 3,
     "product_id": 9,
     "product_name": "Honey Lemon Ginger Concentrate 300 mL",
-    "generated_at": "2026-10-16T05:39:43.998082+00:00",
+    "generated_at": "2026-11-08T13:02:56.219500+00:00",
     "horizon_weeks": 4,
     "model": "linear-trend",
     "forecast": [
@@ -53,17 +53,17 @@
       28.72028
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 4,
     "product_id": 4,
     "product_name": "Pure Honey 1 Liter",
-    "generated_at": "2026-10-16T05:39:43.998094+00:00",
+    "generated_at": "2026-11-08T13:02:56.219511+00:00",
     "horizon_weeks": 4,
     "model": "linear-trend",
     "forecast": [
@@ -73,17 +73,17 @@
       25.458042
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 5,
     "product_id": 2,
     "product_name": "Pure Honey 250 mL",
-    "generated_at": "2026-10-16T05:39:43.998105+00:00",
+    "generated_at": "2026-11-08T13:02:56.219521+00:00",
     "horizon_weeks": 4,
     "model": "linear-trend",
     "forecast": [
@@ -93,17 +93,17 @@
       25.582751
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 6,
     "product_id": 13,
     "product_name": "Honey Infused Turmeric Ginger 300 mL",
-    "generated_at": "2026-10-16T05:39:43.998116+00:00",
+    "generated_at": "2026-11-08T13:02:56.219530+00:00",
     "horizon_weeks": 4,
     "model": "linear-trend",
     "forecast": [
@@ -113,17 +113,17 @@
       23.165501
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 7,
     "product_id": 26,
     "product_name": "Robusta Coffee 125 g",
-    "generated_at": "2026-10-16T05:39:43.998127+00:00",
+    "generated_at": "2026-11-08T13:02:56.219539+00:00",
     "horizon_weeks": 4,
     "model": "linear-trend",
     "forecast": [
@@ -133,17 +133,17 @@
       23.996503
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 8,
     "product_id": 18,
     "product_name": "Pure Tableya 200 g",
-    "generated_at": "2026-10-16T05:39:43.998139+00:00",
+    "generated_at": "2026-11-08T13:02:56.219547+00:00",
     "horizon_weeks": 4,
     "model": "linear-trend",
     "forecast": [
@@ -153,17 +153,17 @@
       21.245455
     ],
     "future_labels": [
-      "2026-W42",
-      "2026-W43",
-      "2026-W44",
-      "2026-W45"
+      "2026-W45",
+      "2026-W46",
+      "2026-W47",
+      "2026-W48"
     ]
   },
   {
     "id": 9,
     "product_id": 1,
     "product_name": "Pure Honey 100 mL",
-    "generated_at": "2026-10-16T05:39:43.998149+00:00",
+    "generated_at": "2026-11-08T13:02:56.219556+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -173,17 +173,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 10,
     "product_id": 3,
     "product_name": "Pure Honey 500 mL",
-    "generated_at": "2026-10-16T05:39:43.998159+00:00",
+    "generated_at": "2026-11-08T13:02:56.219565+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -193,17 +193,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 11,
     "product_id": 5,
     "product_name": "Pure Honey 3.7 Liter",
-    "generated_at": "2026-10-16T05:39:43.998170+00:00",
+    "generated_at": "2026-11-08T13:02:56.219574+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -213,17 +213,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 12,
     "product_id": 6,
     "product_name": "Pure Honey 1 container",
-    "generated_at": "2026-10-16T05:39:43.998180+00:00",
+    "generated_at": "2026-11-08T13:02:56.219582+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -233,17 +233,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 13,
     "product_id": 7,
     "product_name": "RFH with Comb 250 mL",
-    "generated_at": "2026-10-16T05:39:43.998190+00:00",
+    "generated_at": "2026-11-08T13:02:56.219591+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -253,17 +253,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 14,
     "product_id": 8,
     "product_name": "RFH with Comb 500 mL",
-    "generated_at": "2026-10-16T05:39:43.998199+00:00",
+    "generated_at": "2026-11-08T13:02:56.219599+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -273,17 +273,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 15,
     "product_id": 10,
     "product_name": "Honey Lemon Ginger Concentrate 1 Liter",
-    "generated_at": "2026-10-16T05:39:43.998237+00:00",
+    "generated_at": "2026-11-08T13:02:56.219608+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -293,17 +293,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 16,
     "product_id": 11,
     "product_name": "Honey Calamansi Concentrate 300 mL",
-    "generated_at": "2026-10-16T05:39:43.998249+00:00",
+    "generated_at": "2026-11-08T13:02:56.219617+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -313,17 +313,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 17,
     "product_id": 12,
     "product_name": "Honey Calamansi Concentrate 1 Liter",
-    "generated_at": "2026-10-16T05:39:43.998258+00:00",
+    "generated_at": "2026-11-08T13:02:56.219628+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -333,17 +333,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 18,
     "product_id": 14,
     "product_name": "Honey Infused Turmeric Ginger 1 Liter",
-    "generated_at": "2026-10-16T05:39:43.998269+00:00",
+    "generated_at": "2026-11-08T13:02:56.219638+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -353,17 +353,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 19,
     "product_id": 16,
     "product_name": "Honey Infused Ginger 1 Liter",
-    "generated_at": "2026-10-16T05:39:43.998279+00:00",
+    "generated_at": "2026-11-08T13:02:56.219649+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -373,17 +373,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 20,
     "product_id": 17,
     "product_name": "Honey Vinegar 250 mL",
-    "generated_at": "2026-10-16T05:39:43.998289+00:00",
+    "generated_at": "2026-11-08T13:02:56.219659+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -393,17 +393,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 21,
     "product_id": 19,
     "product_name": "Pure Tableya 1 kg",
-    "generated_at": "2026-10-16T05:39:43.998299+00:00",
+    "generated_at": "2026-11-08T13:02:56.219671+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -413,17 +413,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 22,
     "product_id": 20,
     "product_name": "Cacao Nibs 100 g",
-    "generated_at": "2026-10-16T05:39:43.998309+00:00",
+    "generated_at": "2026-11-08T13:02:56.219681+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -433,17 +433,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 23,
     "product_id": 21,
     "product_name": "Cacao Nibs 500 g",
-    "generated_at": "2026-10-16T05:39:43.998319+00:00",
+    "generated_at": "2026-11-08T13:02:56.219692+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -453,17 +453,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 24,
     "product_id": 23,
     "product_name": "Cacao Powder 500 g",
-    "generated_at": "2026-10-16T05:39:43.998329+00:00",
+    "generated_at": "2026-11-08T13:02:56.219702+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -473,17 +473,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 25,
     "product_id": 24,
     "product_name": "Pure Corn Coffee 150 g",
-    "generated_at": "2026-10-16T05:39:43.998339+00:00",
+    "generated_at": "2026-11-08T13:02:56.219711+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -493,17 +493,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 26,
     "product_id": 25,
     "product_name": "Pure Corn Coffee 1 kg",
-    "generated_at": "2026-10-16T05:39:43.998351+00:00",
+    "generated_at": "2026-11-08T13:02:56.219723+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -513,17 +513,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 27,
     "product_id": 27,
     "product_name": "Robusta Coffee 1 kg",
-    "generated_at": "2026-10-16T05:39:43.998361+00:00",
+    "generated_at": "2026-11-08T13:02:56.219734+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -533,17 +533,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 28,
     "product_id": 28,
     "product_name": "Moringa Powder 100 g",
-    "generated_at": "2026-10-16T05:39:43.998371+00:00",
+    "generated_at": "2026-11-08T13:02:56.219743+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -553,17 +553,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 29,
     "product_id": 29,
     "product_name": "Moringa Powder 500 g",
-    "generated_at": "2026-10-16T05:39:43.998381+00:00",
+    "generated_at": "2026-11-08T13:02:56.219752+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -573,17 +573,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 30,
     "product_id": 30,
     "product_name": "Moringa Powder 1 kg",
-    "generated_at": "2026-10-16T05:39:43.998392+00:00",
+    "generated_at": "2026-11-08T13:02:56.219761+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -593,17 +593,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 31,
     "product_id": 31,
     "product_name": "Turmeric Powder 100 g",
-    "generated_at": "2026-10-16T05:39:43.998402+00:00",
+    "generated_at": "2026-11-08T13:02:56.219769+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -613,17 +613,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 32,
     "product_id": 32,
     "product_name": "Banana Chips 100 g",
-    "generated_at": "2026-10-16T05:39:43.998413+00:00",
+    "generated_at": "2026-11-08T13:02:56.219777+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -633,17 +633,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 33,
     "product_id": 33,
     "product_name": "Uriel Liniment Oil 60 mL",
-    "generated_at": "2026-10-16T05:39:43.998422+00:00",
+    "generated_at": "2026-11-08T13:02:56.219785+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -653,17 +653,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 34,
     "product_id": 34,
     "product_name": "Calamansi Powder",
-    "generated_at": "2026-10-16T05:39:43.998433+00:00",
+    "generated_at": "2026-11-08T13:02:56.219794+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -673,17 +673,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 35,
     "product_id": 35,
     "product_name": "Cacao Butter",
-    "generated_at": "2026-10-16T05:39:43.998443+00:00",
+    "generated_at": "2026-11-08T13:02:56.219802+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -693,17 +693,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 36,
     "product_id": 36,
     "product_name": "Lip Moisturizer",
-    "generated_at": "2026-10-16T05:39:43.998452+00:00",
+    "generated_at": "2026-11-08T13:02:56.219810+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -713,17 +713,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 37,
     "product_id": 37,
     "product_name": "Lemon Powder",
-    "generated_at": "2026-10-16T05:39:43.998461+00:00",
+    "generated_at": "2026-11-08T13:02:56.219818+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -733,17 +733,17 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   },
   {
     "id": 38,
     "product_id": 38,
     "product_name": "Ginger Powder",
-    "generated_at": "2026-10-16T05:39:43.998472+00:00",
+    "generated_at": "2026-11-08T13:02:56.219826+00:00",
     "horizon_weeks": 4,
     "model": "naive-mean",
     "forecast": [
@@ -753,10 +753,10 @@
       0.0
     ],
     "future_labels": [
-      "2026-W43",
-      "2026-W44",
-      "2026-W45",
-      "2026-W46"
+      "2026-W46",
+      "2026-W47",
+      "2026-W48",
+      "2026-W49"
     ]
   }
 ]

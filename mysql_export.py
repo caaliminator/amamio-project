@@ -48,6 +48,7 @@ _PARENT_FK = {
     "batch_dispensing": ("batch_records", "batch_record_id"),
     "batch_steps": ("batch_records", "batch_record_id"),
     "purchase_order_items": ("purchase_orders", "purchase_order_id"),
+    "supplier_payment_attachments": ("supplier_payments", "supplier_payment_id"),
 }
 
 

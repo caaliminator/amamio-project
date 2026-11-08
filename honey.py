@@ -99,9 +99,26 @@ def new():
                                     only=",".join(str(c["id"]) for c in created)))
         flash(err, "error")
 
-    return render_template("honey/new.html", suppliers=db.read("suppliers"),
+    honey_sup, other_sup = _suppliers_by_honey()
+    return render_template("honey/new.html", honey_suppliers=honey_sup,
+                           other_suppliers=other_sup,
                            sources=SOURCES, today=services.today_iso(),
                            form=form, start=1 if request.method == "POST" else 0)
+
+
+def _suppliers_by_honey():
+    """(suppliers linked to a honey item in the directory, everyone else),
+    each by name — so the ones who supply honey are listed first."""
+    import supplier_service
+    honey_items = {m["id"] for m in db.read("raw_materials")
+                   if "honey" in (m.get("name") or "").lower() and services.is_purchasable(m)}
+    linked = set()
+    for mid, links in supplier_service.links_by_material(supplier_service.approved_links()).items():
+        if mid in honey_items:
+            linked.update(l.get("supplier_id") if isinstance(l, dict) else l for l in links)
+    rows = sorted(db.read("suppliers"), key=lambda s: (s.get("name") or "").lower())
+    return ([s for s in rows if s["id"] in linked],
+            [s for s in rows if s["id"] not in linked])
 
 
 @honey_bp.route("/<int:container_id>")
@@ -144,6 +161,7 @@ def qc(container_id):
     return render_template(
         "honey/qc.html", c=_row(record), form=form,
         appearances=services.QC_APPEARANCE,
+        fail_signs=services.QC_FAIL_APPEARANCE,
         moisture_max=services.MOISTURE_PASS_MAX,
         pass_products=services.HONEY_PASS_PRODUCTS,
         fail_products=services.HONEY_FAIL_PRODUCTS,

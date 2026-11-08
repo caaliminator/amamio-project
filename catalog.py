@@ -2,8 +2,10 @@
 from flask import (Blueprint, abort, flash, redirect, render_template, request,
                    url_for)
 
+import additions_service as adds
 import db
 import services
+import supplier_service
 from security import current_user, module_required
 
 catalog_bp = Blueprint("catalog", __name__)
@@ -54,6 +56,24 @@ def index():
 @catalog_bp.route("/materials", methods=["GET", "POST"])
 @module_required("catalog")
 def materials():
+    if request.method == "POST" and not (request.form.get("id") or "").strip():
+        # A new material or supply: only the Admin adds one, and it joins the
+        # materials list once the Super Admin approves it.
+        user = current_user()
+        if not adds.can_add(user):
+            flash("New materials and supplies are added by the Admin and approved "
+                  "by the Super Admin.", "error")
+            return redirect(url_for("catalog.materials"))
+        kind = "material" if request.form.get("category") == "raw" else "supply"
+        payload, err = adds.clean_item(request.form, kind)
+        req = None
+        if not err:
+            req, err = adds.submit(kind, payload, user)
+        if err:
+            flash(err, "error")
+            return redirect(url_for("catalog.materials"))
+        flash("'%s' sent to the Super Admin for approval." % payload["name"], "success")
+        return redirect(url_for("additions.detail", req_id=req["id"]))
     if request.method == "POST":
         mid = (request.form.get("id") or "").strip()
         name = (request.form.get("name") or "").strip()
@@ -89,18 +109,21 @@ def materials():
                 "track_mode": track_mode, "reorder_level": reorder,
                 "supplier_id": supplier_id, "unit_cost": unit_cost,
                 "expiry_date": expiry})
+            # The usual supplier is always one of the item's suppliers.
+            supplier_service.ensure_link(supplier_id, mid)
             # Changing stock here records an inventory adjustment in the ledger.
             services.record_adjustment("material", mid, stock,
                                        reason="Stock edit via catalog",
                                        user_id=(current_user() or {}).get("id"))
             flash("Material updated.", "success")
         else:
-            db.insert("raw_materials", {
+            row = db.insert("raw_materials", {
                 "name": name, "category": category, "unit": unit,
                 "track_mode": track_mode, "stock_qty": stock,
                 "reorder_level": reorder, "supplier_id": supplier_id,
                 "unit_cost": unit_cost, "expiry_date": expiry,
                 "storage_location": "", "created_at": services.now_iso()})
+            supplier_service.ensure_link(supplier_id, row["id"])
             flash("Material '%s' added." % name, "success")
         return redirect(url_for("catalog.materials"))
 
@@ -109,7 +132,8 @@ def materials():
                            categories=_categories(),
                            suppliers=db.read("suppliers"),
                            track_modes=services.TRACK_MODES,
-                           track_labels=services.TRACK_MODE_LABELS)
+                           track_labels=services.TRACK_MODE_LABELS,
+                           can_add=adds.can_add(current_user()))
 
 
 @catalog_bp.route("/product/<int:product_id>/bom", methods=["GET", "POST"])

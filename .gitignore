@@ -19,3 +19,10 @@ data/platform_imports.json
 # Staff photos and e-signatures (Users & Profiles) are personal data —
 # they stay on this computer, never in the (public) repository.
 data/uploads/
+
+# The client's supplier spreadsheet: uploaded through Supplier Directory →
+# Import from Excel, never committed.
+/SUPPLIERS*DIRECTORY*.xlsx
+
+# Backups of the data folder taken when it was rebuilt — local only.
+/data_old*/

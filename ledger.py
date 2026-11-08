@@ -5,8 +5,10 @@ it once the Super Admin approves (issues) it; payments — advance, partial or
 full — are recorded here, optionally against one PO.  The rules live in
 purchasing_service.py (ledger_entries, record_payment).
 """
-from flask import (Blueprint, abort, flash, redirect, render_template,
+from flask import (Blueprint, abort, flash, g, redirect, render_template,
                    request, send_file, url_for)
+
+import os
 
 import db
 import finance_service as fin
@@ -104,7 +106,8 @@ def print_statement(supplier_id):
 @module_required("ledger")
 def pay(supplier_id):
     payment, err = pur.record_payment(supplier_id, current_user(), request.form,
-                                      proof=request.files.get("proof"))
+                                      proof=request.files.get("proof"),
+                                      attachments=request.files.getlist("attachments"))
     if err:
         flash(err, "error")
         return redirect(url_for("ledger.supplier", supplier_id=supplier_id,
@@ -112,6 +115,54 @@ def pay(supplier_id):
     flash("Payment of %s to %s recorded." % (services.fmt_peso(payment["amount"]),
                                             payment["supplier_name"]), "success")
     return redirect(url_for("ledger.supplier", supplier_id=supplier_id))
+
+
+def _payment_or_404(payment_id):
+    payment = db.get("supplier_payments", payment_id)
+    if not payment:
+        abort(404)
+    return payment
+
+
+@ledger_bp.route("/payments/<int:payment_id>")
+@module_required("ledger")
+def payment(payment_id):
+    """One payment: its details, proof of payment and attachments, and a form
+    to attach more (e.g. the official receipt that came later)."""
+    pay = _payment_or_404(payment_id)
+    g.nav_endpoint = "ledger.index"
+    po = db.get("purchase_orders", pay.get("po_id")) if pay.get("po_id") else None
+    return render_template("ledger/payment.html", p=pay, po=po,
+                           attachments=pay.get("attachments") or [],
+                           max_attachments=pur.MAX_ATTACHMENTS)
+
+
+@ledger_bp.route("/payments/<int:payment_id>/attachments", methods=["POST"])
+@module_required("ledger")
+def add_attachments(payment_id):
+    pay, err = pur.add_payment_attachments(payment_id, current_user(),
+                                           request.files.getlist("attachments"),
+                                           request.form.get("attachments_label"))
+    if err:
+        flash(err, "error")
+    else:
+        flash("Attached to the payment of %s." % services.fmt_peso(pay["amount"]), "success")
+    return redirect(url_for("ledger.payment", payment_id=payment_id))
+
+
+@ledger_bp.route("/payments/<int:payment_id>/files/<int:n>")
+@module_required("ledger")
+def attachment(payment_id, n):
+    """One attachment of a payment (picture or PDF) — ledger users only."""
+    pay = _payment_or_404(payment_id)
+    att = next((a for a in pay.get("attachments") or [] if a.get("n") == n), None)
+    path = uploads.picture_path("payments", (att or {}).get("file"))
+    if not path:
+        abort(404)
+    is_pdf = att.get("kind") == "pdf"
+    return send_file(path, max_age=3600,
+                     mimetype="application/pdf" if is_pdf else "image/jpeg",
+                     download_name=att.get("name") or os.path.basename(path))
 
 
 @ledger_bp.route("/payments/<int:payment_id>/proof")

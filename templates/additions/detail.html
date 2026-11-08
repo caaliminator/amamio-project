@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}{{ r.kind_label }}: {{ r.title }}{% endblock %}
+{% block content %}
+<div class="focus">
+<a class="back-link" href="{{ url_for('additions.index') }}">{{ icon('arrow-left', 15) }} New Records</a>
+
+<div class="record-head">
+  <div>
+    <div class="record-code">NEW {{ r.kind_label|upper }}</div>
+    <h1 class="record-title">{{ r.title }}</h1>
+    <div class="muted small">Added by {{ r.requested_by_name or '—' }} on {{ (r.created_at or '')[:10] }}</div>
+  </div>
+  <span class="badge {{ r.badge }}">{{ 'Waiting for the Super Admin' if r.status == 'Pending' else r.status }}</span>
+</div>
+
+{% if r.status == 'Pending' %}
+<div class="next-action">
+  <div class="next-action-text">
+    {% if can_decide %}<b>Next: your approval</b><span>Approving adds it to the system now. Rejecting tells the Admin why.</span>
+    {% else %}<b>Waiting for the Super Admin's approval</b><span>It is not part of the system yet — no list or dropdown shows it until it is approved.</span>{% endif %}
+  </div>
+</div>
+{% elif r.status == 'Approved' %}
+<div class="next-action">
+  <div class="next-action-text"><b>Approved by {{ r.decided_by_name or 'the Super Admin' }}{% if r.decided_at %} on {{ r.decided_at[:10] }}{% endif %}</b><span>It is now part of the system.</span></div>
+  {% if record_url %}<a class="btn btn-primary btn-sm" href="{{ record_url }}">Open it</a>{% endif %}
+</div>
+{% elif r.status == 'Rejected' %}
+<div class="next-action">
+  <div class="next-action-text"><b>Rejected by {{ r.decided_by_name or 'the Super Admin' }}{% if r.decided_at %} on {{ r.decided_at[:10] }}{% endif %}</b><span>{{ r.remarks }}</span></div>
+</div>
+{% elif r.status == 'Withdrawn' %}
+<div class="next-action">
+  <div class="next-action-text"><b>Withdrawn</b><span>The Admin took it back; it was not added.</span></div>
+</div>
+{% endif %}
+
+{% if problem %}
+<div class="flash flash-error">This can't be added as it is: {{ problem }}</div>
+{% endif %}
+
+<div class="card mb">
+  <div class="card-title">What was filled in</div>
+  <dl class="review-list">
+    {% for label, value in details %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% endfor %}
+  </dl>
+</div>
+
+{% if can_decide %}
+<div class="card mb">
+  <div class="card-title">Your decision</div>
+  <form method="post" action="{{ url_for('additions.approve', req_id=r.id) }}" class="mb">
+    <button class="btn btn-primary" type="submit" {{ 'disabled' if problem }}>{{ icon('check', 15) }} Approve — add it to the system</button>
+  </form>
+  <form method="post" action="{{ url_for('additions.reject', req_id=r.id) }}">
+    <div class="form-row">
+      <label class="form-label" for="reason">Or reject it — reason <span class="req">*</span></label>
+      <input type="text" id="reason" name="reason" maxlength="500" required placeholder="e.g. Already listed under another name">
+    </div>
+    <button class="btn btn-ghost" type="submit">Reject</button>
+  </form>
+</div>
+{% endif %}
+
+{% if can_withdraw %}
+<form method="post" action="{{ url_for('additions.withdraw', req_id=r.id) }}">
+  <button class="btn btn-ghost btn-sm" type="submit">Withdraw it</button>
+</form>
+{% endif %}
+</div>
+{% endblock %}

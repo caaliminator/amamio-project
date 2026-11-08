@@ -61,6 +61,27 @@
 </div></div>
 {% endif %}
 
+<div class="section-label">{{ 'New records waiting for your approval' if can_decide else 'New records waiting for the Super Admin' }} ({{ creations|length }})</div>
+{% if creations %}
+<div class="queue mb">
+  {% for r in creations %}
+  <a class="queue-item" href="{{ url_for('additions.detail', req_id=r.id) }}">
+    <span class="code" style="min-width:96px">{{ kinds.get(r.kind, r.kind) }}</span>
+    <span class="queue-main">
+      <span class="queue-title">{{ r.title }}</span>
+      <span class="queue-sub">Added by {{ r.requested_by_name or '—' }} · {{ (r.created_at or '')[:10] }}</span>
+    </span>
+    <span class="queue-go">{{ 'Approve or reject' if can_decide else 'Open' }} {{ icon('arrow-right', 14) }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card mb"><div class="empty" style="padding:24px">
+  <div class="empty-title">Nothing waiting</div>
+  <p class="muted">No new employee, supplier, material or supply is waiting for approval.</p>
+</div></div>
+{% endif %}
+
 {% if others %}
 <div class="section-label">Waiting at the other stage ({{ others|length }})</div>
 <div class="queue">

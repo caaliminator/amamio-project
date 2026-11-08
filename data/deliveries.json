@@ -3,13 +3,13 @@
     "sales_order_id": 1,
     "customer_name": "Metro Grocers",
     "status": "Delivered",
-    "scheduled_date": "2026-10-15",
+    "scheduled_date": "2026-11-07",
     "driver": "Rey (Truck 1)",
     "address": "Butuan City",
-    "delivered_at": "2026-10-16T05:39:37.626206+00:00",
+    "delivered_at": "2026-11-08T13:02:50.841213+00:00",
     "confirmed_by_customer": true,
     "notes": "",
-    "created_by": 5,
+    "created_by": 10,
     "id": 1
   }
 ]

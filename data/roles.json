@@ -26,7 +26,7 @@
   {
     "key": "packing_head",
     "name": "Packing Team Head",
-    "description": "Leads packing and dispatch per channel; uploads platform sales",
+    "description": "Leads packing and dispatch per channel",
     "id": 5
   },
   {
@@ -44,7 +44,19 @@
   {
     "key": "finance_admin",
     "name": "Finance Admin",
-    "description": "Supplier payments and ledgers, payments due, cash and bank accounts",
+    "description": "Supplier payments and ledgers, payments due; views the cash and bank accounts",
     "id": 8
+  },
+  {
+    "key": "customer_service_admin",
+    "name": "Customer Service Admin",
+    "description": "Customers, sales orders (payments and returns) and deliveries",
+    "id": 9
+  },
+  {
+    "key": "sales_marketing_admin",
+    "name": "Sales Marketing Admin",
+    "description": "Marketplace sales uploads and reports; stock release requests",
+    "id": 10
   }
 ]

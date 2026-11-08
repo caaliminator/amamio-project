@@ -4,7 +4,8 @@
 * MATERIALS     — the four month-end reports (raw materials; jars, bottles &
                   packaging; production / cleaning supplies; office supplies)
 * ASSETS        — the Inventory of Assets (AFP-001 …)
-* SUPPLIERS     — the Supplier Directory (office / production / packing)
+
+The Supplier Directory is the client's spreadsheet, in ``seed_suppliers.py``.
 
 Kept apart from ``seed.py`` so the lists are easy to correct.  Prices, stock
 levels and reorder levels are demo figures, not the client's numbers.
@@ -218,66 +219,3 @@ ASSET_CATEGORIES = []
 for _row in ASSETS:
     if _row[2] not in ASSET_CATEGORIES:
         ASSET_CATEGORIES.append(_row[2])
-
-
-# --- Supplier Directory -----------------------------------------------------
-# (name, tin, category, items, buy_from / contact)
-SUPPLIERS = [
-    ("Trimix Butuan", "", "Production", "Switches, timers and electrical parts", ""),
-    ("Allen Mall", "", "Packing", "Jute cord rope 15 mm & 25 mm", "Shopee"),
-    ("Akiro Store", "", "Packing", "Vacuum sealers 25x35 cm", ""),
-    ("2 Dragons", "", "Office", "12.5 in x 164 ft phototop (glossy)", "Shopee"),
-    ("Best Buy Equipment and Supplies", "005-171-447-000", "Production", "", ""),
-    ("Born For You", "", "Packing", "Lip balm tube 5 mL", "Shopee"),
-    ("Carol 201302", "", "Packing", "", ""),
-    ("Cartels Box PH", "", "Packing", "Dark amber gel pump / mist spray 50 mL", ""),
-    ("CBPH Packing Supplies", "", "Packing", "Packing tape / cling wrap / bubble wrap", ""),
-    ("Clabel Store", "", "Packing", "Thermal label 25x15 mm / 1500 pcs", "Shopee"),
-    ("Curated Plants - Daily Deals", "", "Packing", "1 L", ""),
-    ("Darasin", "", "Packing", "Turmeric powder sticker", ""),
-    ("Drakes Packaging Supplies", "", "Packing", "300 mL plastic jar", "Shopee"),
-    ("Davao CVI", "", "Packing", "Bottles 100 / 200 / 240 / 280 / 500 mL", "0919-232-4051"),
-    ("Easyhome 168", "", "Packing",
-     "Brown matte pouch 18x25 cm; ginger pouch 11x18 cm; white matte pouch "
-     "13x21 cm; clear goodie pouch (tableya) 5.5x8.5 cm", "Shopee"),
-    ("Entrepouch", "", "Packing", "White matte pouch 13x21 cm", ""),
-    ("ES Print Industries Inc", "", "Office", "Cutting machine", ""),
-    ("Filpet, Incorporated", "000-117-868-00001", "Packing", "Bottles 300 mL / 1 L", "CDO"),
-    ("Freya Box", "", "Packing", "Corrugated box small / medium / large", "Shopee"),
-    ("Gomakearts", "", "Packing", "36 in kraft paper rolls", "0935-042-6624"),
-    ("Hand and Full", "", "Packing", "Jars / bottles", "Shopee"),
-    ("Inkrite", "", "Office", "Pigment ink", "Shopee"),
-    ("Tintrepreneur Online Shop", "", "Packing", "Uriel plastic seal 85 mL", "Shopee"),
-    ("Joystar Consumer Goods Trading", "", "Production", "", ""),
-    ("JRE Gasul Center", "773-799-363-00000", "Production", "Gasul (LPG)", ""),
-    ("Label House", "", "Packing", "Stickers (Davao)", ""),
-    ("Marbros.Coop", "", "Production", "Face mask / sponge", "Shopee"),
-    ("Megawise Industries", "", "Packing", "1 L / 3.7 L HDPE", "Shopee"),
-    ("Nexpak Packaging PH", "", "Packing", "3.7 L HDPE", "Shopee"),
-    ("Panda's Stationery Shop", "", "Office", "Cutting mat PVC (green) A3 300x450 mm", "Shopee"),
-    ("PKJ Storage & Organizer Shop", "", "Packing", "Lip balm seal", "Shopee"),
-    ("Red Three Online", "", "Packing", "Black matte pouch 15x22 cm", ""),
-    ("Sanitary Care Products Asia", "004-640-600-00020", "Production",
-     "Tissue / dishwashing / all-purpose cleaner", "Shopee"),
-    ("Slow Live House", "", "Packing", "Seal cap liners (CC) 70 mm", "Shopee"),
-    ("Smallshop", "", "Office", "Cutting mat transparent 12x12 in", "Shopee"),
-    ("Sticker Online", "", "Office", "Yassen vinyl (transparent)", ""),
-    ("Sungold Commercial", "010-048-909-001", "Packing", "Jars", "TikTok"),
-    ("SY Homedeco", "", "Production", "Gloves", "Mae Leng 0950-466-6595"),
-    ("Tengjia International Corp", "009-858-156-00000", "Packing", "Jars", "Shopee"),
-    ("Tomm & Thea", "", "Production", "Dishwashing / detergent / all-purpose cleaner", ""),
-    ("The Blue Pantry OPC", "649-351-209-00000", "Production", "", "Shopee"),
-    ("The Home Patrol", "", "Packing", "Cookie jar 440 mL (banana chips)", "Shopee"),
-    ("Waybill Online", "", "Packing", "Tape dispenser", "Shopee"),
-    ("Yopsun", "", "Office",
-     "Quaff 90 gsm A4; waterproof glossy / matte / transparent; A3 Quaff "
-     "glossy photo sticker 135 gsm", ""),
-]
-
-# Raw-material sources used by the demo deliveries (not on the paper
-# directory, which covers office / production / packing suppliers).
-DEMO_RAW_SUPPLIERS = [
-    ("Mindanao Forest Apiary", "Raw", "Raw forest honey by container", "0917-100-2001"),
-    ("Highland Produce Traders", "Raw", "Ginger, turmeric, lemon, calamansi by crate", "0917-100-2002"),
-    ("Agusan Cacao Growers", "Raw", "Fermented cacao beans", "0917-100-2003"),
-]

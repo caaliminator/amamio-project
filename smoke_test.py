@@ -50,10 +50,12 @@ def stock(name, kind="material"):
 
 
 def checklist(**fails):
-    """Inspection checklist form fields: every point Pass, except those
-    given as point=remark, which Fail with that remark."""
-    data = {"visual_description": "Free from molds, insects, decay and rotten"}
-    for key, _, _ in services.INSPECTION_POINTS:
+    """Inspection checklist form fields: every point (of both lanes' lists)
+    Pass, except those given as point=remark, which Fail with that remark."""
+    # Date marking "Pass" needs the expiry date (picked on a calendar).
+    data = {"visual_description": "Free from molds, insects, decay and rotten",
+            "expiry_date": "2099-12-31"}
+    for key, _, _ in services.INSPECTION_POINTS + services.SUPPLY_INSPECTION_POINTS:
         data["chk_" + key] = "Fail" if key in fails else "Pass"
         data["chk_%s_remarks" % key] = fails.get(key, "")
     return data
@@ -70,7 +72,8 @@ def inspect(c, box_id, **fields):
 ACCOUNTS = [("superadmin", "super123"), ("admin", "admin123"),
             ("receiving", "recv123"), ("production", "prod123"),
             ("packing", "pack123"), ("packer1", "member123"),
-            ("assets", "assets123"), ("finance", "finance123")]
+            ("assets", "assets123"), ("finance", "finance123"),
+            ("service", "service123"), ("marketing", "market123")]
 
 # 1) every demo account logs in and gets a home screen with its tasks
 for u, p in ACCOUNTS:
@@ -102,10 +105,10 @@ with application.test_client() as c:
 # 1b) each user picks light, dark or "match my device"; it is remembered
 with application.test_client() as c:
     login(c, "packer1", "member123")
-    check(b'data-theme="dark"' in c.get("/dashboard").data, "dark theme by default")
-    c.post("/settings/theme", data={"theme": "light"})
-    check(b'data-theme="light"' in c.get("/dashboard").data,
-          "light theme is saved and applied")
+    check(b'data-theme="light"' in c.get("/dashboard").data, "light theme by default")
+    c.post("/settings/theme", data={"theme": "dark"})
+    check(b'data-theme="dark"' in c.get("/dashboard").data,
+          "dark theme is saved and applied")
     c.post("/settings/theme", data={"theme": "system"})
     page = c.get("/dashboard").data
     check(b'data-theme-pref="system"' in page and b'data-theme="' not in page,
@@ -114,8 +117,10 @@ with application.test_client() as c:
           "an unknown theme is refused")
 with application.test_client() as c:
     login(c, "packer2", "member123")
-    check(b'data-theme="dark"' in c.get("/dashboard").data,
+    check(b'data-theme="light"' in c.get("/dashboard").data,
           "one user's theme does not change another's")
+with application.test_client() as c:
+    check(b'data-theme="light"' in c.get("/login").data, "the sign-in page is light too")
 
 # 1c) every page has an "About this page" note, and users can hide them
 import page_notes             # noqa: E402
@@ -125,6 +130,7 @@ NOT_PAGES = {"static", "auth.root", "auth.login", "auth.logout",
              "platforms.export_csv", "platforms.import_file",
              "migration.download", "requests.bom_calc", "production.new",
              "requests.new_material", "auth.user_image", "ledger.proof",
+             "ledger.attachment",
              "receiving.delivery_proof", "receiving.box_photo"}
 pages = {r.endpoint for r in application.url_map.iter_rules()
          if "GET" in r.methods and r.endpoint not in NOT_PAGES}
@@ -154,6 +160,49 @@ with application.test_client() as c:
 
 # 3) role guards hold
 GUARDS = [
+    # Packing Team Head: packing only.
+    ("packing", "pack123", "/packing/new", 200),
+    ("packing", "pack123", "/orders/", 403),
+    ("packing", "pack123", "/customers/", 403),
+    ("packing", "pack123", "/deliveries/", 403),
+    ("packing", "pack123", "/platforms/", 403),
+    ("packing", "pack123", "/sales/", 403),
+    ("packing", "pack123", "/products-in-out/", 403),
+    # Customer Service Admin: customers, sales orders, deliveries.
+    ("service", "service123", "/orders/", 200),
+    ("service", "service123", "/orders/new", 200),
+    ("service", "service123", "/customers/", 200),
+    ("service", "service123", "/deliveries/", 200),
+    ("service", "service123", "/inventory/", 200),
+    ("service", "service123", "/platforms/", 403),
+    ("service", "service123", "/sales/", 403),
+    ("service", "service123", "/packing/", 403),
+    ("service", "service123", "/ledger/", 403),
+    ("service", "service123", "/finance/accounts", 403),
+    ("service", "service123", "/requests/", 403),
+    ("service", "service123", "/approvals/", 403),
+    ("service", "service123", "/receiving/", 403),
+    ("service", "service123", "/purchasing/", 403),
+    ("service", "service123", "/reports/", 403),
+    ("service", "service123", "/qr/scan", 403),
+    # Sales Marketing Admin: sales uploads & reports, stock release.
+    ("marketing", "market123", "/platforms/", 200),
+    ("marketing", "market123", "/platforms/upload", 200),
+    ("marketing", "market123", "/sales/", 200),
+    ("marketing", "market123", "/sales/new", 200),
+    ("marketing", "market123", "/orders/", 403),
+    ("marketing", "market123", "/customers/", 403),
+    ("marketing", "market123", "/deliveries/", 403),
+    ("marketing", "market123", "/packing/", 403),
+    ("marketing", "market123", "/ledger/", 403),
+    ("marketing", "market123", "/requests/", 403),
+    ("marketing", "market123", "/approvals/", 403),
+    ("marketing", "market123", "/analytics/", 403),
+    # Finance Admin: finance pages only.
+    ("finance", "finance123", "/inventory/", 403),
+    ("finance", "finance123", "/qr/scan", 403),
+    ("finance", "finance123", "/orders/", 403),
+    ("finance", "finance123", "/platforms/", 403),
     ("packing", "pack123", "/receiving/", 403),
     ("packing", "pack123", "/approvals/", 403),
     ("packer1", "member123", "/platforms/", 403),
@@ -187,6 +236,62 @@ for u, p, route, expected in GUARDS:
         check(c.get(route).status_code == expected,
               "%s -> %s is %d" % (u, route, expected))
 
+# 3a) The purchase request list is split by stage, urgency in its own colour
+with application.test_client() as c:
+    login(c, "superadmin", "super123")
+    page = c.get("/requests/?show=all").data.decode("utf-8")
+    check(page.count('class="prt-card ') >= 1 and 'class="prt-divider ' in page
+          and 'class="pr-stages"' in page and 'class="prt-children"' in page
+          and "urg-chip urg-" in page and "st-chip tone-" in page,
+          "the purchase request table: stage dividers, request cards with their items, coloured status / urgency")
+
+# 3b) Role-based menus: each function admin and the packing team see only
+#     their own job's pages
+MENUS = {
+    ("service", "service123"): (["Sales Orders", "Deliveries", "Customers", "Stock on Hand"],
+                                ["Sales Uploads", "Stock Release", "Packing &amp; Dispatch",
+                                 "Supplier Ledger", "Purchase Requests", "Approvals"]),
+    ("marketing", "market123"): (["Sales Uploads &amp; Reports", "Stock Release", "Stock on Hand"],
+                                 ["Sales Orders", "Customers", "Deliveries", "Packing &amp; Dispatch",
+                                  "Supplier Ledger", "Purchase Requests", "Approvals"]),
+    ("packing", "pack123"): (["Record Packing", "Packing &amp; Dispatch", "Purchase Requests"],
+                             ["Sales Orders", "Customers", "Sales Uploads", "Stock Release",
+                              "Products In / Out"]),
+    ("finance", "finance123"): (["Payments Due", "Supplier Ledger", "Cash &amp; Bank Accounts"],
+                                ["Stock on Hand", "Sales Orders", "Sales Uploads", "Scan a QR"]),
+}
+for (u, pw), (shown, hidden) in MENUS.items():
+    with application.test_client() as c:
+        login(c, u, pw)
+        page = c.get("/dashboard").data.decode("utf-8")
+        nav = page[page.find("<nav"):page.find("</nav>")]
+        check(all(x in nav for x in shown) and not any(x in nav for x in hidden),
+              "%s's menu has only its own pages" % u)
+with application.test_client() as c:
+    login(c, "superadmin", "super123")
+    page = c.get("/users").data.decode("utf-8") if c.get("/users").status_code == 200 \
+        else c.get("/auth/users").data.decode("utf-8")
+    check("Customer Service Admin" in page and "Sales Marketing Admin" in page,
+          "the two new roles can be given to a user")
+svc_user = db.query("users", username="service")[0]
+mkt_user = db.query("users", username="marketing")[0]
+pack_user = db.query("users", username="packing")[0]
+n_svc = len(db.query("notifications", user_id=svc_user["id"]))
+n_pack = len(db.query("notifications", user_id=pack_user["id"]))
+_honey = db.query("products", name="Pure Honey 250 mL")[0]
+services.create_sales_order(db.read("customers")[0]["id"],
+                            [{"product_id": _honey["id"], "qty": 1, "unit_price": 399}],
+                            user_id=svc_user["id"])
+check(len(db.query("notifications", user_id=svc_user["id"])) == n_svc + 1
+      and len(db.query("notifications", user_id=pack_user["id"])) == n_pack,
+      "a new sales order notifies Customer Service, not the Packing Team Head")
+with application.test_client() as c:
+    login(c, "marketing", "market123")
+    c.post("/sales/new", data={"product_id": str(_honey["id"]), "qty": "2", "remarks": "Shopee promo"})
+    mine = [r for r in db.read("sales_requests") if r.get("requestor_id") == mkt_user["id"]]
+    check(mine and mine[-1]["status"] == "Pending Approval",
+          "the Sales Marketing Admin requests a stock release")
+
 # 4) Module 1, part 1 — the receiving head records a delivery
 with application.test_client() as c:
     login(c, "receiving", "recv123")
@@ -216,9 +321,15 @@ with application.test_client() as c:
     unread_after = len([n for n in db.read("notifications") if not n["is_read"]])
     check(unread_after > unread_before,
           "the team is notified a delivery arrived")
+    ginger_batch_no = boxes[0]["lot_no"]
+    ym = services.today_iso()[:7]
+    check(ginger_batch_no.startswith("GINGER-%s-" % ym) and len(ginger_batch_no.split("-")[-1]) == 3
+          and boxes[1]["lot_no"] == ginger_batch_no and boxes[0]["supplier_lot"] == "LOT-A"
+          and boxes[2]["lot_no"].startswith("LEMON-%s-" % ym),
+          "each item gets a batch no. ITEM-YEAR-MONTH-NNN (its boxes share it; the supplier lot is kept)")
     payload = services.qr_payload(boxes[0]["box_code"])
-    check("Ginger" in payload and "10 kg" in payload and "LOT-A" in payload,
-          "QR label carries the item, quantity and lot")
+    check("Ginger" in payload and "10 kg" in payload and ginger_batch_no in payload,
+          "QR label carries the item, quantity and batch no.")
     data = c.get("/qr/lookup?token=" + payload).get_json()
     check(data.get("kind") == "box", "scanning the full label text finds the box")
     check(c.get("/receiving/%d/labels" % batch["id"]).status_code == 200,
@@ -367,7 +478,7 @@ with application.test_client() as c:
           and "Free from molds, insects, decay and rotten" in page,
           "the report prints MM-DD-YY dates, the document header and the visual description")
     lot_a = [row for row in services.receiving_report_rows(today, today)
-             if row["lot_no"] == "LOT-A"]
+             if row["lot_no"] == ginger_batch_no]
     check(len(lot_a) == 1 and lot_a[0]["qty"] == 20 and lot_a[0]["boxes"] == 2,
           "the report has one row per item and lot, its boxes added up")
     check(db.get("receiving_boxes", boxes[2]["id"])["action_taken"] == "Rejected"
@@ -449,6 +560,10 @@ with application.test_client() as c:
           "Receiving can't open Products In / Out")
 with application.test_client() as c:
     login(c, "packing", "pack123")
+    check(c.get("/products-in-out/").status_code == 403,
+          "the Packing Team Head (packing only) can't open Products In / Out")
+with application.test_client() as c:
+    login(c, "production", "prod123")
     check(b"Products In / Out" in c.get("/dashboard").data,
           "Products In / Out shows in the sidebar")
     p_before, prod = stock("Pure Honey 250 mL", "product")
@@ -557,6 +672,16 @@ with application.test_client() as c:
     processing = db.query("raw_materials", name=services.PROCESSING_HONEY)
     check(processing and processing[0]["stock_qty"] >= 10,
           "failed honey is kept as honey for processing")
+    import purchasing_service as _pur  # noqa: E402
+    pid = processing[0]["id"]
+    check(all(r["id"] != pid for _, rows in _pur.item_choices() for r in rows)
+          and all(m["id"] != pid for m in services.purchasable_materials())
+          and any(m["id"] == pid for m in services.stocked_materials()),
+          "honey for processing is stock, but never offered to buy or receive")
+    _, err = _pur.create_purchase_request(
+        db.query("users", username="production")[0], "Production", "test", "",
+        [{"material_id": str(pid), "qty": "1", "unit": "kg"}], requested_by_name="A B")
+    check(bool(err), "a purchase request for honey for processing is refused")
     c.post("/honey/%d/allocate" % bad["id"],
            data={"product": services.HONEY_PASS_PRODUCTS[0], "kg": "5"})
     check(not db.get("honey_containers", bad["id"]).get("allocations"),
@@ -630,21 +755,30 @@ with application.test_client() as c:
           "the Super Admin can record packing for a chosen packer")
 
 # 7c) Purchase Request Form -> approval -> Purchase Order (the client's forms)
-demo = db.query("purchase_requests", pr_no="2026-09-017")
-check(demo and demo[0]["status"] == "Ordered"
-      and demo[0]["checked_by_name"] == "Jefrey S. Pabillore",
-      "the client's PR 2026-09-017 is seeded, approved and ordered")
-demo_po = db.query("purchase_orders", po_no="2026-09-017")
-check(demo_po and abs(demo_po[0]["grand_total"] - 1100) < 0.01
-      and demo_po[0]["supplier_name"] == "Trimix Butuan",
-      "its PO to Trimix Butuan totals P1,100.00")
+check(not db.query("purchase_requests", pr_no="2026-09-017")
+      and not db.query("purchase_orders", po_no="2026-09-017"),
+      "no sample PR / PO is seeded (the Trimix Butuan example is gone)")
+# Computer parts & maintenance: no catalog items linked, so it can be
+# preferred / ordered from for items that aren't on the materials list.
+parts = db.query("suppliers", ref_no="62")[0]
 with application.test_client() as c:
     login(c, "production", "prod123")
     page = c.get("/requests/new").data.decode("utf-8")
     check('name="material_id"' in page and 'data-combo="itemOptions"' in page
           and 'data-combo="supplierOptions"' in page
-          and 'name="requested_by_name"' in page and "Expected date" in page,
+          and 'name="requested_by_name"' in page and "Expected date" in page
+          and 'name="preferred_supplier_id"' in page,
           "PR form has the item and supplier search boxes, expected date and requestor")
+    before = len(db.read("purchase_requests"))
+    c.post("/requests/new", data={
+        "department": "Production", "purpose": "Spare parts for the sealer",
+        "requested_by_name": "Aldren Ocate", "material_id": ["other"],
+        "description": ["Heating element"], "purpose_use": ["Band sealer"],
+        "qty": ["2"], "unit": ["pc"], "est_unit_cost": ["450"],
+        "preferred_supplier": ["Trimix Butuan"], "preferred_supplier_id": [""],
+        "budget_category": [""], "remark": [""]})
+    check(len(db.read("purchase_requests")) == before,
+          "a PR refuses a preferred supplier typed instead of picked from the directory")
     c.post("/requests/new", data={
         "department": "Production", "purpose": "Spare parts for the sealer",
         "needed_by": "", "notes": "Heating element burnt", "urgency": "Urgent",
@@ -653,14 +787,17 @@ with application.test_client() as c:
         "description": ["Heating element", "Teflon tape"],
         "purpose_use": ["Band sealer", "Band sealer"], "qty": ["2", "3"],
         "unit": ["pc", "roll"], "est_unit_cost": ["450", "80"],
-        "preferred_supplier": ["Trimix Butuan", ""],
+        "preferred_supplier": [parts["name"], ""],
+        "preferred_supplier_id": [str(parts["id"]), ""],
         "budget_category": ["Equipment / repair", ""], "remark": ["", ""]})
     pr = db.read("purchase_requests")[-1]
     check(pr.get("purpose") == "Spare parts for the sealer"
           and len(pr["items"]) == 2 and abs(pr["total_estimated"] - 1140) < 0.01
           and pr["pr_no"].startswith(services.today_iso()[:7])
-          and pr["requested_by_name"] == "Aldren Ocate",
-          "PR saved with its number, items, estimated total and requestor")
+          and pr["requested_by_name"] == "Aldren Ocate"
+          and pr["items"][0]["preferred_supplier_id"] == parts["id"]
+          and pr["items"][0]["preferred_supplier"] == parts["name"],
+          "PR saved with its number, items, estimated total, requestor and picked supplier")
     sugar = db.query("raw_materials", name="Sugar") or db.read("raw_materials")[:1]
     c.post("/requests/new", data={
         "department": "Production", "purpose": "Restock", "requested_by_name": "",
@@ -702,11 +839,10 @@ with application.test_client() as c:
     check(pr["status"] == "Approved" and pr["approved_by_name"] == super_name
           and pr["checked_by_name"] == admin_name,
           "the Super Admin's final approval signs Approved by")
-trimix = db.query("suppliers", name="Trimix Butuan")[0]
 with application.test_client() as c:
     login(c, "admin", "admin123")
     page = c.get("/purchasing/new?request_id=%d" % pr["id"]).data.decode("utf-8")
-    check('id="supplierOptions"' in page and "Trimix Butuan" in page
+    check('id="supplierOptions"' in page and parts["name"] in page
           and '<select id="supplier_id"' not in page,
           "PO form opens for the approved PR, with a supplier search box")
     pos_before = len(db.read("purchase_orders"))
@@ -718,7 +854,7 @@ with application.test_client() as c:
     check(len(db.read("purchase_orders")) == pos_before,
           "a PO needs a supplier from the Supplier Directory")
     c.post("/purchasing/new?request_id=%d" % pr["id"], data={
-        "request_id": pr["id"], "supplier_id": str(trimix["id"]),
+        "request_id": pr["id"], "supplier_id": str(parts["id"]),
         "po_date": services.today_iso(), "payment_terms": "Advance payment",
         "advance_amount": "", "pr_item_id": ["1"], "include": ["1"],
         "description": ["Heating element"], "qty": ["2"], "unit": ["pc"],
@@ -726,7 +862,7 @@ with application.test_client() as c:
     check(len(db.read("purchase_orders")) == pos_before,
           "advance payment terms need the amount paid up front")
     c.post("/purchasing/new?request_id=%d" % pr["id"], data={
-        "request_id": pr["id"], "supplier_id": str(trimix["id"]),
+        "request_id": pr["id"], "supplier_id": str(parts["id"]),
         "supplier_address": "Butuan", "po_date": services.today_iso(),
         "payment_terms": "Advance payment", "advance_amount": "500",
         "deliver_to": "Amamio Farm Products",
@@ -740,7 +876,7 @@ with application.test_client() as c:
     pr = db.get("purchase_requests", pr["id"])
     check(po["po_no"] == pr["pr_no"] and len(po["items"]) == 1
           and abs(po["grand_total"] - 1070) < 0.01 and po["labor"] == 150
-          and po["supplier_id"] == trimix["id"] and po["advance_amount"] == 500,
+          and po["supplier_id"] == parts["id"] and po["advance_amount"] == 500,
           "PO prepared from the approved lines, with labor cost and advance payment")
     check(po["prepared_by_name"] == admin_name and not po["checked_by_name"],
           "Prepared by is the person signed in; Checked by waits for the check")
@@ -748,7 +884,7 @@ with application.test_client() as c:
           and not pr["items"][1].get("po_id"),
           "the PR shows which line is on the PO and which still needs one")
     import purchasing_service as pur_svc  # noqa: E402
-    check(not any(e["ref"] == po["po_no"] for e in pur_svc.ledger_entries(trimix["id"])),
+    check(not any(e["ref"] == po["po_no"] for e in pur_svc.ledger_entries(parts["id"])),
           "a PO is not on the ledger before it is approved")
     c.post("/purchasing/%d/approve" % po["id"])
     po = db.get("purchase_orders", po["id"])
@@ -771,37 +907,37 @@ with application.test_client() as c:
     check("Purchase Order" in page and super_name in page and "Labor cost" in page,
           "PO prints as the Purchase Order form")
     # Supplier ledger: the issued PO is a credit; payments are debits.
-    before = pur_svc.ledger_entries(trimix["id"])
+    before = pur_svc.ledger_entries(parts["id"])
     check(any(e["ref"] == po["po_no"] and abs(e["credit"] - 1070) < 0.01 for e in before),
           "the issued PO is posted to the supplier's ledger")
-    page = c.get("/ledger/%d?po=%d" % (trimix["id"], po["id"])).data.decode("utf-8")
+    page = c.get("/ledger/%d?po=%d" % (parts["id"], po["id"])).data.decode("utf-8")
     check(po["po_no"] in page and 'value="500.00"' in page,
           "the ledger offers the advance payment that is due")
-    c.post("/ledger/%d/pay" % trimix["id"], data={
+    c.post("/ledger/%d/pay" % parts["id"], data={
         "po_id": str(po["id"]), "amount": "5000", "kind": "Full payment",
         "method": "Cash"})
     check(pur_svc.po_paid(po["id"]) == 0, "a payment can't be more than the PO's balance")
-    c.post("/ledger/%d/pay" % trimix["id"], data={
+    c.post("/ledger/%d/pay" % parts["id"], data={
         "po_id": str(po["id"]), "amount": "500", "kind": "Advance payment",
         "method": "GCash", "reference": "GC-1001"})
-    c.post("/ledger/%d/pay" % trimix["id"], data={
+    c.post("/ledger/%d/pay" % parts["id"], data={
         "po_id": str(po["id"]), "amount": "200", "kind": "Partial payment",
         "method": "Cash"})
     summary = pur_svc.po_payment_summary(db.get("purchase_orders", po["id"]))
-    entries = pur_svc.ledger_entries(trimix["id"])
+    entries = pur_svc.ledger_entries(parts["id"])
     check(summary["paid"] == 700 and abs(summary["balance"] - 370) < 0.01
           and abs(entries[-1]["balance"] - (before[-1]["balance"] - 700)) < 0.01,
           "advance and partial payments lower the PO's and the supplier's balance")
-    row = [r for r in pur_svc.ledger_summary() if r["id"] == trimix["id"]][0]
+    row = [r for r in pur_svc.ledger_summary() if r["id"] == parts["id"]][0]
     check(abs(row["balance"] - entries[-1]["balance"]) < 0.01,
           "the ledger list shows the same balance as the supplier's ledger")
-    for route in ("/ledger/", "/ledger/?show=all", "/ledger/%d" % trimix["id"],
+    for route in ("/ledger/", "/ledger/?show=all", "/ledger/%d" % parts["id"],
                   "/ledger/print", "/ledger/print?show=all"):
         check(c.get(route).status_code == 200, "%s renders" % route)
-    page = c.get("/ledger/%d/print" % trimix["id"]).data.decode("utf-8")
+    page = c.get("/ledger/%d/print" % parts["id"]).data.decode("utf-8")
     check("Supplier Ledger" in page and po["po_no"] in page and "GC-1001" in page,
           "the supplier's ledger prints with its POs and payments")
-    page = c.get("/ledger/%d/print?from=2999-01-01" % trimix["id"]).data.decode("utf-8")
+    page = c.get("/ledger/%d/print?from=2999-01-01" % parts["id"]).data.decode("utf-8")
     check("Balance brought forward" in page and "GC-1001" not in page,
           "a printed ledger from a date brings the earlier balance forward")
 
@@ -817,47 +953,79 @@ with application.test_client() as c:
     page = c.get("/purchasing/%d" % po["id"]).data.decode("utf-8")
     check(po["po_no"] in page and "Cancel PO" not in page,
           "Finance sees a PO read-only")
-    c.post("/finance/accounts", data={"name": "Cash on hand", "kind": "Cash on hand",
-                                      "opening_balance": "10000"})
-    c.post("/finance/accounts", data={"name": "BDO Savings", "kind": "Bank",
-                                      "bank": "BDO", "account_no": "0012-3456",
-                                      "opening_balance": "50000"})
-    c.post("/finance/accounts", data={"name": "cash on hand", "kind": "Cash on hand"})
+    # Only the Super Admin transacts on the cash & bank accounts.
+    r = c.post("/finance/accounts", data={"name": "Cash on hand", "kind": "Cash on hand",
+                                          "opening_balance": "10000"})
+    check(r.status_code == 403 and not db.read("money_accounts"),
+          "Finance Admin can't add a cash / bank account")
+    page = c.get("/finance/accounts").data.decode("utf-8")
+    check("View only" in page and "Add an account" not in page,
+          "Finance Admin sees the accounts page view only")
+with application.test_client() as su:
+    login(su, "superadmin", "super123")
+    su.post("/finance/accounts", data={"name": "Cash on hand", "kind": "Cash on hand",
+                                       "opening_balance": "10000"})
+    su.post("/finance/accounts", data={"name": "BDO Savings", "kind": "Bank",
+                                       "bank": "BDO", "account_no": "0012-3456",
+                                       "opening_balance": "50000"})
+    su.post("/finance/accounts", data={"name": "cash on hand", "kind": "Cash on hand"})
     accs = {a["name"]: a for a in db.read("money_accounts")}
     check(set(accs) == {"Cash on hand", "BDO Savings"},
-          "Finance adds its own accounts; a duplicate name is refused")
+          "the Super Admin adds the accounts; a duplicate name is refused")
     cash, bdo = accs["Cash on hand"], accs["BDO Savings"]
-    c.post("/finance/accounts/%d/entry" % cash["id"], data={
+    su.post("/finance/accounts/%d/entry" % cash["id"], data={
         "direction": "in", "kind": "Deposit / cash in", "amount": "500"})
-    c.post("/finance/accounts/%d/entry" % bdo["id"], data={
+    su.post("/finance/accounts/%d/entry" % bdo["id"], data={
         "direction": "Transfer", "to_account_id": str(cash["id"]), "amount": "2000"})
     check(abs(fin_svc.account_balance(db.get("money_accounts", cash["id"])) - 12500) < 0.01
           and abs(fin_svc.account_balance(db.get("money_accounts", bdo["id"])) - 48000) < 0.01,
-          "money in and a transfer move the account balances")
+          "the Super Admin's money in and transfer move the account balances")
+    page = su.get("/finance/accounts/%d" % bdo["id"]).data.decode("utf-8")
+    check('id="entryForm"' in page and "Close this account" in page,
+          "the Super Admin gets the money in / out form")
+for who, pw in (("finance", "finance123"), ("admin", "admin123")):
+    with application.test_client() as other:
+        login(other, who, pw)
+        tries = [other.post("/finance/accounts/%d/entry" % cash["id"], data={
+                     "direction": "out", "kind": "Withdrawal / cash out", "amount": "100"}),
+                 other.post("/finance/accounts/%d/edit" % cash["id"], data={
+                     "name": "Petty cash", "kind": "Cash on hand"}),
+                 other.post("/finance/accounts/%d/active" % cash["id"])]
+        page = other.get("/finance/accounts/%d" % cash["id"]).data.decode("utf-8")
+        acc_now = db.get("money_accounts", cash["id"])
+        check(all(t.status_code == 403 for t in tries) and acc_now["name"] == "Cash on hand"
+              and acc_now["active"]
+              and abs(fin_svc.account_balance(acc_now) - 12500) < 0.01
+              and 'id="entryForm"' not in page and "View only" in page,
+              "%s can't record money in / out, edit or close an account (view only)" % who)
+with application.test_client() as c:
+    login(c, "finance", "finance123")
     paid_before = pur_svc.po_paid(po["id"])
-    c.post("/ledger/%d/pay" % trimix["id"], data={
+    c.post("/ledger/%d/pay" % parts["id"], data={
         "po_id": str(po["id"]), "amount": "100", "kind": "Partial payment", "method": "Cash"})
     check(pur_svc.po_paid(po["id"]) == paid_before,
           "once accounts exist, a payment must say which account it came from")
-    page = c.get("/ledger/%d?po=%d" % (trimix["id"], po["id"])).data.decode("utf-8")
+    page = c.get("/ledger/%d?po=%d" % (parts["id"], po["id"])).data.decode("utf-8")
     check('name="account_id"' in page and "BDO Savings" in page,
           "the payment form offers the accounts")
-    c.post("/ledger/%d/pay" % trimix["id"], data={
+    c.post("/ledger/%d/pay" % parts["id"], data={
         "po_id": str(po["id"]), "amount": "100", "kind": "Partial payment",
         "method": "Bank transfer", "account_id": str(bdo["id"])})
     check(abs(pur_svc.po_paid(po["id"]) - paid_before - 100) < 0.01
           and abs(fin_svc.account_balance(db.get("money_accounts", bdo["id"])) - 47900) < 0.01,
           "a supplier payment comes out of the account it was paid from")
     page = c.get("/finance/accounts/%d" % bdo["id"]).data.decode("utf-8")
-    check("Paid Trimix Butuan" in page and "Transfer to Cash on hand" in page,
+    check("Paid " + parts["name"] in page and "Transfer to Cash on hand" in page,
           "the account statement shows the supplier payment and the transfer")
     check(c.get("/finance/accounts/%d/print" % bdo["id"]).status_code == 200,
           "the account statement prints")
-    c.post("/finance/accounts/%d/active" % cash["id"])
-    check(not db.get("money_accounts", cash["id"])["active"]
-          and all(a["id"] != cash["id"] for a in fin_svc.active_accounts()),
-          "a closed account can't be paid from")
-    c.post("/finance/accounts/%d/active" % cash["id"])
+    with application.test_client() as su:
+        login(su, "superadmin", "super123")
+        su.post("/finance/accounts/%d/active" % cash["id"])
+        check(not db.get("money_accounts", cash["id"])["active"]
+              and all(a["id"] != cash["id"] for a in fin_svc.active_accounts()),
+              "a closed account can't be paid from")
+        su.post("/finance/accounts/%d/active" % cash["id"])
     r = c.get("/dashboard")
     check(b"Payments due" in r.data, "Finance's home shows Payments due")
     c.get("/logout")
@@ -868,6 +1036,414 @@ with application.test_client() as c:
     for route in ("/purchasing/", "/requests/", "/requests/%d" % pr["id"],
                   "/approvals/", "/purchasing/%d" % po["id"]):
         check(c.get(route).status_code == 200, "%s renders" % route)
+
+# 7d) Supplier Directory = the client's spreadsheet; item links; import;
+# PR / PO supplier filtering; PO supplier details locked from the directory
+import html as _html  # noqa: E402
+import json as _json  # noqa: E402
+import re as _re      # noqa: E402
+
+import supplier_service as sup_svc  # noqa: E402
+import xlsx as _xlsx                # noqa: E402
+
+# (an earlier check added "Not Yet Approved Farm" by hand; it has no No.)
+directory = [s for s in db.read("suppliers") if s.get("ref_no")]
+by_no = {s["ref_no"]: s for s in directory}
+check(len(directory) == 66 and len(by_no) == 66
+      and len(db.read("suppliers")) == 67,
+      "the directory is the spreadsheet's 66 suppliers (no demo suppliers)")
+check(not [s for s in directory if "trimix" in (s.get("name") or "").lower()]
+      and not db.query("suppliers", name="Highland Produce Traders"),
+      "no demo supplier and no Trimix Butuan in the seeded directory")
+metro = [s for s in directory if s["name"] == "Metro Ace Packaging Corporation"]
+check(len(metro) == 2 and len({s["address"] for s in metro}) == 2,
+      "both Metro Ace branches are kept, each with its own address")
+check("clear goddie pouch" in by_no["36"]["materials_supplied"]
+      and "white matte pouch 13x21cm" in by_no["36"]["materials_supplied"],
+      "EASYHOME 168's extra item rows are merged into its items")
+check(by_no["46"]["address"] == "" and by_no["4"]["tin"] == ""
+      and by_no["26"]["materials_supplied"] == "",
+      "'-' in the spreadsheet is stored as blank")
+check(sup_svc.phone_list(by_no["3"]["phone"]) == ["0933-811-2550", "0966-866-1764", "0970-967-6621"],
+      "several mobile numbers in one cell are split")
+check(by_no["15"]["contact_person"] == "" and "3.7L bot." in by_no["15"]["materials_supplied"],
+      "item text typed as Contact Person moved to the items")
+check(by_no["7"]["supplier_type"] == "Farmer" and by_no["2"]["supplier_type"] == "Cooperative"
+      and by_no["51"]["supplier_type"] == sup_svc.ONLINE and "direct" in by_no["51"]["notes"].lower(),
+      "the spreadsheet's Reference is the supplier type")
+honey = db.query("raw_materials", name="Raw Honey")[0]
+check(by_no["1"]["id"] in sup_svc.links_by_material().get(honey["id"], set())
+      and honey["supplier_id"] == by_no["1"]["id"],
+      "Raw Honey is linked to VIGILIO ESCLITO, its usual supplier")
+check(all(m.get("supplier_id") is None
+          or m["supplier_id"] in sup_svc.links_by_material().get(m["id"], set())
+          for m in db.read("raw_materials")),
+      "every item's usual supplier is one of its linked suppliers")
+
+
+def _sheet_rows(suppliers, extra=()):
+    """The directory written back out in the spreadsheet's layout, with its
+    quirks: a title row, EASYHOME's items as extra rows, '-' for blanks."""
+    rows = [["SUPPLIER'S DIRECTORY"],
+            ["No.", "Name", "Address", "Mobile#", "Contact Person",
+             "SUPPLIER CATEGORY", "email add", "TIN", "Reference"]]
+    for sp in sorted(suppliers, key=lambda x: int(x.get("ref_no") or 999)):
+        items = (sp.get("materials_supplied") or "").split("; ")
+        if sp.get("ref_no") != "36":
+            items = ["; ".join(items)]
+        rows.append([sp.get("ref_no") or "", sp["name"], sp.get("address") or "-",
+                     sp.get("phone") or "", sp.get("contact_person") or "",
+                     items[0], sp.get("email") or "", sp.get("tin") or "-",
+                     sp.get("supplier_type") or ""])
+        rows.extend([["", "", "", "", "", more, "", "", ""] for more in items[1:]])
+    rows.extend(extra)
+    return rows
+
+
+def _super_approves(kind, title):
+    """The Super Admin approves the newest waiting record of this kind and
+    title; returns the request (None if there was none)."""
+    waiting = [r for r in db.read("creation_requests")
+               if r["kind"] == kind and r["title"] == title and r["status"] == "Pending"]
+    if not waiting:
+        return None
+    with application.test_client() as sc:
+        login(sc, "superadmin", "super123")
+        sc.post("/additions/%d/approve" % waiting[-1]["id"])
+    return db.get("creation_requests", waiting[-1]["id"])
+
+
+def _upload_sheet(c, rows):
+    data = _xlsx.write_xlsx([("Suppliers Directory", rows)])
+    return c.post("/suppliers/import", data={"workbook": (io.BytesIO(data), "suppliers.xlsx")},
+                  content_type="multipart/form-data")
+
+
+def _confirm(c, page, **extra):
+    payload = _html.unescape(_re.search(r'name="payload" value="([^"]*)"', page).group(1))
+    form = {"payload": payload}
+    for i, default in _re.findall(r'name="match_(\d+)" class="js-match" data-default="([^"]+)"', page):
+        form["match_%s" % i] = default
+    form.update(extra)
+    return c.post("/suppliers/import/confirm", data=form), _json.loads(payload)
+
+
+with application.test_client() as c:
+    login(c, "receiving", "recv123")
+    check(c.get("/suppliers/import").status_code == 403,
+          "only an Admin imports the spreadsheet")
+with application.test_client() as c:
+    login(c, "admin", "admin123")
+    check(b"Import from Excel" in c.get("/suppliers/").data,
+          "the directory offers Import from Excel to the Admin")
+    before = _json.dumps(db.read("suppliers"), sort_keys=True)
+    r = _upload_sheet(c, _sheet_rows(db.read("suppliers")))
+    page = r.data.decode("utf-8")
+    check(r.status_code == 200 and "<b>0</b> new" in page and "<b>0</b> with changes" in page
+          and "<b>67</b> already the same" in page,
+          "re-importing the directory's own spreadsheet finds nothing new or changed")
+    _confirm(c, page)
+    check(_json.dumps(db.read("suppliers"), sort_keys=True) == before,
+          "confirming that import changes nothing")
+    lemon_tin = by_no["3"]["tin"]
+    count_before = len(db.read("suppliers"))
+    extra = [["67", "Agusan Honey Farm", "Cabadbaran City", "09171234567", "Rosa Ty",
+              "Honey", "", "-", "farmer"],
+             ["", "", "", "", "", "honeycomb", "", "", ""],
+             ["4", "Dexter Reblinca", "Buenavista , Agusan del Norte", "0910-1595-699",
+              "Dexter Reblinca", "Calamansi", "", "111-222-333-00000",
+              "Direct Supplier/Consolidator"]]
+    rows = [r for r in _sheet_rows(db.read("suppliers")) if r[0] != "4"] + extra
+    page = _upload_sheet(c, rows).data.decode("utf-8")
+    check("<b>1</b> new" in page and "Fills in <b>TIN</b>" in page and "Agusan Honey Farm" in page,
+          "the preview shows the new supplier and what a match fills in")
+    new_i = _re.search(r'name="match_(\d+)" class="js-match" data-default="new"', page).group(1)
+    _confirm(c, page, **{"category_%s" % new_i: "Raw",
+                         "items_%s" % new_i: [str(honey["id"])]})
+    check(not db.query("suppliers", name="Agusan Honey Farm")
+          and [r for r in db.read("creation_requests")
+               if r["kind"] == "supplier" and r["title"].startswith("Agusan Honey Farm")
+               and r["status"] == "Pending"],
+          "a new supplier from the import waits for the Super Admin, not in the directory yet")
+    _super_approves("supplier", "Agusan Honey Farm (Cabadbaran City)")
+    farm = db.query("suppliers", name="Agusan Honey Farm")
+    check(farm and not farm[0]["approved"] and farm[0]["supplier_type"] == "Farmer"
+          and farm[0]["materials_supplied"] == "Honey; honeycomb"
+          and farm[0]["phone"] == "0917-123-4567",
+          "once approved it joins the directory off the Approved Supplier List, cleaned up the same way")
+    check(farm and farm[0]["id"] in sup_svc.links_by_material().get(honey["id"], set()),
+          "the item link ticked on the preview is saved")
+    check(db.get("suppliers", by_no["4"]["id"])["tin"] == "111-222-333-00000"
+          and len(db.read("suppliers")) == count_before + 1,
+          "a matched row fills in a blank field and is not added twice")
+    rows = [r for r in _sheet_rows(db.read("suppliers")) if r[0] != "3"]
+    rows.append(["3", by_no["3"]["name"], by_no["3"]["address"], by_no["3"]["phone"],
+                 by_no["3"]["contact_person"], "Lemon", "", "999-999-999-00000",
+                 "Direct Supplier/Consolidator"])
+    page = _upload_sheet(c, rows).data.decode("utf-8")
+    i3 = _re.search(r'name="match_(\d+)" class="js-match" data-default="%d"' % by_no["3"]["id"], page).group(1)
+    check("<b>TIN</b> differs" in page, "a field that differs is shown as a conflict")
+    _confirm(c, page)
+    check(db.get("suppliers", by_no["3"]["id"])["tin"] == lemon_tin,
+          "a conflict keeps the directory's value unless the file's is chosen")
+    _confirm(c, page, **{"use_%s_tin" % i3: "file"})
+    check(db.get("suppliers", by_no["3"]["id"])["tin"] == "999-999-999-00000",
+          "choosing the file's value updates the directory")
+    db.update("suppliers", by_no["3"]["id"], {"tin": lemon_tin})
+    # The supplier form: a second branch of the same name is allowed.
+    before_reqs = len(db.read("creation_requests"))
+    c.post("/suppliers/new", data={"name": "Metro Ace Packaging Corporation",
+                                   "category": "Packing", "address": "Davao City"})
+    check(len(db.read("creation_requests")) == before_reqs,
+          "a supplier already in the directory (same name and address) is refused")
+    c.post("/suppliers/new", data={"name": "Metro Ace Packaging Corporation",
+                                   "category": "Packing", "address": "Butuan City",
+                                   "supplier_type": "Retailer",
+                                   "phone": "0917 111 2222\n0918-333-4444",
+                                   "material_ids": [str(honey["id"])]})
+    check(len(db.query("suppliers", name="Metro Ace Packaging Corporation")) == 2,
+          "the Admin's new supplier is not in the directory before it is approved")
+    _super_approves("supplier", "Metro Ace Packaging Corporation (Butuan City)")
+    metro = db.query("suppliers", name="Metro Ace Packaging Corporation")
+    check(len(metro) == 3, "the same name is refused at the same address, allowed for a new branch")
+    branch = [m for m in metro if m["address"] == "Butuan City"][0]
+    check(branch["phone"] == "0917-111-2222 / 0918-333-4444" and branch["supplier_type"] == "Retailer"
+          and branch["id"] in sup_svc.links_by_material().get(honey["id"], set()),
+          "the supplier form saves the type, several numbers and the catalog items")
+    page = c.get("/suppliers/%d" % branch["id"]).data.decode("utf-8")
+    check("Retailer" in page and "Raw Honey" in page and "0918-333-4444" in page,
+          "the supplier page shows its type, catalog items and numbers")
+    c.post("/suppliers/%d/edit" % branch["id"], data={
+        "name": branch["name"], "category": "Packing", "address": "Butuan City",
+        "supplier_type": "Retailer"})
+    check(branch["id"] not in sup_svc.links_by_material().get(honey["id"], set()),
+          "unticking an item on the supplier form removes the link")
+    page = c.get("/suppliers/?type=Farmer").data.decode("utf-8")
+    check("INDAY" in page and "Tengjia" not in page, "the list filters by supplier type")
+    page = c.get("/suppliers/print").data.decode("utf-8")
+    check("Farmer" in page and "Cooperative" in page, "the printed directory shows the supplier type")
+
+# PR: pick-only, approved suppliers, and only the item's suppliers
+blocked = db.insert("suppliers", {"name": "Not On The List Shop", "category": "Raw",
+                                  "approved": False, "created_at": services.now_iso()})
+sup_svc.set_supplier_items(blocked["id"], [honey["id"]])
+tengjia = by_no["13"]
+vigilio = by_no["1"]
+
+
+def _honey_pr(c, supplier_id, typed=""):
+    before = len(db.read("purchase_requests"))
+    c.post("/requests/new", data={
+        "department": "Production", "purpose": "Honey for the next run",
+        "requested_by_name": "Aldren Ocate", "material_id": [str(honey["id"])],
+        "description": ["Raw Honey"], "purpose_use": [""], "qty": ["20"],
+        "unit": ["kg"], "est_unit_cost": ["400"], "preferred_supplier": [typed],
+        "preferred_supplier_id": [str(supplier_id) if supplier_id else ""],
+        "budget_category": ["Raw materials"], "remark": [""]})
+    return len(db.read("purchase_requests")) > before
+
+
+with application.test_client() as c:
+    login(c, "production", "prod123")
+    page = c.get("/requests/new").data.decode("utf-8")
+    opts = _json.loads(_html.unescape(_re.search(
+        r'<script type="application/json" id="supplierOptions">(.*?)</script>', page, _re.S).group(1)))
+    vig = [o for o in opts if o["v"] == vigilio["id"]]
+    check(vig and honey["id"] in vig[0]["d"]["items"]
+          and not [o for o in opts if o["v"] == blocked["id"]],
+          "the PR's supplier list has approved suppliers only, each with the items it supplies")
+    check(not _honey_pr(c, blocked["id"], "Not On The List Shop"),
+          "a PR refuses a supplier that isn't approved")
+    check(not _honey_pr(c, tengjia["id"], tengjia["name"]),
+          "a PR refuses a supplier that doesn't supply the picked item")
+    check(_honey_pr(c, vigilio["id"], vigilio["name"]),
+          "a PR accepts a supplier of the picked item")
+    honey_pr = db.read("purchase_requests")[-1]
+for _u, _p in (("admin", "admin123"), ("superadmin", "super123")):
+    with application.test_client() as c:
+        login(c, _u, _p)
+        c.post("/approvals/%d" % honey_pr["id"], data={"action": "approve"})
+
+# PO: filtered by the ticked items, and the directory's details are locked
+db.update("suppliers", vigilio["id"], {"tin": ""})
+vigilio = db.get("suppliers", vigilio["id"])
+with application.test_client() as c:
+    login(c, "admin", "admin123")
+    page = c.get("/purchasing/new?request_id=%d" % honey_pr["id"]).data.decode("utf-8")
+    check(vigilio["name"] in page and 'data-material="%d"' % honey["id"] in page
+          and "Supplier type" in page and "Quotation / invoice no." in page,
+          "the PO form suggests the PR's supplier and knows each line's item")
+    check('id="supplier_address" name="supplier_address"' in page
+          and _re.search(r'id="supplier_address"[^>]*readonly', page)
+          and not _re.search(r'id="supplier_tin"[^>]*readonly', page),
+          "a detail the directory has is locked; a blank one stays open")
+
+    def _po(supplier_id, **fields):
+        data = {"request_id": honey_pr["id"], "supplier_id": str(supplier_id),
+                "po_date": services.today_iso(), "payment_terms": "Cash on delivery",
+                "pr_item_id": ["1"], "include": ["1"], "qty": ["20"], "unit": ["kg"],
+                "unit_price": ["400"]}
+        data.update(fields)
+        before = len(db.read("purchase_orders"))
+        c.post("/purchasing/new?request_id=%d" % honey_pr["id"], data=data)
+        return db.read("purchase_orders")[-1] if len(db.read("purchase_orders")) > before else None
+
+    check(_po(tengjia["id"]) is None,
+          "the server refuses a PO supplier that supplies none of the items")
+    honey_po = _po(vigilio["id"], supplier_address="Fake Street 1",
+                   supplier_contact="0000", supplier_contact_person="Somebody Else",
+                   supplier_type="Retailer", supplier_tin="123-456-789-00000",
+                   supplier_reference="Q-2026-77", save_to_directory="1")
+    check(honey_po and honey_po["supplier_address"] == vigilio["address"]
+          and honey_po["supplier_contact_person"] == vigilio["contact_person"]
+          and honey_po["supplier_type"] == vigilio["supplier_type"]
+          and vigilio["phone"] in honey_po["supplier_contact"],
+          "the server takes locked supplier details from the directory, not the form")
+    check(honey_po and honey_po["supplier_tin"] == "123-456-789-00000"
+          and honey_po["supplier_reference"] == "Q-2026-77"
+          and db.get("suppliers", vigilio["id"])["tin"] == "123-456-789-00000"
+          and db.get("suppliers", vigilio["id"])["address"] == vigilio["address"],
+          "a detail typed in a blank field is kept, and saved to the directory when asked")
+    page = c.get("/purchasing/%d/print" % honey_po["id"]).data.decode("utf-8")
+    check("Supplier type" in page and vigilio["supplier_type"] in page
+          and "Quotation / invoice no." in page and "Q-2026-77" in page,
+          "the printed PO shows the supplier type and the quotation / invoice no.")
+    c.post("/purchasing/%d/cancel" % honey_po["id"])
+    db.update("suppliers", vigilio["id"], {"tin": ""})
+    page = c.get("/purchasing/new?request_id=%d" % honey_pr["id"]).data.decode("utf-8")
+    check(_re.search(r'id="supplier_contact_person"[^>]*readonly', page)
+          and 'value="123-456-789-00000"' in page,
+          "a PO restarted from a cancelled one is locked too, keeping what was typed in blank fields")
+    check('name="other_fees"' in page and 'name="other_fees_note"' in page
+          and 'value="NON VAT"' in page and 'id="vat_amount"' in page,
+          "the PO totals step has other / misc. fees and VAT / NON VAT with the VAT amount")
+    vat_po = _po(vigilio["id"], vat_type="VAT", vat_rate="12", discount="100",
+                 other_fees="50", other_fees_note="Handling fee")
+    check(vat_po and vat_po["vat_type"] == "VAT" and abs(vat_po["tax"] - 948) < 0.01
+          and vat_po["other_fees"] == 50 and vat_po["other_fees_note"] == "Handling fee"
+          and abs(vat_po["grand_total"] - (8000 - 100 + 50 + 948)) < 0.01,
+          "VAT is worked out on the items after the discount; other fees add to the total")
+    page = c.get("/purchasing/%d/print" % vat_po["id"]).data.decode("utf-8")
+    check("Other / misc. fees (Handling fee)" in page and "VAT (12%)" in page,
+          "the printed PO shows the other fees and the VAT")
+    c.post("/purchasing/%d/cancel" % vat_po["id"])
+    zero_po = _po(vigilio["id"], vat_type="VAT", vat_rate="0")
+    check(zero_po and zero_po["vat_type"] == "NON VAT" and zero_po["tax"] == 0
+          and zero_po["grand_total"] == 8000,
+          "a VAT rate of 0 is recorded as NON VAT")
+    page = c.get("/purchasing/%d/print" % zero_po["id"]).data.decode("utf-8")
+    check("NON VAT" in page, "the printed PO says NON VAT")
+    c.post("/purchasing/%d/cancel" % zero_po["id"])
+    non_po = _po(vigilio["id"], vat_type="NON VAT", vat_rate="12")
+    check(non_po and non_po["vat_type"] == "NON VAT" and non_po["tax"] == 0,
+          "choosing NON VAT ignores a rate left in the box")
+    c.post("/purchasing/%d/cancel" % non_po["id"])
+
+# 7e) New records: only the Admin adds an employee, supplier, material or
+# supply; the Super Admin approves; only then is it part of the system.
+for _u, _p in (("receiving", "recv123"), ("production", "prod123"), ("superadmin", "super123")):
+    with application.test_client() as c:
+        login(c, _u, _p)
+        check(c.get("/suppliers/new").status_code == 403
+              and c.get("/additions/new/employee").status_code in (403,)
+              and c.get("/additions/new/material").status_code == 403,
+              "%s can't add new records (only the Admin can)" % _u)
+with application.test_client() as c:
+    login(c, "production", "prod123")
+    before = len(db.read("raw_materials"))
+    c.post("/catalog/materials", data={"name": "Sneaky Item", "category": "raw",
+                                       "unit": "kg"})
+    check(len(db.read("raw_materials")) == before
+          and not [r for r in db.read("creation_requests") if r["title"] == "Sneaky Item"],
+          "the catalog page no longer lets a team head add a material")
+with application.test_client() as c:
+    login(c, "admin", "admin123")
+    page = c.get("/additions/").data.decode("utf-8")
+    check("Add new employee" in page and "Add supplier" in page and "Add new material" in page
+          and "Add new supply" in page, "the Admin's New Records page offers all four")
+    for route in ("/additions/new/employee", "/additions/new/material", "/additions/new/supply"):
+        check(c.get(route).status_code == 200, "%s renders" % route)
+    c.post("/additions/new/employee", data={
+        "first_name": "Rosalie", "middle_name": "Cruz", "last_name": "Batobalonos",
+        "position": "Packing Staff", "department": "Packing", "employee_no": "AFP-E-099"})
+    emp_req = db.read("creation_requests")[-1]
+    check(emp_req["kind"] == "employee" and emp_req["status"] == "Pending"
+          and not db.query("employees", name="Rosalie Cruz Batobalonos"),
+          "a new employee waits for approval and is not on the list yet")
+    _page = c.get("/requests/new").data.decode("utf-8")
+    _emps = _re.search(r'id="employeeOptions">(.*?)</script>', _page, _re.S).group(1)
+    check("Batobalonos" not in _emps,
+          "a waiting employee is not offered on purchase requests")
+    c.post("/additions/%d/approve" % emp_req["id"])
+    check(db.get("creation_requests", emp_req["id"])["status"] == "Pending",
+          "the Admin can't approve their own new record")
+    c.post("/additions/new/material", data={
+        "name": "Moringa Seeds", "category": "raw", "subcategory": "Raw materials",
+        "unit": "kg", "track_mode": "weight", "reorder_level": "2", "unit_cost": "300"})
+    mat_req = db.read("creation_requests")[-1]
+    tengjia_id = db.query("suppliers", ref_no="13")[0]["id"]
+    c.post("/additions/new/supply", data={
+        "name": "Square Bottle 500 mL", "category": "packaging", "subcategory": "Jars / Bottles",
+        "unit": "pc", "track_mode": "piece", "reorder_level": "100", "unit_cost": "14",
+        "supplier_id": str(tengjia_id)})
+    sup_req = db.read("creation_requests")[-1]
+    before = len(db.read("creation_requests"))
+    c.post("/additions/new/supply", data={
+        "name": "square bottle 500 ml", "category": "packaging", "unit": "pc"})
+    check(len(db.read("creation_requests")) == before,
+          "the same new item can't be sent twice while it waits")
+    c.post("/additions/new/supply", data={"name": "Hexagonal Jar 250 mL",
+                                          "category": "packaging", "unit": "pc"})
+    check(len(db.read("creation_requests")) == before,
+          "an item already on the materials list is refused")
+    c.post("/catalog/materials", data={"name": "Glass Dropper 30 mL", "category": "packaging",
+                                       "unit": "pc", "track_mode": "piece"})
+    drop_req = db.read("creation_requests")[-1]
+    check(drop_req["title"] == "Glass Dropper 30 mL" and drop_req["kind"] == "supply"
+          and not db.query("raw_materials", name="Glass Dropper 30 mL"),
+          "adding on the catalog page sends the item for approval too")
+    c.post("/additions/%d/withdraw" % drop_req["id"])
+    check(db.get("creation_requests", drop_req["id"])["status"] == "Withdrawn",
+          "the Admin can withdraw a record that is still waiting")
+    check(not db.query("raw_materials", name="Moringa Seeds")
+          and not db.query("raw_materials", name="Square Bottle 500 mL"),
+          "waiting materials and supplies are not on the materials list")
+admin_id = db.query("users", username="admin")[0]["id"]
+with application.test_client() as c:
+    login(c, "superadmin", "super123")
+    page = c.get("/approvals/").data.decode("utf-8")
+    check("New records waiting for your approval" in page and "Rosalie Cruz Batobalonos" in page
+          and "Moringa Seeds" in page, "the Super Admin's approvals list the new records")
+    check("Rosalie Cruz Batobalonos" in c.get("/employees/").data.decode("utf-8"),
+          "the Employees page shows the employee waiting for approval")
+    check(c.get("/additions/%d" % emp_req["id"]).status_code == 200, "a new record's page renders")
+    c.post("/additions/%d/approve" % emp_req["id"])
+    emp = db.query("employees", name="Rosalie Cruz Batobalonos")
+    check(emp and emp[0]["department"] == "Packing"
+          and db.get("creation_requests", emp_req["id"])["status"] == "Approved"
+          and db.get("creation_requests", emp_req["id"])["record_id"] == emp[0]["id"],
+          "approving the employee adds them to the list")
+    c.post("/additions/%d/reject" % mat_req["id"], data={"reason": ""})
+    check(db.get("creation_requests", mat_req["id"])["status"] == "Pending",
+          "a rejection needs a reason")
+    c.post("/additions/%d/reject" % mat_req["id"], data={"reason": "Use the existing Moringa item"})
+    check(db.get("creation_requests", mat_req["id"])["status"] == "Rejected"
+          and not db.query("raw_materials", name="Moringa Seeds"),
+          "a rejected material is never added")
+    c.post("/additions/%d/approve" % sup_req["id"])
+    bottle = db.query("raw_materials", name="Square Bottle 500 mL")
+    check(bottle and bottle[0]["category"] == "packaging" and bottle[0]["stock_qty"] == 0
+          and bottle[0]["supplier_id"] == tengjia_id
+          and tengjia_id in sup_svc.links_by_material().get(bottle[0]["id"], set()),
+          "an approved supply joins the materials list, linked to its usual supplier, with no stock")
+    c.post("/additions/%d/approve" % sup_req["id"])
+    check(len(db.query("raw_materials", name="Square Bottle 500 mL")) == 1,
+          "approving twice adds it only once")
+    check(c.get("/additions/?show=all").status_code == 200, "/additions/?show=all renders")
+mine = [n["message"] for n in db.read("notifications") if n.get("user_id") == admin_id]
+check(any("Approved: employee Rosalie" in m for m in mine)
+      and any("Rejected: raw material Moringa Seeds" in m and "existing Moringa" in m for m in mine),
+      "the Admin is told when a record is approved or rejected")
 
 # 8) Module 5 — sales uploads and reports
 # A made-up Shopify CSV goes through the whole flow (upload → preview → save
@@ -904,7 +1480,7 @@ def upload(client, platform, name, content):
 
 
 with application.test_client() as c:
-    login(c, "packing", "pack123")
+    login(c, "marketing", "market123")
     r, preview = upload(c, "Shopify", "shopify-orders.csv", SHOPIFY_CSV.encode())
     check(r.status_code == 302 and preview is not None
           and preview.status_code == 200 and b"Shopify" in preview.data,
@@ -954,7 +1530,7 @@ PAGES = {
                "/facility/sanitation", "/facility/sanitation/new",
                "/facility/sanitation/print", "/facility/pest",
                "/facility/pest/print", "/suppliers/",
-               "/suppliers/new", "/suppliers/print"],
+               "/suppliers/print"],     # (adding a supplier is the Admin's)
     "production": ["/production/", "/production/batch/new", "/production/batch/1",
                    "/production/batch/1/print", "/production/daily-report",
                    "/production/daily-report?view=day&all=1",
@@ -1060,7 +1636,8 @@ with application.test_client() as c:
              if i["status"] == "Ordered"]
     c.post("/purchasing/new?request_id=%d" % req["id"], data={
         "request_id": req["id"],
-        "supplier_id": str(db.query("suppliers", name="Highland Produce Traders")[0]["id"]),
+        # GROWER'S CHOICE supplies the lemon on this request
+        "supplier_id": str(db.query("suppliers", ref_no="3")[0]["id"]),
         "po_date": services.today_iso(), "payment_terms": "Cash on delivery",
         "pr_item_id": [str(i["item_id"]) for i in lines],
         "include": ["1"] * len(lines),
@@ -1081,7 +1658,7 @@ with application.test_client() as c:
     check(po["po_no"] in page and "No purchase order" in page,
           "receiving starts by choosing the purchase order")
     page = c.get("/receiving/new?po=%d" % po["id"]).data.decode("utf-8")
-    check("PO line 1" in page and po["supplier_name"] in page,
+    check("PO line 1" in page and po["supplier_name"].replace("'", "&#39;") in page,
           "the PO's supplier and items are filled in")
     first, second = po["items"][0], po["items"][1]
     c.post("/receiving/new?po=%d" % po["id"], data={
@@ -1142,7 +1719,8 @@ with application.test_client() as c:
     check(c.get("/purchasing/new?request_id=%d" % old[0]["id"]).status_code == 200,
           "the PO form opens for an older production request")
     c.post("/purchasing/new?request_id=%d" % old[0]["id"], data={
-        "request_id": old[0]["id"], "supplier_id": str(db.read("suppliers")[0]["id"]),
+        "request_id": old[0]["id"],
+        "supplier_id": str(db.query("suppliers", ref_no="3")[0]["id"]),
         "payment_terms": "Cash on delivery",
         "pr_item_id": [str(i["item_id"]) for i in lines],
         "include": ["1"] * len(lines), "description": [""] * len(lines),
@@ -1153,8 +1731,43 @@ check(po["purchase_request_id"] == old[0]["id"]
       and [i["description"] for i in po["items"]] == ["Lemon", "Ginger"],
       "a PO for an older production request is named from the materials")
 
-# 9b) the client's PO 2026-09-017 (switches, not stocked yet) received in full
-demo_po = db.query("purchase_orders", po_no="2026-09-017")[0]
+# 9b) a PO for switches (not on the materials list yet) received in full
+with application.test_client() as c:
+    login(c, "production", "prod123")
+    c.post("/requests/new", data={
+        "department": "Production", "purpose": "Machine accessories",
+        "requested_by_name": "Aldren Ocate", "urgency": "Normal",
+        "material_id": ["other", "other"],
+        "description": ["Timer switch", "Center switch"],
+        "purpose_use": ["Dehydrator", "Dehydrator"], "qty": ["1", "1"],
+        "unit": ["pc", "pc"], "est_unit_cost": ["700", "150"],
+        "preferred_supplier": ["", ""], "preferred_supplier_id": ["", ""],
+        "budget_category": ["Equipment / repair", "Equipment / repair"],
+        "remark": ["", ""]})
+    switch_pr = db.read("purchase_requests")[-1]
+for _u, _p in (("admin", "admin123"), ("superadmin", "super123")):
+    with application.test_client() as c:
+        login(c, _u, _p)
+        c.post("/approvals/%d" % switch_pr["id"], data={"action": "approve"})
+switch_pr = db.get("purchase_requests", switch_pr["id"])
+with application.test_client() as c:
+    login(c, "admin", "admin123")
+    _its = switch_pr["items"]
+    c.post("/purchasing/new?request_id=%d" % switch_pr["id"], data={
+        "request_id": switch_pr["id"], "supplier_id": str(parts["id"]),
+        "po_date": services.today_iso(), "payment_terms": "Cash on delivery",
+        "pr_item_id": [str(i["item_id"]) for i in _its], "include": ["1"] * len(_its),
+        "qty": [str(i["approved_qty"] or i["requested_qty"]) for i in _its],
+        "unit": ["pc"] * len(_its), "unit_price": ["700", "150"]})
+    demo_po = db.read("purchase_orders")[-1]
+    c.post("/purchasing/%d/approve" % demo_po["id"])
+with application.test_client() as c:
+    login(c, "superadmin", "super123")
+    c.post("/purchasing/%d/approve" % demo_po["id"])
+demo_po = db.get("purchase_orders", demo_po["id"])
+check(demo_po["purchase_request_id"] == switch_pr["id"] and demo_po["status"] == "Approved"
+      and abs(demo_po["grand_total"] - 850) < 0.01,
+      "a PO for the switches is prepared and approved")
 n = len(demo_po["items"])
 with application.test_client() as c:
     login(c, "receiving", "recv123")
@@ -1186,7 +1799,7 @@ with application.test_client() as c:
             "usable_qty": str(b["declared_qty"]), "unusable_qty": "0",
             "damaged_qty": "0", "acceptance": "Accepted", "cleaned": "1"})
     check(db.get("purchase_orders", demo_po["id"])["status"] == "Delivered"
-          and db.query("purchase_requests", pr_no="2026-09-017")[0]["status"] == "Received",
+          and db.get("purchase_requests", switch_pr["id"])["status"] == "Received",
           "the PO is delivered and the PR received once everything passes inspection")
 
 # 10) a request without a reason is refused
@@ -1201,7 +1814,7 @@ with application.test_client() as c:
 
 # 11) customer order -> confirm deducts stock -> pay -> Paid
 with application.test_client() as c:
-    login(c, "packing", "pack123")
+    login(c, "service", "service123")
     _, product = stock("Pure Honey 250 mL", "product")
     c.post("/orders/new", data={"customer_id": 1, "discount": 0,
            "product_id": product["id"], "qty": 3, "unit_price": 399},
@@ -1226,6 +1839,351 @@ with application.test_client() as c:
               "%s resolves as a %s" % (token, kind))
     check(c.get("/qr/image/RB-1").status_code == 200, "QR image renders")
 
+# 12b) Files: supplier payment attachments; delivery DR / OR / AR files
+from PIL import Image as _Image  # noqa: E402
+
+
+def _png(color="red"):
+    buf = io.BytesIO()
+    _Image.new("RGB", (40, 30), color).save(buf, "PNG")
+    return buf.getvalue()
+
+
+_PDF = b"%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n"
+chona = db.query("suppliers", ref_no="5")[0]
+with application.test_client() as c:
+    login(c, "admin", "admin123")
+    page = c.get("/ledger/%d" % chona["id"]).data.decode("utf-8")
+    check('name="attachments"' in page and "multiple" in page and "application/pdf" in page,
+          "the payment form takes more attachments (pictures or PDFs)")
+    acct = [a for a in db.read("money_accounts") if a.get("active", True)]
+    base = {"amount": "250", "kind": "Partial payment", "method": "Cash",
+            "account_id": str(acct[0]["id"]) if acct else ""}
+    before = len(db.read("supplier_payments"))
+    c.post("/ledger/%d/pay" % chona["id"], data=dict(base, attachments=[
+        (io.BytesIO(b"not a picture"), "notes.txt")]), content_type="multipart/form-data")
+    check(len(db.read("supplier_payments")) == before,
+          "a file that is neither a picture nor a PDF is refused, nothing saved")
+    c.post("/ledger/%d/pay" % chona["id"], data=dict(
+        base, attachments_label="Official receipt and invoice",
+        proof=(io.BytesIO(_png("blue")), "receipt.png"),
+        attachments=[(io.BytesIO(_png()), "or.png"), (io.BytesIO(_PDF), "invoice.pdf")]),
+        content_type="multipart/form-data")
+    pay = db.read("supplier_payments")[-1]
+    atts = pay.get("attachments") or []
+    check(pay["supplier_id"] == chona["id"] and pay["proof"] and len(atts) == 2
+          and [a["kind"] for a in atts] == ["image", "pdf"]
+          and atts[1]["name"] == "invoice.pdf" and atts[0]["label"] == "Official receipt and invoice",
+          "a payment on account saves its proof and both attachments")
+    r = c.get("/ledger/payments/%d/files/2" % pay["id"])
+    check(r.status_code == 200 and r.mimetype == "application/pdf" and r.data.startswith(b"%PDF"),
+          "a PDF attachment opens as a PDF")
+    check(c.get("/ledger/payments/%d/files/1" % pay["id"]).status_code == 200
+          and c.get("/ledger/payments/%d/files/9" % pay["id"]).status_code == 404,
+          "a picture attachment opens; a missing one is 404")
+    page = c.get("/ledger/payments/%d" % pay["id"]).data.decode("utf-8")
+    check("Attachments · 2" in page and "invoice.pdf" in page and "Attach more files" in page,
+          "the payment's page lists its attachments and offers to attach more")
+    c.post("/ledger/payments/%d/attachments" % pay["id"], data={
+        "attachments_label": "Deposit slip",
+        "attachments": [(io.BytesIO(_PDF), "deposit.pdf")]}, content_type="multipart/form-data")
+    atts = db.get("supplier_payments", pay["id"])["attachments"]
+    check(len(atts) == 3 and atts[2]["n"] == 3 and atts[2]["label"] == "Deposit slip",
+          "more files can be attached to a payment later")
+    check("3 attachments" in c.get("/ledger/%d" % chona["id"]).data.decode("utf-8"),
+          "the ledger links each payment to its attachments")
+with application.test_client() as c:
+    login(c, "receiving", "recv123")
+    check(c.get("/ledger/payments/%d/files/1" % pay["id"]).status_code == 403,
+          "payment attachments are for ledger users only")
+# A PO payment shows its attachments on the PO too.
+paid_po = [p for p in db.read("supplier_payments") if p.get("po_id")]
+if paid_po:
+    with application.test_client() as c:
+        login(c, "admin", "admin123")
+        c.post("/ledger/payments/%d/attachments" % paid_po[0]["id"], data={
+            "attachments": [(io.BytesIO(_png()), "or.png")]}, content_type="multipart/form-data")
+        page = c.get("/purchasing/%d" % paid_po[0]["po_id"]).data.decode("utf-8")
+        check("1 attachment" in page, "a PO's payments show their attachments")
+
+# An issued PO (the honey request's) for the Delivered by check.
+with application.test_client() as c:
+    login(c, "admin", "admin123")
+    c.post("/purchasing/new?request_id=%d" % honey_pr["id"], data={
+        "request_id": honey_pr["id"], "supplier_id": str(vigilio["id"]),
+        "po_date": services.today_iso(), "payment_terms": "Cash on delivery",
+        "pr_item_id": ["1"], "include": ["1"], "qty": ["20"], "unit": ["kg"],
+        "unit_price": ["400"]})
+    honey_po2 = db.read("purchase_orders")[-1]
+    c.post("/purchasing/%d/approve" % honey_po2["id"])
+with application.test_client() as c:
+    login(c, "superadmin", "super123")
+    c.post("/purchasing/%d/approve" % honey_po2["id"])
+with application.test_client() as c:
+    login(c, "receiving", "recv123")
+    check(db.get("purchase_orders", honey_po2["id"])["status"] == "Approved",
+          "an issued PO is open for receiving")
+    page = c.get("/receiving/new?po=%d" % honey_po2["id"]).data.decode("utf-8")
+    check('id="delivered_by"' in page and 'value="VIGILIO ESCLITO"' in page,
+          "Delivered by starts as the PO's supplier name")
+    page = c.get("/receiving/new?po=none").data.decode("utf-8")
+    check('name="or_no"' in page and 'name="ar_no"' in page and 'name="or_file"' in page
+          and 'name="ar_file"' in page and 'name="delivery_ref"' in page,
+          "the receive form has DR, OR and acknowledgement receipt numbers, each with a file")
+    _, ginger = stock("Ginger")
+    r = c.post("/receiving/new?po=none", data={
+        "supplier_id": str(chona["id"]), "received_date": services.today_iso(),
+        "received_time": "09:00", "delivered_by": chona["name"],
+        "delivery_ref": "DR-9001", "or_no": "OR-9001", "ar_no": "AR-9001",
+        "material_id": [str(ginger["id"])], "qty_per_box": ["5"], "boxes": ["1"],
+        "lot_no": [""], "expiry_date": [""], "packaging_condition": [""], "temperature_c": [""],
+        "proof": (io.BytesIO(_png()), "dr.png"), "or_file": (io.BytesIO(_PDF), "or.pdf")},
+        content_type="multipart/form-data")
+    rb = db.read("receiving_batches")[-1]
+    check(r.status_code == 302 and rb["delivery_ref"] == "DR-9001" and rb["or_no"] == "OR-9001"
+          and rb["ar_no"] == "AR-9001" and rb["delivered_by"] == chona["name"]
+          and rb["proof"] and rb["or_proof"].endswith(".pdf") and not rb.get("ar_proof"),
+          "a delivery saves its DR, OR and AR numbers and their files")
+    r = c.get("/receiving/%d/proof?doc=or" % rb["id"])
+    check(r.status_code == 200 and r.mimetype == "application/pdf", "the OR file opens as a PDF")
+    c.post("/receiving/%d/proof?doc=ar" % rb["id"], data={
+        "proof": (io.BytesIO(_png("green")), "ar.png")}, content_type="multipart/form-data")
+    check(db.get("receiving_batches", rb["id"]).get("ar_proof"),
+          "the AR file can be added later on the delivery's page")
+    page = c.get("/receiving/%d" % rb["id"]).data.decode("utf-8")
+    check("Delivery documents" in page and "Official receipt (OR)" in page and "OR-9001" in page,
+          "the delivery's page shows its DR, OR and AR")
+    page = c.get("/receiving/%d/mrr" % rb["id"]).data.decode("utf-8")
+    check("OR-9001" in page and "AR-9001" in page, "the receiving report shows the OR and AR numbers")
+    before = len(db.read("receiving_batches"))
+    c.post("/receiving/new?po=none", data={
+        "supplier_id": str(chona["id"]), "received_date": services.today_iso(),
+        "received_time": "09:00", "material_id": [str(ginger["id"])], "qty_per_box": ["5"],
+        "boxes": ["1"], "lot_no": [""], "expiry_date": [""], "packaging_condition": [""],
+        "temperature_c": [""], "ar_file": (io.BytesIO(b"junk"), "ar.txt")},
+        content_type="multipart/form-data")
+    check(len(db.read("receiving_batches")) == before,
+          "a bad document file stops the delivery from saving")
+
+# 12c) Inspection lanes: Raw Material Inspection, Packaging & Supplies Check,
+# Honey Inspection — each with its own way of checking
+with application.test_client() as c:
+    login(c, "receiving", "recv123")
+    nav = c.get("/receiving/").data.decode("utf-8")
+    check("Raw Material Inspection" in nav and "Packaging &amp; Supplies Check" in nav
+          and "Honey Inspection" in nav and "Boxes for Inspection" not in nav
+          and "Honey Containers" not in nav,
+          "the menu shows the three inspection lanes (no more 'Boxes' / 'Honey Containers')")
+    tengjia_s = db.query("suppliers", ref_no="13")[0]
+    bottle_m = db.query("raw_materials", name="Square Bottle 300 mL")[0]
+    _, ginger_m = stock("Ginger")
+    c.post("/receiving/new?po=none", data={
+        "supplier_id": str(tengjia_s["id"]), "received_date": services.today_iso(),
+        "received_time": "10:00", "material_id": [str(bottle_m["id"]), str(ginger_m["id"])],
+        "qty_per_box": ["100", "5"], "boxes": ["1", "1"], "lot_no": ["", ""],
+        "expiry_date": ["", ""], "packaging_condition": ["", ""], "temperature_c": ["", ""]})
+    lane_batch = db.read("receiving_batches")[-1]
+    lane_boxes = {b["material_name"]: b for b in db.query("receiving_boxes", batch_id=lane_batch["id"])}
+    bottle_box, ginger_box = lane_boxes["Square Bottle 300 mL"], lane_boxes["Ginger"]
+with application.test_client() as c:
+    login(c, "production", "prod123")
+    raw_page = c.get("/receiving/inspection").data.decode("utf-8")
+    sup_page = c.get("/receiving/inspection/supplies").data.decode("utf-8")
+    check("Raw Material Inspection" in raw_page and ginger_box["box_code"] in raw_page
+          and bottle_box["box_code"] not in raw_page,
+          "a raw material box waits in Raw Material Inspection")
+    check("Packaging &amp; Supplies Check" in sup_page and bottle_box["box_code"] in sup_page
+          and ginger_box["box_code"] not in sup_page,
+          "a bottle box waits in Packaging & Supplies Check")
+    page = c.get("/receiving/box/%d/inspect" % bottle_box["id"]).data.decode("utf-8")
+    check("Clean the content" not in page and "Test results" not in page
+          and "Defects" in page and "Odor / appearance" not in page
+          and "Food-grade certificate" in page,
+          "the packaging & supplies check skips cleaning and tests and uses its own checklist")
+    page = c.get("/receiving/box/%d/inspect" % ginger_box["id"]).data.decode("utf-8")
+    check("Clean the content" in page and "Odor / appearance" in page and "Test results" in page,
+          "the raw material inspection keeps cleaning, the full checklist and tests")
+    supply_answers = {"visual_description": "Clean, no cracks", "usable_qty": "100",
+                      "unusable_qty": "0", "damaged_qty": "0", "cleaned": "0"}
+    for key, _, _ in services.SUPPLY_INSPECTION_POINTS:
+        supply_answers["chk_" + key] = "Fail" if key == "defects" else "Pass"
+        supply_answers["chk_%s_remarks" % key] = "3 cracked necks" if key == "defects" else ""
+    supply_answers["chk_dates"] = "N/A"          # bottles carry no expiry
+    c.post("/receiving/box/%d/inspect" % bottle_box["id"], data=dict(supply_answers, acceptance="Accepted"))
+    check(services.box_status(db.get("receiving_boxes", bottle_box["id"])) == services.BOX_AWAITING,
+          "a box that failed the defects check can't be accepted")
+    c.post("/receiving/box/%d/inspect" % bottle_box["id"], data=dict(
+        supply_answers, acceptance="Hold", nonconformity="Cracked necks",
+        nc_types=["Damaged packaging"]))
+    held_box = db.get("receiving_boxes", bottle_box["id"])
+    check(services.box_status(held_box) == services.BOX_HOLD
+          and held_box["checklist_lane"] == "supplies"
+          and set(held_box["checklist"]) == {k for k, _, _ in services.SUPPLY_INSPECTION_POINTS},
+          "the supplies checklist is saved with its own points, without odor or test")
+    page = c.get("/receiving/box/%d/checklist" % bottle_box["id"]).data.decode("utf-8")
+    check("Packaging &amp; Supplies Inspection Checklist" in page and "Defects" in page
+          and "Odor / appearance" not in page, "the printed checklist is the packaging & supplies one")
+    check("Damaged packaging" in services.nc_types_for(held_box),
+          "a failed defects check suggests 'Damaged packaging' on the hold report")
+    home = c.get("/dashboard").data.decode("utf-8")
+    check("Raw material inspection" in home and "Packaging &amp; supplies check" in home
+          and "Honey inspection" in home, "the production head's home has a task per lane")
+    check("Honey Inspection" in c.get("/honey/").data.decode("utf-8"), "the honey page is Honey Inspection")
+
+# 12d) Batch numbers and expiry: given on receipt, dates picked at inspection
+import production_service as _prod_svc  # noqa: E402
+ym = services.today_iso()[:7]
+with application.test_client() as c:
+    login(c, "receiving", "recv123")
+    cal = db.query("raw_materials", name="Calamansi")[0]
+    dexter = db.query("suppliers", ref_no="4")[0]
+    used = services._batch_numbers_used("CALAMANSI", ym)
+    page = c.post("/receiving/new/preview?po=none", data={
+        "supplier_id": str(dexter["id"]), "received_date": services.today_iso(),
+        "material_id": [str(cal["id"])], "qty_per_box": ["8"], "boxes": ["2"],
+        "lot_no": [""], "expiry_date": [""], "packaging_condition": [""],
+        "temperature_c": [""]}).data.decode("utf-8")
+    expected_no = "CALAMANSI-%s-%03d" % (ym, max(used or [0]) + 1)
+    check(expected_no in page, "the receiving report preview shows the batch no. it will give")
+    for _ in range(2):
+        c.post("/receiving/new?po=none", data={
+            "supplier_id": str(dexter["id"]), "received_date": services.today_iso(),
+            "received_time": "11:00", "material_id": [str(cal["id"])], "qty_per_box": ["8"],
+            "boxes": ["2"], "lot_no": [""], "expiry_date": [""], "packaging_condition": [""],
+            "temperature_c": [""]})
+    cal_boxes = [b for b in db.read("receiving_boxes") if b["material_id"] == cal["id"]][-4:]
+    first_no, second_no = cal_boxes[0]["lot_no"], cal_boxes[2]["lot_no"]
+    check(first_no == expected_no and cal_boxes[1]["lot_no"] == first_no
+          and int(second_no[-3:]) == int(first_no[-3:]) + 1,
+          "the next delivery of the same item this month gets the next number in the series")
+with application.test_client() as c:
+    login(c, "production", "prod123")
+    page = c.get("/receiving/box/%d/inspect" % cal_boxes[0]["id"]).data.decode("utf-8")
+    check('type="date" name="mfg_date"' in page and 'type="date" name="expiry_date"' in page
+          and first_no in page, "the checklist has calendars for date marking and shows the batch no.")
+    answers = checklist()
+    answers.update({"usable_qty": "8", "unusable_qty": "0", "damaged_qty": "0", "cleaned": "1",
+                    "acceptance": "Accepted", "expiry_date": "", "mfg_date": ""})
+    c.post("/receiving/box/%d/inspect" % cal_boxes[0]["id"], data=answers)
+    check(services.box_status(db.get("receiving_boxes", cal_boxes[0]["id"])) == services.BOX_AWAITING,
+          "date marking 'Pass' without an expiry date is refused")
+    answers.update({"mfg_date": "2099-01-02", "expiry_date": "2099-01-01"})
+    c.post("/receiving/box/%d/inspect" % cal_boxes[0]["id"], data=answers)
+    check(services.box_status(db.get("receiving_boxes", cal_boxes[0]["id"])) == services.BOX_AWAITING,
+          "an expiry before the manufacturing date is refused")
+    from datetime import date as _d, timedelta as _td  # noqa: E402
+    soon = (_d.fromisoformat(services.today_iso()) + _td(days=10)).isoformat()
+    answers.update({"mfg_date": services.today_iso(), "expiry_date": soon})
+    c.post("/receiving/box/%d/inspect" % cal_boxes[0]["id"], data=answers)
+    done_box = db.get("receiving_boxes", cal_boxes[0]["id"])
+    check(services.box_status(done_box) == services.BOX_ACCEPTED and done_box["expiry_date"] == soon
+          and done_box["mfg_date"] == services.today_iso(),
+          "the dates picked on the calendar are saved on the box")
+    page = c.get("/receiving/box/%d/inspect" % cal_boxes[1]["id"]).data.decode("utf-8")
+    check('value="%s"' % soon in page, "the next box of the same batch starts with the batch's dates")
+    page = c.get("/receiving/box/%d/checklist" % cal_boxes[0]["id"]).data.decode("utf-8")
+    check("EXP" in page and first_no in page, "the printed checklist shows the batch no. and dates")
+    row = [r for r in services.batch_rows() if r["batch_no"] == first_no][0]
+    check(row["accepted_qty"] == 8 and row["in_storage"] == 8 and row["expiry_date"] == soon
+          and row["status"] == "Waiting for inspection",
+          "Batches & Expiry adds up a batch (one box still waiting)")
+    answers.update({"usable_qty": "8"})
+    c.post("/receiving/box/%d/inspect" % cal_boxes[1]["id"], data=answers)
+    row = [r for r in services.batch_rows() if r["batch_no"] == first_no][0]
+    check(row["remaining"] == 16 and row["status"] == "Expiring soon" and row["days_left"] == 10,
+          "a batch with stock that expires within 30 days is flagged")
+    page = c.get("/receiving/batches?show=expiring").data.decode("utf-8")
+    check(first_no in page and "Expiring soon" in page and "10 days left" in page,
+          "the Batches & Expiry page lists it")
+    for show in ("stock", "all"):
+        check(c.get("/receiving/batches?show=" + show).status_code == 200,
+              "/receiving/batches?show=%s renders" % show)
+    check("expired or expiring within 30 days" in c.get("/dashboard").data.decode("utf-8"),
+          "the home page warns about expiring batches")
+    check(services.fefo_batch(cal["id"])["batch_no"] == first_no,
+          "the batch to use first is the one that expires first (FEFO)")
+    hlgc = db.query("products", name="Honey Calamansi Concentrate 300 mL")[0]
+    line = [l for l in _prod_svc.default_dispensing(hlgc["id"], 10) if l["material_id"] == cal["id"]][0]
+    check(line["lot_no"] == first_no and line["expiry_date"] == soon,
+          "production dispensing fills in the batch no. and expiry to use first")
+with application.test_client() as c:
+    login(c, "receiving", "recv123")
+    nav = c.get("/receiving/").data.decode("utf-8")
+    check("Batches &amp; Expiry" in nav, "the receiving menu has Batches & Expiry")
+
+# 12e) Supplies In / Out names the batch: OUT from a batch, new stock IN
+#      starts one, returns go back to theirs
+def _batch(no):
+    return [r for r in services.batch_rows(cal["id"]) if r["batch_no"] == no][0]
+
+
+def _cal_stock():
+    return services.current_stock("material", cal["id"])
+
+
+with application.test_client() as c:
+    login(c, "admin", "admin123")
+    page = c.get("/supplies/move?material_id=%d&direction=OUT" % cal["id"]).data.decode("utf-8")
+    check(first_no in page and 'id="stepBatch"' in page,
+          "the IN / OUT form has a batch step listing the item's batches")
+    before = _cal_stock()
+    move = {"direction": "OUT", "category": "raw", "material_id": str(cal["id"]),
+            "reason": "Used in production", "person": "Production team"}
+    c.post("/supplies/move", data=dict(move, qty="20", batch_no=first_no))
+    check(abs(_cal_stock() - before) < 0.001, "an OUT can't take more than the batch has left")
+    c.post("/supplies/move", data=dict(move, qty="5", batch_no=first_no))
+    last = sorted(db.read("stock_movements"), key=lambda m: m["id"])[-1]
+    check(last["batch_no"] == first_no and abs(_cal_stock() - (before - 5)) < 0.001
+          and _batch(first_no)["remaining"] == 11,
+          "an OUT from a batch is recorded with its batch no. and comes off what the batch has left")
+    _, loose = services.batch_choices(cal["id"])
+    _, err = assets_service.record_supply_movement(
+        cal["id"], "OUT", loose + 1, "Used in production", user_id=1, notify=False, batch_no="")
+    check(bool(err) and "batch" in err, "an OUT with no batch no. is limited to stock from before batch numbers")
+    _, err = assets_service.record_supply_movement(
+        cal["id"], "IN", 2, "Returned unused", user_id=1, notify=False, batch_no=first_no)
+    check(not err and _batch(first_no)["remaining"] == 13, "a return goes back to its batch")
+    _, err = assets_service.record_supply_movement(
+        cal["id"], "IN", 10, "Returned unused", user_id=1, notify=False, batch_no=first_no)
+    check(bool(err), "a return can't put back more than went out of the batch")
+    _, err = assets_service.record_supply_movement(
+        cal["id"], "IN", 4, services.NEW_STOCK_REASON, user_id=1, notify=False,
+        expiry_date="2000-01-01")
+    check(bool(err), "new stock with an expiry date already passed is refused")
+    later = (_d.fromisoformat(services.today_iso()) + _td(days=200)).isoformat()
+    expect_no = services.next_batch_no("Calamansi")
+    c.post("/supplies/move", data={"direction": "IN", "category": "raw", "material_id": str(cal["id"]),
+                                   "reason": services.NEW_STOCK_REASON, "qty": "4",
+                                   "expiry_date": later, "person": "Market"})
+    hand = sorted(db.read("stock_movements"), key=lambda m: m["id"])[-1]
+    check(hand["batch_no"] == expect_no and hand["batch_new"] and hand["expiry_date"] == later,
+          "a delivery / purchase IN gets a new batch no. of its own, with its expiry")
+    hand_row = _batch(expect_no)
+    check(hand_row["remaining"] == 4 and hand_row["source"] == "Supplies IN",
+          "Batches & Expiry lists a batch taken in by hand")
+    check(int(services.next_batch_no("Calamansi")[-3:]) == int(expect_no[-3:]) + 1,
+          "receiving carries on the same series after it")
+    bmr = db.insert("batch_records", {"batch_no": "BMR-TEST-BATCH", "status": "Completed",
+                                      "stock_posted": True,
+                                      "dispensing": [{"material_id": cal["id"], "lot_no": expect_no.lower(),
+                                                      "theoretical_qty": 1.5}]})
+    check(_batch(expect_no)["remaining"] == 2.5,
+          "a finished production batch comes off the batch its dispensing line names")
+    db.delete("batch_records", bmr["id"])
+    page = c.get("/supplies/%d" % cal["id"]).data.decode("utf-8")
+    check(first_no in page and expect_no in page,
+          "the item page lists its batches")
+    page = c.get("/supplies/movements").data.decode("utf-8")
+    check("Batch %s" % first_no in page, "the movements log shows the batch no.")
+    for b in cal_boxes[:2]:
+        db.update("receiving_boxes", b["id"], {"expiry_date": "2000-01-01"})
+    _, err = assets_service.record_supply_movement(
+        cal["id"], "OUT", 1, "Used in production", user_id=1, notify=False, batch_no=first_no)
+    check(bool(err) and "expired" in err, "an expired batch can't go out for use")
+    _, err = assets_service.record_supply_movement(
+        cal["id"], "OUT", 1, "Damaged / expired", user_id=1, notify=False, batch_no=first_no)
+    check(not err, "an expired batch goes out as Damaged / expired")
+
 # 13) the MySQL export builds, including the new tables
 import mysql_export            # noqa: E402
 
@@ -1236,7 +2194,8 @@ for table in ("receiving_boxes", "packing_items", "honey_allocations",
               "month_end_count_lines", "batch_dispensing", "batch_steps",
               "retention_samples", "sanitation_areas", "pest_control_areas",
               "purchase_orders", "purchase_order_items",
-              "nonconformance_reports"):
+              "nonconformance_reports", "creation_requests", "supplier_items",
+              "supplier_payment_attachments"):
     check("CREATE TABLE `%s`" % table in schema,
           "MySQL schema has %s" % table)
 check("INSERT INTO `users`" in data_sql, "MySQL data dump includes rows")

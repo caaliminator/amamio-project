@@ -5,8 +5,8 @@
     "product_id": 28,
     "product_name": "Moringa Powder 100 g",
     "description": "Moringa Powder 100 g, sealed as sold",
-    "prod_date": "2026-10-06",
-    "exp_date": "2027-10-06",
+    "prod_date": "2026-10-29",
+    "exp_date": "2027-10-29",
     "qty": 2.0,
     "disposal_date": "",
     "status": "Retained",
@@ -14,7 +14,7 @@
     "inspected_by": "Maria Santos Dela Cruz",
     "approved_by": "Liza Ramos Fernandez",
     "created_by": 4,
-    "created_at": "2026-10-16T05:39:42.837929+00:00",
+    "created_at": "2026-11-08T13:02:55.088883+00:00",
     "id": 1
   },
   {
@@ -23,8 +23,8 @@
     "product_id": 9,
     "product_name": "Honey Lemon Ginger Concentrate 300 mL",
     "description": "Honey Lemon Ginger Concentrate 300 mL, sealed as sold",
-    "prod_date": "2026-10-10",
-    "exp_date": "2026-10-14",
+    "prod_date": "2026-11-02",
+    "exp_date": "2026-11-06",
     "qty": 1.0,
     "disposal_date": "",
     "status": "Retained",
@@ -32,7 +32,7 @@
     "inspected_by": "Maria Santos Dela Cruz",
     "approved_by": "Liza Ramos Fernandez",
     "created_by": 4,
-    "created_at": "2026-10-16T05:39:42.845966+00:00",
+    "created_at": "2026-11-08T13:02:55.096654+00:00",
     "id": 2
   }
 ]
