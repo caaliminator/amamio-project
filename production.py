@@ -39,14 +39,13 @@ def _batch_or_404(batch_id):
 @production_bp.route("/")
 @module_required("production")
 def index():
-    show = request.args.get("show", "recent")
+    # Every batch; the page's tabs and pager do the rest (an old ?show=all
+    # link still works — it is simply ignored).
     in_progress = [ps.decorate(r) for r in ps.batch_rows(ps.IN_PROGRESS)]
     finished = [ps.decorate(r) for r in ps.batch_rows()
                 if r.get("status") in (ps.COMPLETED, ps.CANCELLED)]
-    if show != "all":
-        finished = finished[:8]
     return render_template("production/index.html", stats=ps.batch_summary(),
-                           in_progress=in_progress, finished=finished, show=show)
+                           in_progress=in_progress, finished=finished)
 
 
 @production_bp.route("/new")
@@ -220,11 +219,10 @@ def daily_report():
 @production_bp.route("/retention")
 @module_required("production")
 def retention():
-    show = request.args.get("show", "retained")
-    if show not in ("retained", "due", "disposed"):
-        show = "retained"
+    # Every sample; the page's tabs (Retained / Due / Disposed) split them.
+    # An old ?show= link still works — it is simply ignored.
     return render_template("production/retention.html",
-                           samples=ps.retention_rows(show), show=show,
+                           samples=ps.retention_rows("all"),
                            stats=ps.retention_summary(), today=services.today_iso())
 
 

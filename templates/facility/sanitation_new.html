@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Record cleaning{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('facility.sanitation') }}">{{ icon('arrow-left', 15) }} Cleaning &amp; Sanitation</a>
+<a class="back-link" href="{{ url_for('facility.sanitation') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Cleaning &amp; Sanitation</span></a>
 
 <form method="post" class="wizard" data-wizard data-wizard-start="{{ start }}" id="sanForm"
       data-submit-label="Save cleaning record" data-cancel="{{ url_for('facility.sanitation') }}">

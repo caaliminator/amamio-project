@@ -180,7 +180,7 @@
   <div class="card">
     <div class="card-title">{{ order_count }} line(s){% if order_count > 300 %} <span class="muted">— showing the latest 300</span>{% endif %}</div>
     <div class="table-wrap">
-      <table class="table">
+      <table class="table" data-no-filter>
         <thead><tr><th>Date</th><th>Platform</th><th>Order</th><th class="wrap">Product</th><th class="num">Qty</th><th class="num">Net</th><th>Status</th></tr></thead>
         <tbody>
           {% for r in orders %}

@@ -2,8 +2,11 @@
    `line` is a dict of submitted values (or empty).  A PO line passes
    `locked` ({name, unit}): its item is the one ordered and can't be changed,
    and the quantity is counted in the PO's unit.  Otherwise the item is
-   picked from the list; `new_item` offers adding an item not stocked yet. #}
-{% macro item_fields(line, materials, categories, category_of, track_labels, conditions, new_item=none, new_unit='', locked=none) %}
+   picked from the list; `new_item` offers adding an item not stocked yet.
+   Honey (`is_honey`) comes in containers, not boxes: the card (class
+   is-honey, set by the caller for a PO line, by item_script when picked)
+   then asks for the net weight of each container and how many. #}
+{% macro item_fields(line, materials, categories, category_of, track_labels, conditions, new_item=none, new_unit='', locked=none, is_honey=none) %}
 <div class="form-row">
   <label class="form-label">Item <span class="req">*</span></label>
   {% if locked %}
@@ -19,7 +22,7 @@
     {% for key, label in categories %}
       <optgroup label="{{ label }}">
         {% for m in materials if category_of(m) == key %}
-          <option value="{{ m.id }}" data-unit="{{ m.unit }}"
+          <option value="{{ m.id }}" data-unit="{{ m.unit }}"{% if is_honey and is_honey(m) %} data-honey="1"{% endif %}
                   data-mode="{{ track_labels.get(m.track_mode, '') }}"
                   {{ 'selected' if line and line.material_id|string == m.id|string }}>{{ m.name }}</option>
         {% endfor %}
@@ -31,7 +34,7 @@
 </div>
 <div class="form-grid cols-2">
   <div class="form-row">
-    <label class="form-label">Quantity in each box <span class="req">*</span></label>
+    <label class="form-label"><span class="if-box">Quantity in each box</span><span class="if-honey">Net weight of each container</span> <span class="req">*</span></label>
     <div class="big-field">
       <input type="number" name="qty_per_box" step="0.001" min="0.001" required
              inputmode="decimal" placeholder="0" value="{{ line.qty_per_box if line else '' }}"
@@ -40,25 +43,36 @@
     </div>
   </div>
   <div class="form-row">
-    <label class="form-label">Number of boxes <span class="req">*</span></label>
+    <label class="form-label"><span class="if-box">Number of boxes</span><span class="if-honey">Number of containers</span> <span class="req">*</span></label>
     <div class="big-field">
       <input type="number" name="boxes" min="1" max="100" step="1" required
              inputmode="numeric" value="{{ line.boxes if line and line.boxes else 1 }}"
              data-review-label="Boxes">
-      <span class="unit">box</span>
+      <span class="unit"><span class="if-box">box</span><span class="if-honey">container</span></span>
     </div>
   </div>
 </div>
+<div class="form-hint if-honey honey-note">{{ icon('honey', 14) }} Honey comes in containers: each gets its own QR label and goes to <b>Honey Inspection</b> for the moisture &amp; appearance check.</div>
 {% endmacro %}
 
 {# Keeps the unit label next to the quantity in step with the chosen item. #}
 {% macro item_script() %}
 <script>
 (function () {
+  // Honey: the card speaks of containers (and the review step too).
+  function honeyLabels(card) {
+    if (!card.classList) return;
+    var honey = card.classList.contains("is-honey");
+    var per = card.querySelector('[name="qty_per_box"]'), n = card.querySelector('[name="boxes"]');
+    if (per) per.setAttribute("data-review-label", honey ? "Per container (net)" : "Per box");
+    if (n) n.setAttribute("data-review-label", honey ? "Containers" : "Boxes");
+  }
   function sync(card) {
     var sel = card.querySelector(".js-material");
-    if (!sel) return;
+    if (!sel) { honeyLabels(card); return; }
     var opt = sel.options[sel.selectedIndex];
+    if (card.classList) card.classList.toggle("is-honey", !!(opt && opt.getAttribute("data-honey")));
+    honeyLabels(card);
     var unit = opt && opt.getAttribute("data-unit");
     var mode = opt && opt.getAttribute("data-mode");
     var u = card.querySelector(".js-unit");

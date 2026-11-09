@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}All packing runs{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('packing.index') }}">{{ icon('arrow-left', 15) }} Packing &amp; Dispatch</a>
+<a class="back-link" href="{{ url_for('packing.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Packing &amp; Dispatch</span></a>
 <div class="page-head">
   <div><h1 class="page-title">All packing runs</h1><p class="page-sub">The full record, by channel and status.</p></div>
 </div>

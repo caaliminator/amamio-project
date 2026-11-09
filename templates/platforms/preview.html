@@ -2,7 +2,7 @@
 {% block title %}Check the upload{% endblock %}
 {% block content %}
 <div class="wizard">
-<a class="back-link" href="{{ url_for('platforms.upload', platform=platform) }}">{{ icon('arrow-left', 15) }} Choose another file</a>
+<a class="back-link" href="{{ url_for('platforms.upload', platform=platform) }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Choose another file</span></a>
 <div class="wz-progress"><button class="is-done" type="button"></button><button class="is-done" type="button"></button><button class="is-current" type="button"></button></div>
 <div class="wz-count">Step 3 of 3</div>
 <h1 class="wz-title">Check before saving</h1>
@@ -61,7 +61,7 @@
     <input type="hidden" name="file" value="{{ filename }}">
     <input type="hidden" name="platform" value="{{ platform }}">
     <input type="hidden" name="template_id" value="{{ template.id }}">
-    <a class="btn btn-ghost" href="{{ url_for('platforms.upload', platform=platform) }}">Back</a>
+    <a class="btn btn-ghost btn-back" href="{{ url_for('platforms.upload', platform=platform) }}">{{ icon('arrow-left', 15) }} Back</a>
     <span class="wz-spacer"></span>
     {% if not result.missing %}<button class="btn btn-primary" type="submit">Save {{ result.new }} line(s)</button>{% endif %}
   </form>

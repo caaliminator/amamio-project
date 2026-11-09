@@ -9,7 +9,7 @@
       {% if product.sku %} · SKU {{ product.sku }}{% endif %}
     </p>
   </div>
-  <a class="btn btn-ghost" href="{{ url_for('catalog.index') }}">&larr; Back to catalog</a>
+  <a class="btn btn-ghost btn-back" href="{{ url_for('catalog.index') }}">{{ icon('arrow-left', 15) }} Back to catalog</a>
 </div>
 
 <div class="grid grid-2">

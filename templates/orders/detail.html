@@ -10,7 +10,7 @@
       <span class="badge {{ payment_badge.get(order.payment_status, 'badge-muted') }}">{{ order.payment_status }}</span>
     </p>
   </div>
-  <a class="btn btn-ghost" href="{{ url_for('orders.index') }}">Back to orders</a>
+  <a class="btn btn-ghost btn-back" href="{{ url_for('orders.index') }}">{{ icon('arrow-left', 15) }} Back to orders</a>
 </div>
 
 <div class="grid grid-2">
@@ -38,7 +38,7 @@
         </tfoot>
       </table>
     </div>
-    {% if order.remarks %}<p class="muted mt">Remarks: {{ order.remarks }}</p>{% endif %}
+    {% if order.remarks %}<div class="note-inline-block mt"><span class="note-sublabel">Remarks</span><blockquote class="note-quote">{{ order.remarks }}</blockquote></div>{% endif %}
   </div>
 
   <div>

@@ -25,15 +25,30 @@
 </div>
 {% endif %}
 
-<div class="section-label">Waiting for you</div>
+<div class="section-label">Waiting for you <span class="wf-total">{{ waiting|length }}</span></div>
 {% if waiting %}
-<div class="queue">
-  {% for w in waiting %}
-  <a class="queue-item" href="{{ w.url }}">
-    <span class="queue-main"><span class="queue-title">{{ w.title }}</span>{% if w.sub %}<span class="queue-sub">{{ w.sub }}</span>{% endif %}</span>
-    <span class="queue-go">Open {{ icon('arrow-right', 14) }}</span>
-  </a>
-  {% endfor %}
+{# What needs attention, as a table: how many, what, which area, open it. #}
+<div class="card wf-card">
+  <div class="table-wrap">
+    <table class="table wf-table" data-no-filter>
+      <thead><tr>
+        <th class="wf-count-col">Count</th><th>What's waiting</th><th>Area</th><th class="actions"></th>
+      </tr></thead>
+      <tbody>
+        {% for w in waiting %}
+        <tr class="wf-row tone-{{ w.tone }}" data-href="{{ w.url }}">
+          <td class="wf-count-col"><span class="wf-count">{{ w.count if w.count is not none else '•' }}</span></td>
+          <td class="wrap">
+            <a class="wf-title" href="{{ w.url }}">{{ w.label[:1]|upper ~ w.label[1:] }}</a>
+            {% if w.sub %}<span class="cell-sub">{{ w.sub }}</span>{% endif %}
+          </td>
+          <td><span class="wf-area"><span class="wf-area-ico">{{ icon(w.icon, 15) }}</span>{{ w.area }}</span></td>
+          <td class="actions"><a class="btn btn-ghost btn-sm wf-open" href="{{ w.url }}">Open {{ icon('arrow-right', 14) }}</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% else %}
 <div class="card"><div class="empty" style="padding:24px">

@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Approvals{% endblock %}
 {% block content %}
+{% from "requests/_cards.html" import pr_head, pr_card with context %}
+{% from "purchasing/_cards.html" import po_head, po_card with context %}
 <div class="page-head">
   <div>
     <h1 class="page-title">Approvals</h1>
@@ -14,88 +16,146 @@
 </div>
 
 {% set my_step = 'final approval' if is_super_admin else 'check (initial approval)' %}
-
-<div class="section-label">Purchase requests waiting for your {{ my_step }} ({{ requests|length }})</div>
-{% if requests %}
-<div class="queue mb">
-  {% for r in requests %}
-  <a class="queue-item" href="{{ url_for('approvals.decide', request_id=r.id) }}">
-    <span class="code" style="min-width:96px">{{ r.pr_label }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ r.purpose or r.reason or r.summary }}</span>
-      <span class="queue-sub">{{ r.summary }} · {{ r.department or ('Production' if r.type == 'production' else '—') }} · {{ r.requestor_name }}{% if r.needed_by %} · expected {{ r.needed_by }}{% endif %}{% if r.checked_by_name %} · checked by {{ r.checked_by_name }}{% endif %}</span>
-    </span>
-    {% if r.total %}<b class="nowrap">{{ r.total|peso }}</b>{% endif %}
-    {% if (r.urgency or 'Normal') != 'Normal' %}<span class="badge {{ urgency_badge.get(r.urgency, 'badge-warn') }}">{{ r.urgency }}</span>{% endif %}
-    <span class="queue-go">{{ 'Final approval' if r.stage == 'final' else 'Check' }} {{ icon('arrow-right', 14) }}</span>
-  </a>
-  {% endfor %}
+{# A tab per kind of approval — purchase requests and purchase orders
+   waiting for you, new records, and what waits at the other stage — each a
+   table of cards (the same cards as Purchase Requests / Purchase Orders).
+   Runs on the shared card-table component (app.js "Card tables"). #}
+<div data-ct="approvals">
+<div class="prt-topbar">
+  <div class="prt-tabs" role="tablist" aria-label="Approvals">
+    <button type="button" class="prt-tab tone-amber" role="tab" data-tab="requests" aria-selected="false" tabindex="-1">
+      <span class="prt-tab-ico">{{ icon('requests', 16) }}</span><span class="prt-tab-name">Purchase requests</span>
+      <span class="prt-tab-count" data-count>{{ pr_rows|length }}</span></button>
+    <button type="button" class="prt-tab tone-blue" role="tab" data-tab="orders" aria-selected="false" tabindex="-1">
+      <span class="prt-tab-ico">{{ icon('orders', 16) }}</span><span class="prt-tab-name">Purchase orders</span>
+      <span class="prt-tab-count" data-count>{{ po_rows|length }}</span></button>
+    <button type="button" class="prt-tab tone-green-soft" role="tab" data-tab="records" aria-selected="false" tabindex="-1">
+      <span class="prt-tab-ico">{{ icon('plus', 16) }}</span><span class="prt-tab-name">New records</span>
+      <span class="prt-tab-count" data-count>{{ creations|length }}</span></button>
+    {% if other_rows %}
+    <button type="button" class="prt-tab tone-done" role="tab" data-tab="others" aria-selected="false" tabindex="-1">
+      <span class="prt-tab-ico">{{ icon('swap', 16) }}</span><span class="prt-tab-name">At the other stage</span>
+      <span class="prt-tab-count" data-count>{{ other_rows|length }}</span></button>
+    {% endif %}
+  </div>
+  <div class="tf-bar prt-filters">
+    <label class="tf-search">{{ icon('search', 15) }}
+      <input type="search" class="ct-search" placeholder="Search requests, orders, records…" autocomplete="off" aria-label="Search approvals"></label>
+    <div class="tf-pill tf-dates" role="group" aria-label="Date">
+      <span class="tf-pill-label">{{ icon('calendar', 15) }} Date</span>
+      <input type="date" class="ct-from" aria-label="From">
+      <span class="tf-arrow" aria-hidden="true">→</span>
+      <input type="date" class="ct-to" aria-label="To">
+    </div>
+    <label class="tf-pill"><span class="tf-pill-label">Urgency</span>
+      <select data-ct-filter="data-urgency" aria-label="Urgency"><option value="">All</option>
+        <option>Critical</option><option>Urgent</option><option>Normal</option></select></label>
+    <button type="button" class="tf-clear ct-clear" hidden>{{ icon('close', 13) }} Clear</button>
+  </div>
+  <div class="prt-topbar-tools">
+    <label class="prt-show">Show
+      <select class="ct-size" aria-label="Rows per page in each table"><option value="10">10</option><option value="15">15</option><option value="25">25</option><option value="50">50</option></select>
+      entries</label>
+  </div>
 </div>
-{% else %}
-<div class="card mb"><div class="empty" style="padding:24px">
-  <div class="empty-icon">{{ icon('approvals', 30) }}</div>
-  <div class="empty-title">Nothing waiting for you</div>
-  <p class="muted">No purchase request is waiting for your {{ my_step }}.</p>
+
+{% macro stage_box(key, tone, ico, title, sub, count) %}
+<section class="prt-box prt-stage-card tone-{{ tone }}" data-stage-card="{{ key }}" role="tabpanel" hidden>
+  <div class="prt-final-head">
+    <span class="prt-final-icon">{{ icon(ico, 18) }}</span>
+    <div>
+      <h2 class="prt-final-title">{{ title }} <span class="pr-group-count">{{ count }}</span></h2>
+      <div class="prt-final-sub">{{ sub }}</div>
+    </div>
+  </div>
+  {{ caller() }}
+  <div class="prt-foot">
+    <span class="prt-info" data-info aria-live="polite"></span>
+    <span class="pager-controls" data-controls>
+      <button type="button" class="pager-btn" data-prev>&lsaquo; Previous</button>
+      <span class="pager-page" data-page></span>
+      <button type="button" class="pager-btn" data-next>Next &rsaquo;</button>
+    </span>
+  </div>
+</section>
+{% endmacro %}
+
+{% call stage_box('requests', 'amber', 'requests', 'Purchase requests waiting for your ' ~ my_step,
+                  'Open one to see its items; Review & approve to decide.', pr_rows|length) %}
+  {% if pr_rows %}
+  <div class="prt" role="table" aria-label="Purchase requests waiting for you">
+    {{ pr_head() }}
+    {% for r in pr_rows %}{{ pr_card(r, 'requests') }}{% endfor %}
+    <div class="prt-empty" data-none hidden>No request here matches.</div>
+  </div>
+  {% else %}
+  <div class="empty" style="padding:24px"><div class="empty-icon">{{ icon('approvals', 30) }}</div>
+    <div class="empty-title">Nothing waiting for you</div>
+    <p class="muted">No purchase request is waiting for your {{ my_step }}.</p></div>
+  {% endif %}
+{% endcall %}
+
+{% call stage_box('orders', 'blue', 'orders', 'Purchase orders waiting for your ' ~ my_step,
+                  'Open one to see its items and prices; Review & approve to decide.', po_rows|length) %}
+  {% if po_rows %}
+  <div class="prt po-table" role="table" aria-label="Purchase orders waiting for you">
+    {{ po_head() }}
+    {% for p in po_rows %}{{ po_card(p, 'orders') }}{% endfor %}
+    <div class="prt-empty" data-none hidden>No purchase order here matches.</div>
+  </div>
+  {% else %}
+  <div class="empty" style="padding:24px"><div class="empty-title">Nothing waiting for you</div>
+    <p class="muted">No purchase order is waiting for your {{ my_step }}.</p></div>
+  {% endif %}
+{% endcall %}
+
+{% call stage_box('records', 'green-soft', 'plus',
+                  'New records waiting for your approval' if can_decide else 'New records waiting for the Super Admin',
+                  'New employees, suppliers, materials and supplies — part of the system once approved.', creations|length) %}
+  {% if creations %}
+  <div class="prt rec-table" role="table" aria-label="New records">
+    <div class="prt-head" role="row">
+      <span role="columnheader">Record</span><span role="columnheader">Kind</span>
+      <span role="columnheader">Added by</span><span role="columnheader">Date</span><span role="columnheader"></span>
+    </div>
+    {% for r in creations %}
+    <div class="prt-card" data-stage="records" data-date="{{ (r.created_at or '')[:10] }}"
+         data-search="{{ (r.title ~ ' ' ~ kinds.get(r.kind, r.kind) ~ ' ' ~ (r.requested_by_name or ''))|lower }}">
+      <div class="prt-row" role="row">
+        <div class="prt-req" role="cell">
+          <span class="prt-rec-ico">{{ icon({'employee': 'users', 'supplier': 'suppliers', 'material': 'box', 'supply': 'swap'}.get(r.kind, 'plus'), 16) }}</span>
+          <div class="prt-req-text"><a class="prt-title" href="{{ url_for('additions.detail', req_id=r.id) }}">{{ r.title }}</a></div>
+        </div>
+        <div role="cell"><span class="st-chip tone-done">{{ kinds.get(r.kind, r.kind) }}</span></div>
+        <div role="cell" class="prt-date">{{ r.requested_by_name or '—' }}</div>
+        <div role="cell" class="prt-date">{{ (r.created_at or '')[:10]|longdate }}</div>
+        <div role="cell" class="prt-cell-end">
+          <a class="btn {{ 'btn-primary' if can_decide else 'btn-ghost' }} btn-sm" href="{{ url_for('additions.detail', req_id=r.id) }}">{{ 'Approve or reject' if can_decide else 'Open' }} {{ icon('arrow-right', 14) }}</a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    <div class="prt-empty" data-none hidden>No record here matches.</div>
+  </div>
+  {% else %}
+  <div class="empty" style="padding:24px"><div class="empty-title">Nothing waiting</div>
+    <p class="muted">No new employee, supplier, material or supply is waiting for approval.</p></div>
+  {% endif %}
+{% endcall %}
+
+{% if other_rows %}
+{% call stage_box('others', 'done', 'swap', 'Waiting at the other stage',
+                  "Purchase requests waiting for the other approver — for your information.", other_rows|length) %}
+  <div class="prt" role="table" aria-label="Waiting at the other stage">
+    {{ pr_head() }}
+    {% for r in other_rows %}{{ pr_card(r, 'others') }}{% endfor %}
+    <div class="prt-empty" data-none hidden>No request here matches.</div>
+  </div>
+{% endcall %}
+{% endif %}
+<div class="card prt-nothing ct-nothing" hidden><div class="empty">
+  <div class="empty-title">Nothing matches</div>
+  <p class="muted">Try other words or dates — the tabs show how many each has.</p>
 </div></div>
-{% endif %}
-
-<div class="section-label">Purchase orders waiting for your {{ my_step }} ({{ orders|length }})</div>
-{% if orders %}
-<div class="queue mb">
-  {% for po in orders %}
-  <a class="queue-item" href="{{ url_for('purchasing.detail', po_id=po.id) }}">
-    <span class="code" style="min-width:96px">{{ po.po_no }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ po.supplier_name }}</span>
-      <span class="queue-sub">{{ po['items']|length }} item(s) · prepared by {{ po.prepared_by_name or '—' }}{% if po.checked_by_name %} · checked by {{ po.checked_by_name }}{% endif %}{% if po.payment_terms %} · {{ po.payment_terms }}{% endif %}</span>
-    </span>
-    <b class="nowrap">{{ po.grand_total|peso }}</b>
-    <span class="queue-go">Open PO {{ icon('arrow-right', 14) }}</span>
-  </a>
-  {% endfor %}
 </div>
-{% else %}
-<div class="card mb"><div class="empty" style="padding:24px">
-  <div class="empty-title">Nothing waiting for you</div>
-  <p class="muted">No purchase order is waiting for your {{ my_step }}.</p>
-</div></div>
-{% endif %}
-
-<div class="section-label">{{ 'New records waiting for your approval' if can_decide else 'New records waiting for the Super Admin' }} ({{ creations|length }})</div>
-{% if creations %}
-<div class="queue mb">
-  {% for r in creations %}
-  <a class="queue-item" href="{{ url_for('additions.detail', req_id=r.id) }}">
-    <span class="code" style="min-width:96px">{{ kinds.get(r.kind, r.kind) }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ r.title }}</span>
-      <span class="queue-sub">Added by {{ r.requested_by_name or '—' }} · {{ (r.created_at or '')[:10] }}</span>
-    </span>
-    <span class="queue-go">{{ 'Approve or reject' if can_decide else 'Open' }} {{ icon('arrow-right', 14) }}</span>
-  </a>
-  {% endfor %}
-</div>
-{% else %}
-<div class="card mb"><div class="empty" style="padding:24px">
-  <div class="empty-title">Nothing waiting</div>
-  <p class="muted">No new employee, supplier, material or supply is waiting for approval.</p>
-</div></div>
-{% endif %}
-
-{% if others %}
-<div class="section-label">Waiting at the other stage ({{ others|length }})</div>
-<div class="queue">
-  {% for r in others %}
-  <a class="queue-item" href="{{ url_for('requests.detail', id=r.id) }}">
-    <span class="code" style="min-width:96px">{{ r.pr_label }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ r.purpose or r.reason or r.summary }}</span>
-      <span class="queue-sub">{{ r.summary }} · {{ r.requestor_name }} · waiting for {{ waiting_on(r) }}</span>
-    </span>
-    {% if r.total %}<b class="nowrap">{{ r.total|peso }}</b>{% endif %}
-    <span class="badge badge-muted">{{ r.status }}</span>
-  </a>
-  {% endfor %}
-</div>
-{% endif %}
 {% endblock %}

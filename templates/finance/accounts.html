@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "finance/_account_fields.html" import account_form %}
+{% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead with context %}
 {% block title %}Cash &amp; Bank Accounts{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -17,16 +18,33 @@
   {% endfor %}
 </div>
 
-<div class="queue mb">
+{# The accounts: a card table (templates/_ct.html). #}
+<style>
+  .prt-card.is-closed { opacity: .6; }
+  .prt-num.is-bad { color: var(--danger); }
+</style>
+<div data-ct="accounts" class="mb">
+{{ ct_topbar(search="Search an account, bank or number…",
+             filters=[('data-kind', 'Kind', rows|map(attribute='kind')|reject('none')|unique|sort),
+                      ('data-state', 'Status', ['Open', 'Closed'] if rows|rejectattr('active')|list else [])]) }}
+{% call ct_box('accounts', ico='wallet', head=['Account', 'Kind', 'Balance', 'Status', ''],
+               cols='minmax(240px, 2.4fr) minmax(120px, 1fr) minmax(130px, 1fr) minmax(100px, .8fr) minmax(90px, auto)',
+               tabbed=false, empty='No account matches.') %}
   {% for a in rows %}
-  <a class="queue-item" href="{{ url_for('finance.account', account_id=a.id) }}" {% if not a.active %}style="opacity:.6"{% endif %}>
-    <span class="queue-main"><span class="queue-title">{{ a.name }}</span>
-      <span class="queue-sub">{{ [a.kind, a.bank, a.account_no]|select|join(' · ') }}</span></span>
-    <b class="nowrap {{ 'is-bad' if a.balance < 0 }}">{{ a.balance|peso }}</b>
-    {% if not a.active %}<span class="badge badge-muted">Closed</span>{% endif %}
-    <span class="queue-go">Open {{ icon('arrow-right', 14) }}</span>
-  </a>
+    {% set href = url_for('finance.account', account_id=a.id) %}
+    {% set is_open = a.active %}
+    {% call ct_row('accounts', href=href, cls='' if is_open else 'is-closed',
+                   search=[a.name, a.kind, a.bank, a.account_no]|select|join(' '),
+                   data={'kind': a.kind, 'state': 'Open' if is_open else 'Closed'}) %}
+      {% set where = [a.bank, a.account_no]|select|join(' · ') %}
+      {% if where %}{% call ct_lead('wallet', a.name, href) %}{{ where }}{% endcall %}{% else %}{{ ct_lead('wallet', a.name, href) }}{% endif %}
+      <div role="cell"><span class="st-chip tone-done">{{ a.kind or '—' }}</span></div>
+      <div role="cell" class="prt-num {{ 'is-bad' if a.balance < 0 }}">{{ a.balance|peso }}</div>
+      <div role="cell"><span class="st-chip tone-{{ 'green-soft' if is_open else 'done' }}">{{ 'Open' if is_open else 'Closed' }}</span></div>
+      <div role="cell" class="prt-cell-end"><a class="btn btn-ghost btn-sm" href="{{ href }}">Open {{ icon('arrow-right', 14) }}</a></div>
+    {% endcall %}
   {% endfor %}
+{% endcall %}
 </div>
 {% endif %}
 

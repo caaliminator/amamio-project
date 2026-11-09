@@ -22,6 +22,90 @@ LINE_KEYS = ("pr_item_id", "include", "brand_model", "qty",
              "unit", "unit_price", "requested_delivery", "remarks")
 
 
+# The Purchase Orders page: a tab per stage, each a table of PO cards.
+# (key, title, what it means, statuses, colour tone, icon)
+PO_STAGES = [
+    ("check", "Waiting for the Admin's check", "Prepared POs; the Admin checks them first.",
+     (pur.PO_PREPARED,), "amber", "requests"),
+    ("final", "For final approval", "Checked by the Admin — the Super Admin approves and issues it.",
+     (pur.PO_FOR_FINAL,), "green-soft", "approvals"),
+    ("issued", "Issued — waiting for delivery", "Approved and sent to the supplier.",
+     (pur.PO_APPROVED,), "green", "truck"),
+    ("delivered", "Delivered", "The goods arrived.", (pur.PO_DELIVERED,), "done", "box"),
+    ("cancelled", "Cancelled", "Called off.", (pur.PO_CANCELLED,), "red", "x-circle"),
+]
+PO_TONE = {status: tone for _, _, _, statuses, tone, _ in PO_STAGES for status in statuses}
+PO_STEPS = ["Prepared", "Checked by the Admin", "Approved & issued", "Delivered"]
+PO_PROGRESS = {pur.PO_PREPARED: 1, pur.PO_FOR_FINAL: 2, pur.PO_APPROVED: 3, pur.PO_DELIVERED: 4}
+
+
+def _days_until(iso):
+    try:
+        return (services.date.fromisoformat((iso or "")[:10])
+                - services.date.fromisoformat(services.today_iso())).days
+    except (TypeError, ValueError):
+        return None
+
+
+def po_card_row(po, user):
+    """A purchase order as a row-card (purchasing/_cards.html)."""
+    total = services._to_float(po.get("grand_total"))
+    lines = po.get("items") or []
+    subtotal = sum(services._to_float(i.get("amount")) for i in lines) or 0
+    items = [{"name": i.get("description") or "Item", "brand": i.get("brand_model") or "",
+              "qty": i.get("qty"), "unit": i.get("unit") or "",
+              "price": services._to_float(i.get("unit_price")),
+              "cost": services._to_float(i.get("amount")),
+              "share": round(services._to_float(i.get("amount")) / subtotal * 100, 2) if subtotal else 0,
+              "seg": n % 6 + 1, "remarks": i.get("remarks") or ""}
+             for n, i in enumerate(lines)]
+    pay = pur.po_payment_summary(po)
+    status = po.get("status") or ""
+    paid_state = ("Paid" if pay["issued"] and pay["balance"] <= 0.005 and pay["paid"] > 0
+                  else "Partly paid" if pay["paid"] > 0.005 else "Unpaid")
+    return {
+        "id": po["id"], "po_no": po.get("po_no") or "PO #%d" % po["id"],
+        "supplier": po.get("supplier_name") or "—", "supplier_id": po.get("supplier_id"),
+        "status": status, "tone": PO_TONE.get(status, "done"),
+        "po_date": (po.get("po_date") or "")[:10], "delivery": (po.get("expected_delivery") or "")[:10],
+        "days_left": _days_until(po.get("expected_delivery")) if status in (pur.PO_PREPARED, pur.PO_FOR_FINAL, pur.PO_APPROVED) else None,
+        "terms": po.get("payment_terms") or "", "total": total, "items": items,
+        "progress": PO_PROGRESS.get(status, 0), "cancelled": status == pur.PO_CANCELLED,
+        "pay": pay, "paid_state": paid_state,
+        "your_turn": pur.can_approve(user, po), "waiting_on": pur.waiting_on(po),
+        "prepared_by": po.get("prepared_by_name") or "", "checked_by": po.get("checked_by_name") or "",
+        "pr_no": po.get("pr_no") or "",
+    }
+
+
+def po_stage_groups(rows, show="open"):
+    groups = []
+    for key, title, sub, statuses, tone, ico in PO_STAGES:
+        if show == "open" and key in ("delivered", "cancelled"):
+            continue
+        items = [r for r in rows if r["status"] in statuses]
+        if items:
+            groups.append({"key": key, "title": title, "sub": sub, "tone": tone, "icon": ico, "rows": items,
+                           "mine": sum(1 for r in items if r["your_turn"])})
+    groups.sort(key=lambda g: 0 if g["mine"] else 1)
+    return groups
+
+
+def awaiting_rows(user):
+    """Approved purchase requests with lines still to order, as row-cards
+    (only the lines still to order count)."""
+    import requests_bp
+    users = services.users_by_id()
+    out = []
+    for r in pur.requests_awaiting_po():
+        open_items = pur.orderable_items(r)
+        part = dict(r, items=open_items, total_estimated=None)
+        row = requests_bp.card_row(part, user, users)
+        row["lines"] = len(open_items)
+        out.append(row)
+    return out
+
+
 @purchasing_bp.route("/")
 @module_required("po_view")
 def index():
@@ -32,17 +116,15 @@ def index():
                   if p.get("status") in (pur.PO_PREPARED, pur.PO_FOR_FINAL,
                                          pur.PO_APPROVED)]
     orders.sort(key=lambda p: (p.get("po_date") or "", p.get("id")), reverse=True)
-    awaiting = []
-    for r in pur.requests_awaiting_po():
-        awaiting.append({"id": r["id"], "pr_no": pur.pr_number(r),
-                         "purpose": r.get("purpose") or r.get("reason") or "",
-                         "summary": pur.summary_line(r),
-                         "department": r.get("department") or "",
-                         "lines": len(pur.orderable_items(r)),
-                         "needed_by": r.get("needed_by") or ""})
-    return render_template("purchasing/index.html", show=show, orders=orders,
-                           awaiting=awaiting, counts=pur.purchasing_counts(),
-                           po_badge=pur.PO_BADGE)
+    user = current_user()
+    rows = [po_card_row(p, user) for p in orders]
+    awaiting = awaiting_rows(user) if can(user, "purchasing") else []
+    import requests_bp
+    return render_template("purchasing/index.html", show=show, rows=rows,
+                           groups=po_stage_groups(rows, show), awaiting=awaiting,
+                           counts=pur.purchasing_counts(), po_steps=PO_STEPS,
+                           steps=requests_bp.PROGRESS_STEPS,
+                           suppliers=sorted({r["supplier"] for r in rows if r["supplier"] != "—"}))
 
 
 def _lines_from_form(form):
@@ -116,7 +198,7 @@ def _po_start_values(po):
 
 
 @purchasing_bp.route("/new/preview", methods=["POST"])
-@module_required("purchasing")
+@module_required("po_prepare")
 def preview():
     """The form's last step: the PO exactly as it will print, built from the
     fields typed so far (nothing is saved)."""
@@ -131,7 +213,7 @@ def preview():
 
 
 @purchasing_bp.route("/new", methods=["GET", "POST"])
-@module_required("purchasing")
+@module_required("po_prepare")
 def new():
     """The Purchase Order form, one part at a time."""
     try:
@@ -245,7 +327,7 @@ def approve(po_id):
 
 
 @purchasing_bp.route("/<int:po_id>/delivered", methods=["POST"])
-@module_required("purchasing")
+@module_required("po_prepare")
 def delivered(po_id):
     po, err = pur.mark_delivered(po_id, current_user())
     flash(err or "PO %s marked delivered." % po["po_no"], "error" if err else "success")
@@ -253,7 +335,7 @@ def delivered(po_id):
 
 
 @purchasing_bp.route("/<int:po_id>/cancel", methods=["POST"])
-@module_required("purchasing")
+@module_required("po_prepare")
 def cancel(po_id):
     po, err = pur.cancel_purchase_order(po_id, current_user())
     flash(err or "PO %s cancelled — its items can be ordered again." % po["po_no"],

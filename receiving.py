@@ -22,8 +22,9 @@ Materials Receiving and Inspection Report" is built from these records.
 """
 import os
 from datetime import datetime
+from urllib.parse import urlparse
 
-from flask import (Blueprint, abort, flash, g, redirect, render_template,
+from flask import (Blueprint, abort, flash, g, jsonify, redirect, render_template,
                    request, send_file, url_for)
 
 import db
@@ -100,13 +101,11 @@ def _ncr_or_404(ncr_id):
 @receiving_bp.route("/")
 @module_required("receiving")
 def index():
-    show = request.args.get("show") or "open"
+    # Every delivery is listed; the page shows a tab per status.
     batches = db.read("receiving_batches")
     still_open = (services.RECEIVING_OPEN, services.RECEIVING_FOR_CLOSING)
-    if show == "open":
-        listed = [b for b in batches if b.get("status") in still_open]
-    else:
-        listed = batches
+    listed = batches
+    show = "all"
     boxes = db.read("receiving_boxes")
     stats = {
         "open": len([b for b in batches if b.get("status") in still_open]),
@@ -127,7 +126,7 @@ def new():
     """Which purchase order is this? (skipped when none are open) → the
     delivery wizard, pre-filled from the PO when there is one."""
     form = request.form
-    po_arg = request.values.get("po")
+    po_arg = _po_arg()
     open_pos = pur.open_pos_for_receiving()
     if po_arg is None and open_pos and request.method == "GET":
         return render_template("receiving/choose_po.html", orders=open_pos)
@@ -146,9 +145,21 @@ def new():
         if not err:
             for key, att in doc_files.items():
                 _save_doc(batch, key, att)
-            flash("Delivery %s recorded — %d box(es) labelled. Print the QR "
-                  "labels and stick one on each box." % (batch.get("ref_no"),
-                                                         len(boxes)), "success")
+            honey = services.delivery_honey(batch["id"])
+            parts = []
+            if boxes:
+                parts.append("%d box(es)" % len(boxes))
+            if honey:
+                parts.append("%d honey container(s)" % len(honey))
+            flash("Delivery %s recorded — %s labelled. Print the QR labels and "
+                  "stick one on each.%s" % (
+                      batch.get("ref_no"), " and ".join(parts),
+                      " The honey goes to Honey Inspection for its moisture check; "
+                      "its labels print from the delivery's page." if honey and boxes else ""),
+                  "success")
+            if not boxes and honey:
+                return redirect(url_for("honey.labels", fresh=1,
+                                        only=",".join(str(c["id"]) for c in honey)))
             return redirect(url_for("receiving.labels", batch_id=batch["id"],
                                     fresh=1))
         flash(err, "error")
@@ -164,6 +175,14 @@ DELIVERY_DOCS = [
     ("ar", "Acknowledgement receipt (AR)", "ar_no", "ar_proof", "ar_file"),
 ]
 DOC_BY_KEY = {d[0]: d for d in DELIVERY_DOCS}
+
+
+def _po_arg():
+    """The PO being received: picked on the form by typing its number (the
+    hidden "po" field), else from the address (?po=…, "none" for none)."""
+    if request.method == "POST" and (request.form.get("po") or "").strip():
+        return request.form.get("po").strip()
+    return request.args.get("po")
 
 
 def _read_doc_files(files):
@@ -221,8 +240,8 @@ def new_preview():
     """The form's last step: the Material Receiving Report this delivery
     makes, built from the fields so far (nothing is saved)."""
     po = None
-    if request.args.get("po") not in (None, "", "none"):
-        po = db.get("purchase_orders", _int(request.args.get("po")))
+    if _po_arg() not in (None, "", "none"):
+        po = db.get("purchase_orders", _int(_po_arg()))
     batch, lines, err = services.preview_delivery(current_user(), **_delivery_fields(request.form, po))
     if err:
         return render_template("receiving/_preview_error.html", error=err), 422
@@ -232,6 +251,34 @@ def new_preview():
                            doc_names=[(label, request.form.get(field + "_name"))
                                       for _, label, _, _, field in DELIVERY_DOCS
                                       if request.form.get(field + "_name")])
+
+
+def _po_not_receivable():
+    """{PO no.: why it can't be received} for the POs not open for
+    receiving — said on the form when one of them is typed."""
+    open_ids = {o["id"] for o in pur.open_pos_for_receiving()}
+    out = {}
+    for p in db.read("purchase_orders"):
+        if p["id"] in open_ids or not p.get("po_no"):
+            continue
+        status = p.get("status")
+        if status == pur.PO_PREPARED:
+            why = ("isn't approved yet — it waits for the Admin's check, then the Super "
+                   "Admin's final approval. It can be received once it is approved.")
+        elif status == pur.PO_FOR_FINAL:
+            why = ("isn't approved yet — it waits for the Super Admin's final approval. "
+                   "It can be received once it is approved.")
+        elif status == pur.PO_CANCELLED:
+            why = "was cancelled — nothing can be received against it."
+        elif status == pur.PO_DELIVERED:
+            why = "is already delivered — everything on it was received."
+        else:
+            refs = [b.get("ref_no") for b in db.query("receiving_batches", po_id=p["id"]) if b.get("ref_no")]
+            why = ("has nothing left to receive — everything on it is already in "
+                   + (", ".join(refs) if refs else "an earlier delivery")
+                   + " (received or still being inspected).")
+        out[p["po_no"].strip().lower()] = "%s %s" % (p["po_no"], why)
+    return out
 
 
 def _new_form(form, po):
@@ -244,12 +291,43 @@ def _new_form(form, po):
         category_of=services.material_category,
         track_labels=services.TRACK_MODE_LABELS,
         conditions=services.PACKAGING_CONDITIONS,
+        is_honey=services.is_honey_material,
+        open_pos=[] if po else pur.open_pos_for_receiving(),
+        po_options=[] if po else [
+            {"v": o["id"], "l": o["po_no"] or "", "s": "%s · %s" % (o["supplier_name"] or "—", o["summary"])}
+            for o in pur.open_pos_for_receiving()],
+        po_closed={} if po else _po_not_receivable(),
         docs=services.DOCS_CHECKED,
         now_time=datetime.now().strftime("%H:%M"),
         today=services.today_iso(), form=form, po=po,
         po_lines=[l for l in pur.lines_to_receive(po) if l["remaining"] > 0] if po else [],
         lines=_lines_from_form(form) if request.method == "POST" else [],
         start=1 if request.method == "POST" else 0)
+
+
+@receiving_bp.route("/new/po/<int:po_id>")
+@module_required("receiving")
+def new_po_lines(po_id):
+    """A PO typed into the receive form: its supplier and its items still to
+    come, as the form's item cards (honey as containers)."""
+    po = db.get("purchase_orders", po_id)
+    if not po or po.get("status") != pur.PO_APPROVED:
+        return jsonify({"error": "That purchase order isn't open for receiving."}), 404
+    lines = [l for l in pur.lines_to_receive(po) if l["remaining"] > 0]
+    if not lines:
+        return jsonify({"error": "Everything on %s has already been received." % po.get("po_no")}), 404
+    html = render_template(
+        "receiving/_po_lines.html", po_lines=lines, submitted={},
+        materials=services.purchasable_materials(),
+        categories=services.MATERIAL_CATEGORIES,
+        category_of=services.material_category,
+        track_labels=services.TRACK_MODE_LABELS,
+        conditions=services.PACKAGING_CONDITIONS,
+        is_honey=services.is_honey_material)
+    return jsonify({"id": po["id"], "po_no": po.get("po_no"),
+                    "supplier_id": po.get("supplier_id"),
+                    "supplier_name": po.get("supplier_name") or "",
+                    "html": html})
 
 
 @receiving_bp.route("/<int:batch_id>")
@@ -262,7 +340,8 @@ def batch(batch_id):
     po = db.get("purchase_orders", record.get("po_id")) if record.get("po_id") else None
     return render_template(
         "receiving/batch.html", batch=record, boxes=boxes, po=po,
-        delivery_docs=DELIVERY_DOCS,
+        delivery_docs=DELIVERY_DOCS, has_doc=services.has_delivery_document(record),
+        honey=services.delivery_honey(batch_id),
         badge=services.RECEIVING_BADGE.get(record.get("status"), "badge-muted"),
         received_by=services.user_name(record.get("received_by")),
         awaiting=[b for b in boxes if b["status"] == services.BOX_AWAITING],
@@ -350,7 +429,8 @@ def add_boxes(batch_id):
                                 only=",".join(str(b["id"]) for b in boxes)))
     return render_template(
         "receiving/add.html", batch=record,
-        materials=services.purchasable_materials(),
+        materials=[m for m in services.purchasable_materials()
+                   if not services.is_honey_material(m)],
         categories=services.MATERIAL_CATEGORIES,
         category_of=services.material_category,
         track_labels=services.TRACK_MODE_LABELS,
@@ -411,10 +491,15 @@ def close(batch_id):
         flash(err, "error")
         record = db.get("receiving_batches", batch_id)
     boxes = services.receiving_box_rows(batch_id=batch_id)
+    counts = {s: sum(1 for b in boxes if b["status"] == s)
+              for s in (services.BOX_ACCEPTED, services.BOX_HOLD, services.BOX_REJECTED)}
     return render_template(
-        "receiving/close.html", batch=record, form=form,
+        "receiving/close.html", batch=record, form=form, boxes=boxes, counts=counts,
+        has_doc=services.has_delivery_document(record),
         checks=services.CONTROL_CHECKS, answers=services.CONTROL_ANSWERS,
         awaiting=[b for b in boxes if b["status"] == services.BOX_AWAITING],
+        honey_unchecked=[c for c in services.delivery_honey(batch_id)
+                         if c.get("status") not in services.QC_RESULTS],
         held=[b for b in boxes if b["status"] == services.BOX_HOLD])
 
 
@@ -428,6 +513,18 @@ def _box_or_404(box_id):
     if not rows:
         abort(404)
     return rows[0]
+
+
+def _back_batch(row):
+    """The delivery page to return to after an inspection: ?back=<id> (the
+    delivery page's links, the inspection form's hidden field), else the
+    delivery page this was opened from.  Only the box's own delivery counts."""
+    wanted = _int(request.values.get("back"))
+    if wanted is None and request.referrer:
+        own = url_for("receiving.batch", batch_id=row["batch_id"])
+        if urlparse(request.referrer).path.rstrip("/") == own.rstrip("/"):
+            wanted = row["batch_id"]
+    return row["batch_id"] if wanted == row["batch_id"] else None
 
 
 @receiving_bp.route("/box/<int:box_id>")
@@ -445,7 +542,7 @@ def box(box_id):
         qr_text=services.box_qr_text(record),
         stages=services.BOX_STAGES[1:],
         failed=services.failed_points(record),
-        fefo_first=first,
+        fefo_first=first, back=_back_batch(row),
         can_inspect=can(current_user(), "inspection"))
 
 
@@ -551,7 +648,7 @@ def _lane_page(lane):
     other_waiting = sum(1 for r in rows if r["lane"] == other
                         and r["status"] in (services.BOX_AWAITING, services.BOX_HOLD))
     return render_template("receiving/inspection.html", waiting=waiting,
-                           held=held, done=done[:8], lane_key=lane,
+                           held=held, done=done, lane_key=lane,
                            lane=services.INSPECTION_LANES[lane],
                            other=services.INSPECTION_LANES[other],
                            other_waiting=other_waiting)
@@ -562,8 +659,11 @@ def _lane_page(lane):
 def inspect(box_id):
     row = _box_or_404(box_id)
     g.nav_endpoint = _lane_endpoint(row)
+    back = _back_batch(row)
     if row["status"] != services.BOX_AWAITING:
         flash("Box %s was already inspected." % row["box_code"], "error")
+        if back:
+            return redirect(url_for("receiving.batch", batch_id=back))
         return redirect(url_for("receiving.box", box_id=box_id))
     form = request.form
     if request.method == "POST":
@@ -599,6 +699,13 @@ def inspect(box_id):
                                               box.get("acceptance_status")),
                   "success" if box.get("acceptance_status") == "Accepted"
                   else "error")
+            if back:
+                # Started from the delivery page: the next box of this
+                # delivery, else back to the delivery.
+                nxt = services.receiving_box_rows(batch_id=back, status=services.BOX_AWAITING)
+                if nxt and request.form.get("then") == "next":
+                    return redirect(url_for("receiving.inspect", box_id=nxt[0]["id"], back=back))
+                return redirect(url_for("receiving.batch", batch_id=back))
             nxt = [r for r in services.receiving_box_rows(status=services.BOX_AWAITING)
                    if r["lane"] == row["lane"]]
             if nxt and request.form.get("then") == "next":
@@ -611,8 +718,9 @@ def inspect(box_id):
         points=services.points_for_box(row), check_results=services.CHECK_RESULTS,
         point_types=services.NC_TYPE_FOR_POINT, nc_types=services.NC_TYPES,
         lane_key=row["lane"], lane=services.INSPECTION_LANES[row["lane"]],
-        batch_dates=_batch_dates(row),
-        waiting_count=len([r for r in services.receiving_box_rows(
+        batch_dates=_batch_dates(row), back=back, today=services.today_iso(),
+        waiting_count=len(services.receiving_box_rows(batch_id=back, status=services.BOX_AWAITING))
+        if back else len([r for r in services.receiving_box_rows(
             status=services.BOX_AWAITING) if r["lane"] == row["lane"]]),
         start=1 if request.method == "POST" else 0)
 
@@ -732,9 +840,9 @@ def ncr_list():
     user = current_user()
     if not (can(user, "receiving") or can(user, "inspection")):
         abort(403)
-    show = request.args.get("show") or "open"
-    return render_template("receiving/ncr_list.html", show=show,
-                           rows=services.ncr_rows("open" if show == "open" else None))
+    # Every report; the page's tabs split them by status (an old ?show=
+    # link still works — it is simply ignored).
+    return render_template("receiving/ncr_list.html", rows=services.ncr_rows())
 
 
 @receiving_bp.route("/ncr/<int:ncr_id>")

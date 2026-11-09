@@ -2,7 +2,7 @@
 {% block title %}Dispensing · {{ rec.batch_no }}{% endblock %}
 {% block content %}
 <div class="focus">
-<a class="back-link" href="{{ url_for('production.batch', batch_id=rec.id) }}">{{ icon('arrow-left', 15) }} {{ rec.batch_no }}</a>
+<a class="back-link" href="{{ url_for('production.batch', batch_id=rec.id) }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ rec.batch_no }}</span></a>
 
 <div class="wz-count">Dispensing and weighing</div>
 <h1 class="wz-title">Who weighed and who checked?</h1>

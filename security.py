@@ -95,7 +95,10 @@ PERMISSIONS = {
     # New employees, suppliers, materials and supplies: the Admin adds them,
     # the Super Admin approves them (additions_service.can_add / can_decide).
     "additions":     ADMIN_ROLES,
-    "purchasing":    ADMIN_ROLES,                # preparing / approving POs
+    "purchasing":    ADMIN_ROLES,                # the PO pages and approving POs
+    # Preparing a PO (and closing it as delivered or cancelling it) is the
+    # Admin's alone; the Super Admin only gives the final approval.
+    "po_prepare":    {"admin"},
     # Finance — supplier payments, what is due, and the money accounts.
     "ledger":        ADMIN_ROLES | {"finance_admin"},
     "accounts":      ADMIN_ROLES | {"finance_admin"},   # view balances & statements
@@ -145,7 +148,7 @@ SUPER_ADMIN_ONLY = {"migration", "profiles", "employees", "accounts_transact"}
 
 # Modules where PERMISSIONS is exact — the Admin role does NOT get in by
 # default.  Packing is recorded by the packers and the Super Admin only.
-EXACT_ROLES = {"packing": PERMISSIONS["packing"]}
+EXACT_ROLES = {"packing": PERMISSIONS["packing"], "po_prepare": PERMISSIONS["po_prepare"]}
 
 # Roles that record packing as themselves ("Packed by" is their own name).
 PACKER_ROLES = ("packing_head", "packing_member")
@@ -235,16 +238,19 @@ ROLE_NAV = {
     "receiving_head": [
         ("Receiving", [
             ("dashboard", "Receiving Home",     "dashboard", "auth.dashboard"),
+            # New deliveries start from the log's "Receive a delivery" button.
             ("receiving", "Receiving Log",      "clipboard", "receiving.index"),
-            ("receiving", "Receive a Delivery", "in", "receiving.new"),
-            ("inspection", "Raw Material Inspection",    "inspect", "receiving.inspection"),
-            ("inspection", "Packaging & Supplies Check", "clipboard", "receiving.inspection_supplies"),
-            ("honey",     "Honey Inspection",   "honey", "honey.index"),
             ("supplies",  "Supplies In / Out",  "swap", "supplies.index"),
             ("qr",        "Scan a QR Label",    "qr", "qr.scan"),
         ]),
-        # The records the receiving and inspection work produces.
-        ("Receiving Reports", [
+        # Checking what arrived, one lane per kind of goods.
+        ("Inspection", [
+            ("inspection", "Raw Material Inspection",    "inspect", "receiving.inspection"),
+            ("inspection", "Packaging & Supplies Check", "clipboard", "receiving.inspection_supplies"),
+            ("honey",     "Honey Inspection",   "honey", "honey.index"),
+        ]),
+        # The records and reports both receiving and inspection produce.
+        ("Records & Reports", [
             ("receiving",  "Receiving & Inspection Report", "reports", "receiving.report"),
             ("inspection", "Hold & Rejection Reports",      "shield", "receiving.ncr_list"),
             ("receiving",  "Damage Report",                 "alert", "receiving.damage"),

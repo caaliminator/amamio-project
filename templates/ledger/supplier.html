@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Ledger · {{ supplier.name }}{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('ledger.index') }}">{{ icon('arrow-left', 15) }} Supplier Ledger</a>
+<a class="back-link" href="{{ url_for('ledger.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Supplier Ledger</span></a>
 
 <div class="record-head">
   <div>
@@ -50,16 +50,24 @@
 </div>
 
 {% if payable %}
-<div class="section-label">Purchase orders with a balance</div>
-<div class="queue mb">
+{% from "_ct.html" import ct_box, ct_row, ct_lead with context %}
+<div data-ct="ledger-payable" class="mb">
+{% call ct_box('payable', 'Purchase orders with a balance', 'Press Pay to fill in the payment form below for that PO.', 'amber', 'wallet', payable|length,
+               ['Purchase order', 'Issued', 'Total', 'Paid', 'Still to pay', ''],
+               'minmax(220px, 2fr) minmax(130px, 1fr) minmax(110px, .9fr) minmax(110px, .9fr) minmax(130px, 1fr) minmax(90px, auto)',
+               tabbed=false) %}
   {% for p in payable %}
-  <a class="queue-item" href="{{ url_for('ledger.supplier', supplier_id=supplier.id, po=p.id) }}#pay">
-    <span class="code" style="min-width:96px">{{ p.po_no }}</span>
-    <span class="queue-main"><span class="queue-title">{{ p.balance|peso }} still to pay</span>
-      <span class="queue-sub">Issued {{ p.approved_at }} · {{ p.grand_total|peso }} · paid {{ p.paid|peso }}{% if p.payment_terms %} · {{ p.payment_terms }}{% endif %}{% if p.advance_due %} · {{ p.advance_due|peso }} up front due{% endif %}</span></span>
-    <span class="queue-go">Pay {{ icon('arrow-right', 14) }}</span>
-  </a>
+    {% set pay_url = url_for('ledger.supplier', supplier_id=supplier.id, po=p.id) ~ '#pay' %}
+    {% call ct_row('payable', href=pay_url, date=p.approved_at, search=p.po_no ~ ' ' ~ (p.payment_terms or '')) %}
+      {% call ct_lead('orders', p.po_no, pay_url) %}{{ p.payment_terms or '' }}{% if p.advance_due %}{% if p.payment_terms %} · {% endif %}{{ p.advance_due|peso }} up front due{% endif %}{% endcall %}
+      <div role="cell" class="prt-date">{{ p.approved_at or '—' }}</div>
+      <div role="cell" class="prt-num">{{ p.grand_total|peso }}</div>
+      <div role="cell" class="prt-num">{{ p.paid|peso }}</div>
+      <div role="cell" class="prt-num">{{ p.balance|peso }}</div>
+      <div role="cell" class="prt-cell-end"><a class="btn btn-primary btn-sm" href="{{ pay_url }}">Pay {{ icon('arrow-right', 14) }}</a></div>
+    {% endcall %}
   {% endfor %}
+{% endcall %}
 </div>
 {% endif %}
 

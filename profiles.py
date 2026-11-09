@@ -247,6 +247,67 @@ def save_image(user, kind, upload):
     return filename, None
 
 
+# --- A stand-in e-signature: the name in a handwriting font ----------------------
+# Until a user's real signature is uploaded, one is drawn from their name in
+# a cursive font (one of these, picked by the user so each looks different).
+# The fonts are the computer's own (Windows ships them); none is copied here.
+SIGNATURE_FONTS = ("BRUSHSCI.TTF", "RAGE.TTF", "FREESCPT.TTF", "VLADIMIR.TTF",
+                   "ITCEDSCR.TTF", "PRISTINA.TTF", "MISTRAL.TTF")
+FONT_DIRS = (os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts"),
+             "/usr/share/fonts/truetype", "/Library/Fonts")
+SIGNATURE_INK = (27, 42, 90)        # dark blue, like a pen
+
+
+def _signature_font(user, size):
+    from PIL import ImageFont
+    fonts = [f for f in (os.path.join(d, name) for name in SIGNATURE_FONTS for d in FONT_DIRS)
+             if os.path.isfile(f)]
+    if not fonts:
+        return None
+    # The same user always gets the same hand.
+    pick = fonts[(user.get("id") or 0) % len(fonts)]
+    return ImageFont.truetype(pick, size)
+
+
+def signature_text(user):
+    """First and last name — how most people sign ('Ricardo Villanueva')."""
+    parts = name_parts(user)
+    first = (parts["first_name"] or "").split()
+    last = parts["last_name"] or ""
+    return " ".join(p for p in ((first[0] if first else ""), last) if p) or user.get("name") or ""
+
+
+def make_signature(user):
+    """Draw a cursive stand-in e-signature for the user and store it like an
+    uploaded one (it can be replaced by the real signature any time).
+    Returns (filename, error)."""
+    from PIL import ImageDraw
+    text = signature_text(user)
+    if not text:
+        return None, "The user has no name to sign with."
+    font = _signature_font(user, 120)
+    if not font:
+        return None, "No handwriting font is installed on this computer — upload a signature instead."
+    canvas = Image.new("RGBA", (1800, 420), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(canvas)
+    draw.text((60, 90), text, font=font, fill=SIGNATURE_INK + (255,))
+    # A light underline stroke, as many signatures end with one.
+    box = canvas.getchannel("A").getbbox()
+    if box:
+        x0, x1, y = box[0] + 10, box[2] - 20, box[3] + 14
+        draw.line([(x0, y), ((x0 + x1) // 2, y - 6), (x1, y - 16)], fill=SIGNATURE_INK + (220,), width=4, joint="curve")
+    canvas = canvas.rotate(3, resample=Image.BICUBIC, expand=True)   # a slight upward slant
+    box = canvas.getchannel("A").getbbox()
+    canvas = canvas.crop(box)
+    canvas.thumbnail((900, 300))
+    os.makedirs(upload_dir(), exist_ok=True)
+    filename = "%d-signature-%s.png" % (user["id"], secrets.token_hex(4))
+    canvas.save(os.path.join(upload_dir(), filename), "PNG", optimize=True)
+    remove_image(user, "signature")
+    db.update("users", user["id"], {"signature": filename})
+    return filename, None
+
+
 def remove_image(user, kind):
     path = image_path(user, kind)
     if path:

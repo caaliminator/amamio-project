@@ -1,0 +1,82 @@
+{# A purchase request as a row-card (Purchase Requests, Approvals), and the
+   header row over a table of them.  Import "with context" (uses steps). #}
+{% macro pr_head() %}
+    <div class="prt-head" role="row">
+      <span role="columnheader">Request</span>
+      <span role="columnheader">Items &amp; est. cost</span>
+      <span role="columnheader">Needed by</span>
+      <span role="columnheader">Progress</span>
+      <span role="columnheader">Urgency</span>
+      <span role="columnheader">Status</span>
+    </div>
+{% endmacro %}
+
+{% macro pr_card(r, key, prepare_po=False) %}
+    <div class="prt-card urg-{{ r.urgency|lower }}" data-stage="{{ key }}" data-date="{{ r.date_requested }}"
+         data-needed="{{ r.needed_by }}" data-dept="{{ r.department or '' }}" data-urgency="{{ r.urgency }}"
+         data-search="{{ (r.pr_no ~ ' ' ~ (r.purpose or '') ~ ' ' ~ r.summary ~ ' ' ~ (r.department or '') ~ ' ' ~ r.requested_by ~ ' ' ~ r.status ~ ' ' ~ r.urgency ~ ' ' ~ (r['items']|map(attribute='name')|join(' ')) ~ ' ' ~ (r['items']|map(attribute='supplier')|join(' ')))|lower }}">
+      <div class="prt-row" role="row">
+        <div class="prt-req" role="cell">
+          <button type="button" class="prt-toggle" aria-expanded="false" aria-controls="pri-{{ r.id }}"
+                  aria-label="Show the items of {{ r.pr_no }}">{{ icon('chevron-down', 16) }}</button>
+          <div class="prt-req-text">
+            <a class="prt-title" href="{{ url_for('requests.detail', id=r.id) }}">{{ r.purpose or r.summary }}</a>
+            <div class="prt-sub"><span class="prt-code">{{ r.pr_no }}</span> · {{ r.department or '—' }} · {{ r.requested_by }}</div>
+          </div>
+        </div>
+        <div class="prt-items" role="cell">
+          <div class="prt-bar" aria-hidden="true">
+            {% for it in r['items'] if it.share > 0 %}<span class="seg-{{ it.seg }}" style="width:{{ it.share }}%"></span>{% endfor %}
+          </div>
+          <div class="prt-small"><b>{{ r.total|peso }}</b> · {{ r['items']|length }} item{{ 's' if r['items']|length != 1 }}</div>
+        </div>
+        <div class="prt-date" role="cell">
+          {% if r.needed_by %}{{ r.needed_by|longdate }}
+            {% if r.days_left is not none and r.tone not in ('done', 'red') %}
+            <div class="prt-small {{ 'is-late' if r.days_left < 0 else ('is-soon' if r.days_left <= 3 else '') }}">
+              {% if r.days_left < 0 %}{{ -r.days_left }} day{{ 's' if r.days_left != -1 }} late{% elif r.days_left == 0 %}today{% else %}in {{ r.days_left }} day{{ 's' if r.days_left != 1 }}{% endif %}</div>
+            {% endif %}
+          {% else %}<span class="muted">—</span>{% endif %}
+        </div>
+        <div class="prt-prog" role="cell" title="{{ 'Rejected' if r.rejected else (steps[r.progress - 1] if r.progress else '') }}">
+          {% set pct = (r.progress / steps|length * 100) if not r.rejected else 100 %}
+          <svg viewBox="0 0 36 36" class="prt-ring {{ 'is-rejected' if r.rejected else ('is-done' if r.progress == steps|length else '') }}" aria-hidden="true">
+            <circle cx="18" cy="18" r="15" class="prt-ring-track"/>
+            <circle cx="18" cy="18" r="15" class="prt-ring-fill" pathLength="100" stroke-dasharray="{{ pct }} 100"/>
+          </svg>
+          <span class="prt-ring-text">{{ '✕' if r.rejected else r.progress ~ '/' ~ steps|length }}</span>
+        </div>
+        <div role="cell"><span class="urg-chip urg-{{ r.urgency|lower }}">{% if r.urgency == 'Critical' %}{{ icon('alert', 13) }}{% endif %}{{ r.urgency }}</span></div>
+        <div role="cell"><span class="st-chip tone-{{ r.tone }}">{{ r.status }}</span></div>
+      </div>
+
+      <div class="prt-children" id="pri-{{ r.id }}" hidden>
+        {% for it in r['items'] %}
+        <div class="prt-child">
+          <div class="prt-child-name"><span class="prt-tree" aria-hidden="true"></span>{{ it.name }}</div>
+          <div class="prt-child-cost"><span class="prt-dot seg-{{ it.seg }}"></span>{{ it.cost|peso }}</div>
+          <div class="prt-child-qty">{{ it.qty|qty(it.unit) if it.qty else '—' }}</div>
+          <div class="prt-child-sup">{{ it.supplier or 'No preferred supplier' }}</div>
+          <div class="prt-child-st"><span class="st-chip st-chip-sm tone-{{ it.tone }}">{{ it.status }}{% if it.po_no %} · {{ it.po_no }}{% endif %}</span></div>
+        </div>
+        {% endfor %}
+        <div class="prt-actions">
+          <div class="prt-actions-info">
+            Requested {{ r.date_requested|longdate }}
+            {% if r.waiting_on %}<span class="prt-actions-dot"></span>Waiting for {{ r.waiting_on }}{% endif %}
+            {% if r.po_nos %}<span class="prt-actions-dot"></span>PO {{ r.po_nos|join(', ') }}{% endif %}
+          </div>
+          <div class="prt-actions-btns">
+            {% if prepare_po %}
+            <a class="btn btn-primary btn-sm" href="{{ url_for('purchasing.new', request_id=r.id) }}">{{ icon('orders', 15) }} Prepare PO</a>
+            {% endif %}
+            {% if r.your_turn %}
+            <a class="btn btn-primary btn-sm" href="{{ url_for('approvals.decide', request_id=r.id) }}">{{ icon('approvals', 15) }} Review &amp; approve</a>
+            {% endif %}
+            <a class="btn btn-ghost btn-sm" href="{{ url_for('requests.print_form', id=r.id) }}" target="_blank" rel="noopener">{{ icon('printer', 15) }} Print form</a>
+            <a class="btn btn-ghost btn-sm" href="{{ url_for('requests.detail', id=r.id) }}">View request {{ icon('arrow-right', 15) }}</a>
+          </div>
+        </div>
+      </div>
+    </div>
+{% endmacro %}

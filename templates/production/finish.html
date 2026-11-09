@@ -2,7 +2,7 @@
 {% block title %}Finish {{ rec.batch_no }}{% endblock %}
 {% block content %}
 {% include "production/_inputs.html" %}
-<a class="back-link" href="{{ url_for('production.batch', batch_id=rec.id) }}">{{ icon('arrow-left', 15) }} {{ rec.batch_no }} · {{ rec.product_name }}</a>
+<a class="back-link" href="{{ url_for('production.batch', batch_id=rec.id) }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ rec.batch_no }} · {{ rec.product_name }}</span></a>
 
 {% if shortages %}
 <div class="wizard"><div class="wz-error is-shown" style="margin:0 0 16px">

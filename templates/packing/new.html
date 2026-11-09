@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Record packing{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('packing.index') }}">{{ icon('arrow-left', 15) }} Packing &amp; Dispatch</a>
+<a class="back-link" href="{{ url_for('packing.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Packing &amp; Dispatch</span></a>
 
 {% macro product_card(line) %}
 <div class="line-card" data-line>

@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Equipment IN / OUT log{% endblock %}
 {% block content %}
+{% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead, ct_nothing with context %}
 <div class="focus">
-<a class="back-link" href="{{ url_for('assets.index') }}">{{ icon('arrow-left', 15) }} Equipment &amp; Assets</a>
+<a class="back-link" href="{{ url_for('assets.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Equipment &amp; Assets</span></a>
 <div class="page-head">
   <div>
     <h1 class="page-title">Every IN / OUT</h1>
@@ -13,26 +14,40 @@
   </div>
 </div>
 
-<div class="toolbar">
-  <div class="seg">
-    <a href="{{ url_for('assets.movements') }}" class="{{ 'is-active' if not direction }}">All</a>
-    <a href="{{ url_for('assets.movements', direction='OUT') }}" class="{{ 'is-active' if direction == 'OUT' }}">OUT</a>
-    <a href="{{ url_for('assets.movements', direction='IN') }}" class="{{ 'is-active' if direction == 'IN' }}">IN</a>
-  </div>
-</div>
-
 {% if moves %}
-<div class="queue">
-  {% for m in moves %}
-  <a class="queue-item" href="{{ url_for('assets.detail', asset_id=m.asset_id) }}">
-    <span class="badge {{ 'badge-gold' if m.direction == 'IN' else 'badge-muted' }}" style="min-width:44px;text-align:center">{{ m.direction }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ m.qty|qty }} × {{ m.asset_name }}</span>
-      <span class="queue-sub">{{ m.reason }}{% if m.person %} · {{ m.person }}{% endif %}{% if m.destination and m.destination != m.person %} · {{ m.destination }}{% endif %}{% if m.expected_return %} · back by {{ m.expected_return }}{% endif %}</span>
-    </span>
-    <span class="muted small nowrap">{{ m.when }}</span>
-  </a>
+{% set outs = moves|selectattr('direction', 'equalto', 'OUT')|list %}
+{% set ins = moves|selectattr('direction', 'equalto', 'IN')|list %}
+{% set tabs = [
+  {'key': 'all', 'label': 'All', 'icon': 'swap', 'tone': 'done', 'count': moves|length},
+  {'key': 'out', 'label': 'OUT', 'icon': 'out', 'tone': 'amber', 'count': outs|length},
+  {'key': 'in', 'label': 'IN', 'icon': 'in', 'tone': 'green', 'count': ins|length}] %}
+{# ?direction=OUT / IN opens on that tab. #}
+{% if direction %}<script>try { localStorage.setItem("ct.asset-moves.tab", {{ direction|lower|tojson }}); } catch (e) {}</script>{% endif %}
+<div data-ct="asset-moves">
+{{ ct_topbar(tabs=tabs, search="Search item, reason, person, place…", dates=[('data-date', 'Date')],
+             filters=[('data-reason', 'Reason', moves|map(attribute='reason')|reject('none')|unique|sort|list)]) }}
+{% for key, title, rows in [('all', 'Every IN / OUT', moves), ('out', 'OUT', outs), ('in', 'IN', ins)] %}
+{% call ct_box(key, title, '', 'done', 'swap', rows|length, ['Equipment', 'Direction', 'Reason', 'When', ''],
+               'minmax(220px, 2.2fr) 100px minmax(200px, 1.8fr) minmax(130px, 1fr) minmax(90px, auto)',
+               empty='No movement here matches.') %}
+  {% for m in rows %}
+    {% set where = m.destination if m.destination and m.destination != m.person else '' %}
+    {% call ct_row(key, href=url_for('assets.detail', asset_id=m.asset_id), date=m.day,
+                   search=m.asset_name ~ ' ' ~ m.direction ~ ' ' ~ (m.reason or '') ~ ' ' ~ (m.person or '') ~ ' ' ~ (m.destination or ''),
+                   data={'reason': m.reason}) %}
+      {{ ct_lead('in' if m.direction == 'IN' else 'out', m.qty|qty ~ ' × ' ~ m.asset_name, url_for('assets.detail', asset_id=m.asset_id)) }}
+      <div role="cell"><span class="st-chip tone-{{ 'green' if m.direction == 'IN' else 'amber' }}">{{ m.direction }}</span></div>
+      <div role="cell" class="prt-date">{{ m.reason }}
+        {% if m.person or where or m.expected_return %}<div class="prt-small">{{ m.person or '' }}{% if m.person and where %} · {% endif %}{{ where }}{% if m.expected_return %}{% if m.person or where %} · {% endif %}back by {{ m.expected_return }}{% endif %}</div>{% endif %}</div>
+      <div role="cell" class="prt-date">{{ m.when }}</div>
+      <div role="cell" class="prt-cell-end"><a class="btn btn-ghost btn-sm" href="{{ url_for('assets.detail', asset_id=m.asset_id) }}">Open {{ icon('arrow-right', 14) }}</a></div>
+    {% endcall %}
+  {% else %}
+    <div class="empty" style="padding:24px"><div class="empty-title">Nothing recorded</div></div>
   {% endfor %}
+{% endcall %}
+{% endfor %}
+{{ ct_nothing() }}
 </div>
 {% else %}
 <div class="card"><div class="empty">

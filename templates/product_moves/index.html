@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Products In / Out{% endblock %}
 {% block content %}
+{% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead, ct_nothing with context %}
 <div class="page-head">
   <div>
     <h1 class="page-title">Products In / Out</h1>
@@ -14,46 +15,63 @@
 </div>
 
 {% if moves %}
-<div class="section-label" style="margin-top:0">Latest</div>
-<div class="queue mb">
+<div data-ct="product-moves-latest" class="mb">
+{{ ct_topbar(search="Search product, reason, person…", dates=[('data-date', 'Date')],
+             filters=[('data-direction', 'Direction', ['IN', 'OUT'])]) }}
+{% call ct_box('latest', 'Latest', '', 'done', 'swap', moves|length, ['Product', 'Direction', 'Reason', 'Recorded'],
+               'minmax(220px, 2.2fr) 100px minmax(220px, 2fr) minmax(150px, 1.1fr)',
+               tabbed=false, empty='No movement here matches.') %}
   {% for mv in moves %}
-  <div class="queue-item">
-    <span class="badge {{ 'badge-gold' if mv.direction == 'IN' else 'badge-muted' }}" style="min-width:44px;text-align:center">{{ mv.direction }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ mv.qty|qty(mv.unit) }} · {{ mv.product_name }}</span>
-      <span class="queue-sub">{{ mv.reason }}{% if mv.person %} · {{ mv.person }}{% endif %}{% if mv.reference %} · {{ mv.reference }}{% endif %} · by {{ mv.recorded_by_name }}</span>
-    </span>
-    <span class="muted small nowrap">{{ mv.when }}</span>
-  </div>
+    {% call ct_row('latest', date=mv.when,
+                   search=mv.product_name ~ ' ' ~ mv.direction ~ ' ' ~ (mv.reason or '') ~ ' ' ~ (mv.person or '') ~ ' ' ~ (mv.reference or '') ~ ' ' ~ (mv.recorded_by_name or ''),
+                   data={'direction': mv.direction}) %}
+      {{ ct_lead('in' if mv.direction == 'IN' else 'out', mv.qty|qty(mv.unit) ~ ' · ' ~ mv.product_name) }}
+      <div role="cell"><span class="st-chip tone-{{ 'green' if mv.direction == 'IN' else 'amber' }}">{{ mv.direction }}</span></div>
+      <div role="cell" class="prt-date">{{ mv.reason }}
+        {% set extra = [mv.person, mv.reference]|select|list %}
+        {% if extra %}<div class="prt-small">{{ extra|join(' · ') }}</div>{% endif %}</div>
+      <div role="cell" class="prt-date">{{ mv.when }}<div class="prt-small">by {{ mv.recorded_by_name }}</div></div>
+    {% endcall %}
   {% endfor %}
+{% endcall %}
+{{ ct_nothing("Try other words, dates or filters.") }}
 </div>
 {% endif %}
 
+{% if groups %}
+{% set tabbed = groups|length > 1 %}
+{% set tabs = [] %}
+{% if tabbed %}{% for group, products in groups %}
+  {% set ns = namespace(low=0) %}{% for p in products %}{% if is_low(p) %}{% set ns.low = ns.low + 1 %}{% endif %}{% endfor %}
+  {% set _ = tabs.append({'key': 'g' ~ loop.index, 'label': group, 'icon': 'box', 'tone': 'red' if ns.low else 'done', 'count': products|length}) %}
+{% endfor %}{% endif %}
+<div data-ct="product-moves-products">
+{{ ct_topbar(tabs=tabs, search="Search products…", filters=[('data-stock', 'Stock', ['Low', 'OK'])]) }}
 {% for group, products in groups %}
-<div class="section-label">{{ group }}</div>
-<div class="card mb">
-  <div class="table-wrap">
-    <table class="table">
-      <thead><tr><th>Product</th><th class="text-right">In stock</th><th></th></tr></thead>
-      <tbody>
-        {% for p in products %}
-        <tr>
-          <td>{{ p.name }}{% if is_low(p) %} <span class="badge badge-danger">LOW</span>{% endif %}</td>
-          <td class="text-right nowrap">{{ p.stock_qty|qty(p.unit) }}</td>
-          <td class="text-right nowrap">
-            <a class="btn btn-ghost btn-sm" href="{{ url_for('product_moves.move', product_id=p.id, direction='IN') }}">{{ icon('in', 14) }} IN</a>
-            <a class="btn btn-ghost btn-sm" href="{{ url_for('product_moves.move', product_id=p.id, direction='OUT') }}">{{ icon('out', 14) }} OUT</a>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+{% set key = 'g' ~ loop.index %}
+{% call ct_box(key, group, '', 'done', 'box', products|length, ['Product', 'In stock', 'Stock', ''],
+               'minmax(240px, 2.4fr) minmax(130px, 1fr) minmax(90px, .7fr) minmax(170px, auto)',
+               tabbed=tabbed, empty='No product here matches.') %}
+  {% for p in products %}
+    {% set low = is_low(p) %}
+    {% call ct_row(key, search=p.name ~ ' ' ~ (p.sku or '') ~ ' ' ~ group, data={'stock': 'Low' if low else 'OK'}) %}
+      {{ ct_lead('box', p.name, code=p.sku or '') }}
+      <div role="cell" class="prt-num">{{ p.stock_qty|qty(p.unit) }}</div>
+      <div role="cell">{% if low %}<span class="st-chip tone-red">LOW</span>{% else %}<span class="st-chip tone-green-soft">OK</span>{% endif %}</div>
+      <div role="cell" class="prt-cell-end" style="gap:6px">
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('product_moves.move', product_id=p.id, direction='IN') }}">{{ icon('in', 14) }} IN</a>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('product_moves.move', product_id=p.id, direction='OUT') }}">{{ icon('out', 14) }} OUT</a>
+      </div>
+    {% endcall %}
+  {% endfor %}
+{% endcall %}
+{% endfor %}
+{{ ct_nothing("Try other words — the tabs show how many each has.") }}
 </div>
 {% else %}
 <div class="card"><div class="empty">
   <div class="empty-icon">{{ icon('box', 30) }}</div>
   <div class="empty-title">No products yet</div>
 </div></div>
-{% endfor %}
+{% endif %}
 {% endblock %}

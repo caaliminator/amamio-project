@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ lane.label }}{% endblock %}
 {% block content %}
+{% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead, ct_nothing with context %}
 <div class="page-head">
   <div>
     <h1 class="page-title">{{ lane.label }}</h1>
@@ -20,57 +21,85 @@
 </div>
 {% endif %}
 
-<div class="section-label" style="margin-top:0">Waiting for you ({{ waiting|length }})</div>
-{% if waiting %}
-<div class="queue">
+{% set tabs = [{'key': 'waiting', 'label': 'Waiting for you', 'icon': 'inspect', 'tone': 'amber', 'count': waiting|length}] %}
+{% if held %}{% set _ = tabs.append({'key': 'held', 'label': 'On hold', 'icon': 'pause', 'tone': 'red', 'count': held|length}) %}{% endif %}
+{% if done %}{% set _ = tabs.append({'key': 'done', 'label': 'Inspected', 'icon': 'check', 'tone': 'green', 'count': done|length}) %}{% endif %}
+{% set suppliers = (waiting + held + done)|map(attribute='supplier_name')|reject('none')|unique|sort %}
+{% set tones = {'badge-ok': 'green', 'badge-warn': 'amber', 'badge-danger': 'red'} %}
+
+<div data-ct="inspection-{{ lane_key }}">
+{{ ct_topbar(tabs=tabs, search="Search boxes, materials, suppliers, MRR…", dates=[('data-date', 'Date')],
+             filters=[('data-supplier', 'Supplier', suppliers)]) }}
+
+{% call ct_box('waiting', 'Waiting for you', 'Boxes received and still to be inspected — open one to check it.',
+               'amber', 'inspect', waiting|length, ['Box', 'Quantity', 'Delivery', 'Received', ''],
+               'minmax(240px, 2.2fr) minmax(110px, 1fr) minmax(170px, 1.4fr) minmax(130px, 1fr) minmax(110px, auto)',
+               empty='No box here matches.') %}
   {% for box in waiting %}
-  <a class="queue-item" href="{{ url_for('receiving.inspect', box_id=box.id) }}">
-    <span class="code" style="min-width:58px">{{ box.box_code }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ box.material_name }} — {{ box.declared_qty|qty(box.unit) }}</span>
-      <span class="queue-sub">{{ box.supplier_name }} · {{ box.batch_ref }} · received {{ box.received_at }}</span>
-    </span>
-    <span class="queue-go">Inspect {{ icon('arrow-right', 14) }}</span>
-  </a>
+    {% set href = url_for('receiving.inspect', box_id=box.id) %}
+    {% call ct_row('waiting', href=href, date=box.received_at,
+                   search=box.box_code ~ ' ' ~ box.material_name ~ ' ' ~ (box.supplier_name or '') ~ ' ' ~ (box.batch_ref or ''),
+                   data={'supplier': box.supplier_name}) %}
+      {{ ct_lead('box', box.material_name, href, code=box.box_code) }}
+      <div role="cell" class="prt-num">{{ box.declared_qty|qty(box.unit) }}</div>
+      <div role="cell" class="prt-date">{{ box.supplier_name or '—' }}<div class="prt-small">{{ box.batch_ref }}</div></div>
+      <div role="cell" class="prt-date">{{ box.received_at }}</div>
+      <div role="cell" class="prt-cell-end"><a class="btn btn-primary btn-sm" href="{{ href }}">Inspect {{ icon('arrow-right', 14) }}</a></div>
+    {% endcall %}
+  {% else %}
+    <div class="empty" style="padding:24px">
+      <div class="empty-icon">{{ icon('check', 30) }}</div>
+      <div class="empty-title">Nothing waiting</div>
+      <p class="muted">No {{ lane.short|lower }} waiting. You'll get a notification when the receiving area records a new delivery.</p>
+    </div>
   {% endfor %}
-</div>
-{% else %}
-<div class="card"><div class="empty">
-  <div class="empty-icon">{{ icon('check', 30) }}</div>
-  <div class="empty-title">Nothing waiting</div>
-  <p class="muted">No {{ lane.short|lower }} waiting. You'll get a notification when the receiving area records a new delivery.</p>
-</div></div>
-{% endif %}
+{% endcall %}
 
 {% if held %}
-<div class="section-label">On hold ({{ held|length }})</div>
-<div class="queue">
+{% call ct_box('held', 'On hold', 'Boxes put on hold — decide what happens to them on their hold / rejection report.',
+               'red', 'pause', held|length, ['Box', 'On hold', 'Report', 'Inspected', ''],
+               'minmax(240px, 2fr) minmax(110px, 1fr) minmax(200px, 1.8fr) minmax(130px, 1fr) minmax(100px, auto)',
+               empty='No box here matches.') %}
   {% for box in held %}
-  <a class="queue-item" href="{{ url_for('receiving.box_ncr', box_id=box.id) }}">
-    <span class="code" style="min-width:58px">{{ box.box_code }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ box.material_name }} — {{ box.good_qty|qty(box.unit) }} on hold</span>
-      <span class="queue-sub">{% if box.ncr_no %}{{ box.ncr_no }} · {% endif %}{{ box.nonconformity }}</span>
-    </span>
-    <span class="badge badge-warn">Decide</span>
-  </a>
+    {% set href = url_for('receiving.box_ncr', box_id=box.id) %}
+    {% call ct_row('held', href=href, date=box.checked_at or box.received_at,
+                   search=box.box_code ~ ' ' ~ box.material_name ~ ' ' ~ (box.supplier_name or '') ~ ' ' ~ (box.batch_ref or '') ~ ' ' ~ (box.ncr_no or '') ~ ' ' ~ (box.nonconformity or ''),
+                   data={'supplier': box.supplier_name}) %}
+      {% call ct_lead('box', box.material_name, href, code=box.box_code) %} · {{ box.supplier_name or '—' }}{% endcall %}
+      <div role="cell" class="prt-num">{{ box.good_qty|qty(box.unit) }}</div>
+      <div role="cell" class="prt-date">{{ box.ncr_no or '—' }}{% if box.nonconformity %}<div class="prt-small">{{ box.nonconformity }}</div>{% endif %}</div>
+      <div role="cell" class="prt-date">{{ box.checked_at or '—' }}</div>
+      <div role="cell" class="prt-cell-end"><a class="btn btn-ghost btn-sm" href="{{ href }}">Decide {{ icon('arrow-right', 14) }}</a></div>
+    {% endcall %}
   {% endfor %}
-</div>
+{% endcall %}
 {% endif %}
 
 {% if done %}
-<div class="section-label">Recently inspected</div>
-<div class="queue">
+{% call ct_box('done', 'Inspected', 'Boxes already checked, newest first.',
+               'green', 'check', done|length, ['Box', 'Usable', "Can't use · damaged", 'Inspected', 'Result', ''],
+               'minmax(200px, 2fr) minmax(90px, 1fr) minmax(130px, 1.2fr) minmax(110px, 1fr) minmax(100px, 1fr) minmax(80px, auto)',
+               empty='No box here matches.') %}
   {% for box in done %}
-  <a class="queue-item" href="{{ url_for('receiving.box', box_id=box.id) }}">
-    <span class="code" style="min-width:58px">{{ box.box_code }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ box.material_name }}</span>
-      <span class="queue-sub">{{ box.good_qty|qty(box.unit) }} usable{% if box.unusable_qty %} · {{ box.unusable_qty|qty(box.unit) }} can't be used{% endif %}{% if box.damaged_qty %} · {{ box.damaged_qty|qty(box.unit) }} damaged{% endif %} · {{ box.checked_at }}</span>
-    </span>
-    <span class="badge {{ box.badge }}">{{ box.status }}</span>
-  </a>
+    {% set href = url_for('receiving.box', box_id=box.id) %}
+    {% call ct_row('done', href=href, date=box.checked_at,
+                   search=box.box_code ~ ' ' ~ box.material_name ~ ' ' ~ (box.supplier_name or '') ~ ' ' ~ (box.batch_ref or '') ~ ' ' ~ box.status,
+                   data={'supplier': box.supplier_name}) %}
+      {% call ct_lead('box', box.material_name, href, code=box.box_code) %} · {{ box.supplier_name or '—' }}{% endcall %}
+      <div role="cell" class="prt-num">{{ box.good_qty|qty(box.unit) }}</div>
+      <div role="cell" class="prt-date">
+        {% if box.unusable_qty or box.damaged_qty %}
+          {% if box.unusable_qty %}<div>{{ box.unusable_qty|qty(box.unit) }} can't be used</div>{% endif %}
+          {% if box.damaged_qty %}<div class="prt-small">{{ box.damaged_qty|qty(box.unit) }} damaged</div>{% endif %}
+        {% else %}—{% endif %}
+      </div>
+      <div role="cell" class="prt-date">{{ box.checked_at }}</div>
+      <div role="cell"><span class="st-chip tone-{{ tones.get(box.badge, 'done') }}">{{ box.status }}</span></div>
+      <div role="cell" class="prt-cell-end"><a class="btn btn-ghost btn-sm" href="{{ href }}">Open {{ icon('arrow-right', 14) }}</a></div>
+    {% endcall %}
   {% endfor %}
-</div>
+{% endcall %}
 {% endif %}
+{{ ct_nothing() }}
+</div>
 {% endblock %}

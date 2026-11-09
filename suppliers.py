@@ -92,20 +92,14 @@ def index():
     stype = request.args.get("type") or ""
     if stype not in sup.SUPPLIER_TYPES:
         stype = ""
+    # Every supplier is on the page (a card table with category and type
+    # filters); ?cat= / ?type= / ?q= only preset those filters.
     everyone = _all()
-    counts = {c: sum(1 for s in everyone if s["category"] == c) for c in CATEGORIES}
-    counts["All"] = len(everyone)
-    rows = everyone if cat == "All" else [s for s in everyone if s["category"] == cat]
-    type_counts = {t: sum(1 for s in rows if s.get("supplier_type") == t)
-                   for t in sup.SUPPLIER_TYPES}
-    if stype:
-        rows = [s for s in rows if s.get("supplier_type") == stype]
     waiting = [r for r in adds.pending() if r["kind"] == "supplier"]
-    return render_template("suppliers/index.html", suppliers=rows, cat=cat,
-                           categories=CATEGORIES, counts=counts,
+    return render_template("suppliers/index.html", suppliers=everyone, cat=cat,
+                           categories=CATEGORIES,
                            can_add=adds.can_add(current_user()), waiting=waiting,
                            types=sup.SUPPLIER_TYPES, stype=stype,
-                           type_counts=type_counts,
                            q=request.args.get("q") or "")
 
 

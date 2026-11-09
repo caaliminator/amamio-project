@@ -3,7 +3,7 @@
 {% block title %}Supplies IN / OUT log{% endblock %}
 {% block content %}
 <div class="no-print">
-<a class="back-link" href="{{ url_for('supplies.index', cat=cat or none) }}">{{ icon('arrow-left', 15) }} Supplies In / Out</a>
+<a class="back-link" href="{{ url_for('supplies.index', cat=cat or none) }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Supplies In / Out</span></a>
 <div class="page-head">
   <div>
     <h1 class="page-title">Every IN / OUT</h1>

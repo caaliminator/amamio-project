@@ -70,17 +70,20 @@
   });
 
   /* ---- Minimised sidebar (computers) ----
-     "Collapse menu" folds the sidebar to a rail of icons; the choice is
-     remembered per browser (base.html sets the class before paint).  In the
-     rail each link shows its name on hover (the data-tip tooltip). */
+     The burger at the top of the sidebar folds it to a rail of icons; the
+     choice is remembered per browser (base.html sets the class before
+     paint).  In the rail each link shows its name on hover (the data-tip
+     tooltip).  On a phone the same burger closes the slide-in menu. */
   var MINI_KEY = "amamio.navMini";
+  var DESKTOP = window.matchMedia ? window.matchMedia("(min-width: 900px)") : { matches: true };
   function syncMini() {
     var mini = document.documentElement.classList.contains("nav-mini");
     var btn = document.getElementById("navMini");
     if (btn) {
+      var label = !DESKTOP.matches ? "Close menu" : (mini ? "Expand menu" : "Collapse menu");
       btn.setAttribute("aria-pressed", mini ? "true" : "false");
-      btn.querySelector(".side-text").textContent = mini ? "Expand menu" : "Collapse menu";
-      btn.setAttribute("aria-label", mini ? "Expand menu" : "Collapse menu");
+      btn.setAttribute("aria-label", label);
+      btn.setAttribute("data-tip", label);
     }
     document.querySelectorAll(".sidebar .side-link").forEach(function (a) {
       var label = (a.querySelector(".side-text") || {}).textContent || "";
@@ -89,31 +92,393 @@
     });
   }
   whenReady(syncMini);
+  if (DESKTOP.addEventListener) DESKTOP.addEventListener("change", syncMini);
   document.addEventListener("click", function (e) {
     if (!e.target.closest("#navMini")) return;
+    if (!DESKTOP.matches) {
+      var side = document.getElementById("navLinks");
+      if (side) side.classList.remove("open");
+      return;
+    }
     var mini = document.documentElement.classList.toggle("nav-mini");
     try { window.localStorage.setItem(MINI_KEY, mini ? "1" : "0"); } catch (err) { /* optional */ }
     syncMini();
   });
 
-  /* ---- Confirm dialogs on [data-confirm] elements/forms ---- */
-  document.addEventListener("click", function (e) {
-    var el = e.target.closest("[data-confirm]");
-    if (el && !confirm(el.getAttribute("data-confirm"))) {
-      e.preventDefault();
-      e.stopPropagation();
+  /* ---- Alerts: animated "are you sure?" and result dialogs ----
+     Every button that saves, submits or changes something asks first, in an
+     animated dialog: a gold question for an ordinary action, a red warning
+     for a destructive one (delete, remove, reject, cancel, close, withdraw…).
+     A [data-confirm] question on the button or form is used as the title.
+     Not asked: GET forms (search, filters), the theme and page-note menus,
+     signing in, and anything marked data-no-confirm.  Wizards ask after
+     their own checks (see the wizard's submit handler).
+     The flash messages after a save show as a success (auto-closing) or
+     error dialog.  window.IMS.swal({...}) is there for page scripts too, and
+     alert() uses it. */
+  var DANGER_WORDS = /\b(delete|remove|reject|disapprove|cancel|close|withdraw|discard|void|deactivate|disable|undo|clear|reset)\b/i;
+  var GONE_WORDS = /\b(delete|remove|discard|void)\b/i;      // gone for good
+  function dangerNote(words) {
+    return GONE_WORDS.test(words) ? "This can't be undone." : "Please double-check before you continue.";
+  }
+  var SWAL_ICON = {
+    success: '<svg viewBox="0 0 80 80" class="swal-ico"><circle class="swal-ring" cx="40" cy="40" r="36"/><path class="swal-mark" d="M24 41.5l10.5 10.5L57 29"/></svg>',
+    error: '<svg viewBox="0 0 80 80" class="swal-ico"><circle class="swal-ring" cx="40" cy="40" r="36"/><path class="swal-mark" d="M28 28l24 24M52 28L28 52"/></svg>',
+    warning: '<svg viewBox="0 0 80 80" class="swal-ico"><circle class="swal-ring" cx="40" cy="40" r="36"/><path class="swal-mark" d="M40 22v24"/><circle class="swal-dot" cx="40" cy="56" r="3.2"/></svg>',
+    question: '<svg viewBox="0 0 80 80" class="swal-ico"><circle class="swal-ring" cx="40" cy="40" r="36"/><path class="swal-mark" d="M31 32a9 9 0 1 1 13.5 7.8c-2.6 1.6-4.5 3.4-4.5 6.7V48"/><circle class="swal-dot" cx="40" cy="57" r="3.2"/></svg>',
+    info: '<svg viewBox="0 0 80 80" class="swal-ico"><circle class="swal-ring" cx="40" cy="40" r="36"/><circle class="swal-dot" cx="40" cy="25" r="3.2"/><path class="swal-mark" d="M40 34v24"/></svg>'
+  };
+  var swalOpen = null;     // one dialog at a time; later ones wait
+  var swalQueue = [];
+
+  function swal(opts) {
+    return new Promise(function (resolve) {
+      swalQueue.push({ opts: opts || {}, resolve: resolve });
+      if (!swalOpen) swalNext();
+    });
+  }
+  function swalNext() {
+    var job = swalQueue.shift();
+    if (!job) { swalOpen = null; return; }
+    var o = job.opts, type = o.type || "question";
+    var tone = type === "danger" ? "warning" : type;
+    var back = document.createElement("div");
+    back.className = "swal-backdrop";
+    back.innerHTML =
+      '<div class="swal-box swal-' + type + '" role="' + (o.showCancel === false ? "alertdialog" : "dialog") +
+      '" aria-modal="true" aria-labelledby="swalTitle" aria-describedby="swalText">' +
+      '<div class="swal-icon">' + (SWAL_ICON[tone] || SWAL_ICON.question) + "</div>" +
+      '<h2 class="swal-title" id="swalTitle"></h2>' +
+      '<div class="swal-text" id="swalText"></div>' +
+      '<div class="swal-actions">' +
+      (o.showCancel === false ? "" : '<button type="button" class="btn btn-ghost swal-cancel"></button>') +
+      '<button type="button" class="btn swal-confirm ' + (type === "danger" || type === "error" ? "btn-danger-solid" : "btn-primary") + '"></button>' +
+      "</div>" + (o.timer ? '<div class="swal-timer"><span style="animation-duration:' + o.timer + 'ms"></span></div>' : "") +
+      "</div>";
+    back.querySelector(".swal-title").textContent = o.title || "";
+    var text = back.querySelector(".swal-text");
+    if (o.html) text.innerHTML = o.html; else text.textContent = o.text || "";
+    if (!o.text && !o.html) text.hidden = true;
+    back.querySelector(".swal-confirm").textContent = o.confirmText || "OK";
+    var cancelBtn = back.querySelector(".swal-cancel");
+    if (cancelBtn) cancelBtn.textContent = o.cancelText || "No, go back";
+    var lastFocus = document.activeElement, done = false, timer = null;
+    swalOpen = back;
+    document.body.appendChild(back);
+    document.documentElement.classList.add("swal-shown");
+    function finish(answer) {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      back.classList.add("is-closing");
+      document.removeEventListener("keydown", onKey, true);
+      setTimeout(function () {
+        back.remove();
+        if (!swalQueue.length) document.documentElement.classList.remove("swal-shown");
+        if (lastFocus && lastFocus.focus && document.contains(lastFocus)) { try { lastFocus.focus({ preventScroll: true }); } catch (e) {} }
+        job.resolve(answer);
+        swalNext();
+      }, 160);
     }
-  });
+    function onKey(e) {
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finish(false); }
+      else if (e.key === "Tab") {           // keep the focus inside the dialog
+        var f = back.querySelectorAll("button");
+        var first = f[0], last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    }
+    back.querySelector(".swal-confirm").addEventListener("click", function () { finish(true); });
+    if (cancelBtn) cancelBtn.addEventListener("click", function () { finish(false); });
+    back.addEventListener("mousedown", function (e) { if (e.target === back && o.showCancel !== false) finish(false); });
+    document.addEventListener("keydown", onKey, true);
+    // A destructive question starts on "No"; anything else on the main button.
+    (type === "danger" && cancelBtn ? cancelBtn : back.querySelector(".swal-confirm")).focus();
+    if (o.timer) timer = setTimeout(function () { finish(true); }, o.timer);
+  }
+
+  function lowerFirst(s) { return s ? s.charAt(0).toLowerCase() + s.slice(1) : s; }
+  function buttonLabel(btn) {
+    if (!btn) return "";
+    var t = btn.getAttribute("data-confirm-label") ||
+            (btn.tagName === "INPUT" ? btn.value : btn.textContent) || "";
+    return t.replace(/\s+/g, " ").replace(/[.…]+$/, "").trim();
+  }
+  // What to ask before this form is sent, or null when it doesn't ask.
+  function confirmSpec(form, submitter) {
+    if (!form || (form.getAttribute("method") || "get").toLowerCase() !== "post") return null;
+    if (form.closest("[data-no-confirm]") || (submitter && submitter.hasAttribute("data-no-confirm"))) return null;
+    if (form.id === "themeForm" || form.classList.contains("theme-menu-notes")) return null;
+    if (document.body.classList.contains("no-sidebar")) return null;      // signing in
+    var asked = (submitter && submitter.getAttribute("data-confirm")) || form.getAttribute("data-confirm") || "";
+    var label = form.getAttribute("data-confirm-label") || buttonLabel(submitter) ||
+                buttonLabel(form.querySelector("[type=submit], button:not([type])")) || "Save";
+    var danger = DANGER_WORDS.test(label) || DANGER_WORDS.test(asked) ||
+                 (submitter && DANGER_WORDS.test(submitter.value || ""));
+    return {
+      type: danger ? "danger" : "question",
+      title: asked || label + "?",
+      // A page's own question says it all; otherwise a short reminder.
+      text: (submitter && submitter.getAttribute("data-confirm-text")) || form.getAttribute("data-confirm-text") ||
+            (asked ? "" : danger ? dangerNote(label + " " + ((submitter && submitter.value) || ""))
+                             : "Please make sure everything is correct before you continue."),
+      confirmText: "Yes, " + lowerFirst(label),
+      cancelText: "No, go back"
+    };
+  }
+  // Ask, then send the form exactly as it was (the same button pressed).
+  function confirmSubmit(form, submitter, spec) {
+    swal(spec).then(function (ok) {
+      if (!ok) {
+        // e.g. a dropdown that saves on change goes back to what it was.
+        if (form.hasAttribute("data-reset-on-cancel")) form.reset();
+        return;
+      }
+      form.__swalOK = true;
+      if (typeof form.requestSubmit === "function") {
+        if (submitter && submitter.form === form && !submitter.disabled) form.requestSubmit(submitter);
+        else form.requestSubmit();
+      } else {
+        if (submitter && submitter.name) {
+          var keep = document.createElement("input");
+          keep.type = "hidden"; keep.name = submitter.name; keep.value = submitter.value;
+          form.appendChild(keep);
+        }
+        HTMLFormElement.prototype.submit.call(form);
+      }
+    });
+  }
+  // Wizards call this from their own submit handler, after their checks.
+  function askBeforeSubmit(e, form) {
+    if (form.__swalOK) { form.__swalOK = false; return false; }
+    var spec = confirmSpec(form, e.submitter);
+    if (!spec) return false;
+    e.preventDefault();
+    confirmSubmit(form, e.submitter, spec);
+    return true;
+  }
+
+  // Every other form: asked once its page checks have passed (this runs on
+  // the document, after any check on the form itself).
   document.addEventListener("submit", function (e) {
     var form = e.target;
-    // The button pressed may carry its own question (e.g. "Remove photo").
-    var btn = e.submitter && e.submitter.hasAttribute("data-confirm") ? e.submitter : null;
-    var question = btn ? btn.getAttribute("data-confirm")
-                       : form.matches("[data-confirm]") && form.getAttribute("data-confirm");
-    if (question && !confirm(question)) {
-      e.preventDefault();
-    }
+    if (e.defaultPrevented || form.hasAttribute("data-wizard")) return;
+    askBeforeSubmit(e, form);
+  });
+  // Links and plain buttons with a data-confirm question (submit buttons
+  // are asked by the form above).
+  document.addEventListener("click", function (e) {
+    var el = e.target.closest && e.target.closest("[data-confirm]");
+    if (!el || el.tagName === "FORM") return;
+    var isSubmit = el.form && (el.type === "submit" || (el.tagName === "BUTTON" && !el.getAttribute("type")));
+    if (isSubmit) return;
+    if (el.__swalOK) { el.__swalOK = false; return; }
+    e.preventDefault();
+    e.stopPropagation();
+    var label = buttonLabel(el) || "Continue";
+    var asked = el.getAttribute("data-confirm");
+    var danger = DANGER_WORDS.test(asked) || DANGER_WORDS.test(label);
+    swal({ type: danger ? "danger" : "question", title: asked,
+           text: el.getAttribute("data-confirm-text") || "",
+           confirmText: "Yes, " + lowerFirst(label), cancelText: "No, go back" })
+      .then(function (ok) { if (ok) { el.__swalOK = true; el.click(); } });
   }, true);
+
+  // The messages after a save: success closes by itself, an error waits.
+  whenReady(function () {
+    var area = document.querySelector(".flash-area");
+    if (!area) return;
+    var flashes = Array.prototype.slice.call(area.querySelectorAll(".flash"));
+    if (!flashes.length) return;
+    var errors = flashes.filter(function (f) { return f.classList.contains("flash-error"); });
+    var msgs = (errors.length ? errors : flashes).map(function (f) { return f.textContent.replace(/\s+/g, " ").trim(); });
+    var welcome = !errors.length && msgs.length === 1 && /^Welcome back/i.test(msgs[0]);
+    var html = msgs.map(function (m) { return "<p>" + esc(m) + "</p>"; }).join("");
+    if (errors.length) {
+      swal({ type: "error", title: "Please check", html: html, confirmText: "OK", showCancel: false });
+    } else if (welcome) {
+      swal({ type: "success", title: msgs[0].replace(/\.$/, "") + "!", confirmText: "OK", showCancel: false, timer: 1800 });
+    } else {
+      swal({ type: "success", title: "Done!", html: html, confirmText: "OK", showCancel: false, timer: 2600 });
+    }
+    // Shown in the dialog; the banners for the same messages go.
+    (errors.length ? errors : flashes).forEach(function (f) { f.remove(); });
+    if (!area.querySelector(".flash")) area.remove();
+  });
+
+  // Page scripts' alert() boxes look the same.
+  window.alert = function (message) {
+    swal({ type: "warning", title: String(message), confirmText: "OK", showCancel: false });
+  };
+
+  /* ---- Card tables: tabs of tables whose rows are cards (Purchase
+     Requests, Purchase Orders, Approvals) ----
+       <div data-ct="name">
+         tabs:    .prt-tab[data-tab=key] (with a [data-count]) — optional
+         tables:  [data-stage-card=key], rows .prt-card (data-search text,
+                  data-date / data-* for the filters), pager parts
+                  [data-info] [data-controls] [data-prev] [data-page]
+                  [data-next] and an empty line [data-none]
+         filters: .ct-search, .ct-size, .ct-datekind (its value names the
+                  row attribute holding the date, else data-date),
+                  .ct-from / .ct-to, select[data-ct-filter=attribute],
+                  .ct-clear, and .ct-nothing when nothing matches at all
+       </div>
+     One tab's table shows at a time (the tab picked last time, else the
+     first); every table pages on its own; while filtering, each tab counts
+     its matches.  A click on a card (not on a link or button) opens it. */
+  function cardTable(root) {
+    if (root.dataset.ctReady) return;
+    root.dataset.ctReady = "1";
+    var name = root.getAttribute("data-ct") || "list";
+    var $ = function (sel) { return root.querySelector(sel); };
+    var tabs = Array.prototype.slice.call(root.querySelectorAll(".prt-tab[data-tab]"));
+    var size = $(".ct-size"), search = $(".ct-search"), kind = $(".ct-datekind");
+    var from = $(".ct-from"), to = $(".ct-to"), clear = $(".ct-clear"), nothing = $(".ct-nothing");
+    var selects = Array.prototype.slice.call(root.querySelectorAll("select[data-ct-filter]"));
+    var cards = Array.prototype.map.call(root.querySelectorAll("[data-stage-card]"), function (box) {
+      return { box: box, key: box.getAttribute("data-stage-card"), page: 0,
+               rows: Array.prototype.slice.call(box.querySelectorAll(".prt-card")) };
+    });
+    // Open on the tab picked last time if it has rows, else the first with rows.
+    function hasRows(key) { return cards.some(function (c) { return c.key === key && c.rows.length; }); }
+    var withRows = tabs.filter(function (t) { return hasRows(t.getAttribute("data-tab")); });
+    var state = { tab: (withRows[0] || tabs[0] || { getAttribute: function () { return ""; } }).getAttribute("data-tab") };
+    try {
+      var saved = localStorage.getItem("prtSize");
+      if (saved && size && size.querySelector('option[value="' + saved + '"]')) size.value = saved;
+      var last = localStorage.getItem("ct." + name + ".tab");
+      if (last && hasRows(last)) state.tab = last;
+    } catch (e) {}
+    // A link can open a given tab: ?tab=key (or the older ?show=key).
+    try {
+      var qs = new URLSearchParams(window.location.search);
+      var asked = qs.get("tab") || qs.get("show");
+      if (asked && hasRows(asked)) state.tab = asked;
+    } catch (e) {}
+    function words() { return search ? search.value.toLowerCase().split(/\s+/).filter(Boolean) : []; }
+    function filtersOn() {
+      return !!((from && from.value) || (to && to.value) || selects.some(function (s) { return s.value; }));
+    }
+    function passes(r, w) {
+      var hay = r.getAttribute("data-search") || r.textContent.toLowerCase();
+      if (!w.every(function (x) { return hay.indexOf(x) !== -1; })) return false;
+      var day = (r.getAttribute(kind ? kind.value : "data-date") || "").slice(0, 10);
+      if (from && from.value && (!day || day < from.value)) return false;
+      if (to && to.value && (!day || day > to.value)) return false;
+      return selects.every(function (s) { return !s.value || r.getAttribute(s.getAttribute("data-ct-filter")) === s.value; });
+    }
+    function renderCard(c, w) {
+      var per = size ? (parseInt(size.value, 10) || 10) : 10;
+      var match = c.rows.filter(function (r) { return passes(r, w); });
+      var pages = Math.max(1, Math.ceil(match.length / per));
+      c.page = Math.min(Math.max(c.page, 0), pages - 1);
+      var start = c.page * per, shown = match.slice(start, start + per);
+      c.rows.forEach(function (r) { r.hidden = shown.indexOf(r) === -1; });
+      var q = function (sel) { return c.box.querySelector(sel); };
+      var active = w.length || filtersOn();
+      if (q("[data-none]")) q("[data-none]").hidden = match.length > 0 || !c.rows.length;
+      if (q("[data-info]")) q("[data-info]").innerHTML = match.length
+        ? "Showing <b>" + (start + 1) + "–" + (start + shown.length) + "</b> of <b>" + match.length + "</b>" +
+          (active ? " (of " + c.rows.length + ")" : "") : "";
+      if (q("[data-page]")) q("[data-page]").textContent = "Page " + (c.page + 1) + " of " + pages;
+      if (q("[data-prev]")) q("[data-prev]").disabled = c.page === 0;
+      if (q("[data-next]")) q("[data-next]").disabled = c.page >= pages - 1;
+      if (q("[data-controls]")) q("[data-controls]").hidden = pages <= 1;
+      if (tabs.length) c.box.hidden = state.tab !== c.key;
+      var tab = root.querySelector('.prt-tab[data-tab="' + c.key + '"]');
+      if (tab) {
+        var cnt = tab.querySelector("[data-count]");
+        if (cnt) cnt.textContent = match.length;
+        tab.classList.toggle("is-empty", !!active && match.length === 0);
+      }
+      return match.length;
+    }
+    function render() {
+      var w = words(), total = 0;
+      cards.forEach(function (c) { total += renderCard(c, w); });
+      tabs.forEach(function (t) {
+        var on = t.getAttribute("data-tab") === state.tab;
+        t.classList.toggle("is-active", on);
+        t.setAttribute("aria-selected", on ? "true" : "false");
+        t.tabIndex = on ? 0 : -1;
+      });
+      var active = w.length || filtersOn();
+      if (nothing) nothing.hidden = !(active && total === 0);
+      if (active && total === 0 && tabs.length) cards.forEach(function (c) { c.box.hidden = true; });
+      if (clear) clear.hidden = !active;
+    }
+    function refilter() { cards.forEach(function (c) { c.page = 0; }); render(); }
+    function openTab(key, focus) {
+      state.tab = key;
+      try { localStorage.setItem("ct." + name + ".tab", key); } catch (e) {}
+      render();
+      var t = root.querySelector('.prt-tab[data-tab="' + key + '"]');
+      if (focus && t) t.focus();
+    }
+    if (size) size.addEventListener("change", function () {
+      try { localStorage.setItem("prtSize", size.value); } catch (e) {}
+      refilter();
+    });
+    if (search) search.addEventListener("input", refilter);
+    [from, to, kind].concat(selects).forEach(function (el) { if (el) el.addEventListener("change", refilter); });
+    if (clear) clear.addEventListener("click", function () {
+      if (search) search.value = "";
+      [from, to].concat(selects).forEach(function (el) {
+        if (!el) return;
+        el.value = "";
+        if (el.__syncTypable) el.__syncTypable();   // a typable filter's box
+      });
+      refilter();
+    });
+    cards.forEach(function (c) {
+      var prev = c.box.querySelector("[data-prev]"), next = c.box.querySelector("[data-next]");
+      if (prev) prev.addEventListener("click", function () { c.page--; render(); });
+      if (next) next.addEventListener("click", function () { c.page++; render(); });
+      c.rows.forEach(function (card) {
+        var row = card.querySelector(".prt-row"), kids = card.querySelector(".prt-children");
+        // A row with data-href and nothing to unfold opens its page.
+        if (row && !kids && card.getAttribute("data-href")) {
+          row.addEventListener("click", function (e) {
+            if (e.target.closest("a, button, input, select, label, form")) return;
+            if (window.getSelection && String(window.getSelection())) return;
+            window.location.href = card.getAttribute("data-href");
+          });
+          return;
+        }
+        if (!row || !kids) return;
+        row.addEventListener("click", function (e) {
+          if (e.target.closest("a, button:not(.prt-toggle), input, select, label")) return;
+          var open = kids.hidden;
+          kids.hidden = !open;
+          var btn = card.querySelector(".prt-toggle");
+          if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+          card.classList.toggle("is-open", open);
+        });
+      });
+    });
+    tabs.forEach(function (t, i) {
+      t.addEventListener("click", function () { openTab(t.getAttribute("data-tab")); });
+      t.addEventListener("keydown", function (e) {
+        var k = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+        if (k === undefined) return;
+        e.preventDefault();
+        k = (k + tabs.length) % tabs.length;
+        openTab(tabs[k].getAttribute("data-tab"), true);
+      });
+    });
+    render();
+  }
+  whenReady(function () { document.querySelectorAll("[data-ct]").forEach(cardTable); });
+
+  /* ---- Clickable table rows: <tr data-href="…"> opens that page (links
+     and buttons inside keep their own click). ---- */
+  document.addEventListener("click", function (e) {
+    var tr = e.target.closest && e.target.closest("tr[data-href]");
+    if (!tr || e.target.closest("a, button, input, select, textarea, label")) return;
+    window.location.href = tr.getAttribute("data-href");
+  });
 
   /* ---- Modal open/close ----
      Trigger:  <button data-modal-open="modalId">
@@ -168,29 +533,113 @@
     });
   }
 
-  /* ---- Table paging ----
-     Every .table — and every report .doc-table marked data-paginate — with
-     more than 10 rows shows 10 at a time, with "Show 10 / 25 / 50 / All
-     entries" (remembered per browser), Previous / Next and "Page x of y".  Rows are only hidden, never removed, so forms inside a table
-     still submit every row and printing shows the whole table.  Opt out
-     with data-no-paginate. */
+  /* ---- Tables and lists: filters and paging ----
+     Every list .table and every .queue list (the rows of Purchase Orders,
+     Approvals, Receiving, Honey, Supplies …) with 3 or more rows gets a
+     filter bar above it:
+       · a search box (every word must appear in the row);
+       · when its rows carry dates — written 2026-11-09 or Nov. 9, 2026 — a
+         From / To range (calendars);
+       · drop-downs for short lists: a table column with 2–8 different values
+         (Status, Category, Urgency …), or a list's status badges; up to three.
+     Then paging: 10 at a time, "Show 10 / 15 / 25 / 50 entries"
+     (remembered per browser), Previous / Next, "Showing 1–10 of 23
+     (filtered from 74)".  Report .doc-tables marked data-paginate are paged
+     too.  Rows are only hidden, never removed (forms inside still submit
+     every row; printing shows everything).  Opt out with data-no-paginate
+     or data-no-filter; tables you type into get no filter bar. */
   var PAGE_SIZE = 10;
+  var FILTER_MIN_ROWS = 3;
+  var MONTH_INDEX = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6,
+                      aug: 7, sep: 8, sept: 8, oct: 9, nov: 10, dec: 11 };
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+  // The first date in a text, as YYYY-MM-DD ("" when none).
+  function cellDate(text) {
+    var m = /\b(\d{4})-(\d{2})-(\d{2})\b/.exec(text);
+    if (m) return m[1] + "-" + m[2] + "-" + m[3];
+    m = /\b(Jan|Feb|Mar|Apr|May|June?|July?|Aug|Sept?|Oct|Nov|Dec)[a-z]*\.? (\d{1,2}),? (\d{4})\b/i.exec(text);
+    if (m) {
+      var mi = MONTH_INDEX[m[1].toLowerCase()];
+      if (mi !== undefined) return m[3] + "-" + pad2(mi + 1) + "-" + pad2(+m[2]);
+    }
+    return "";
+  }
+  function cellText(cell) {
+    if (!cell) return "";
+    return (cell.getAttribute("data-filter") || cell.textContent || "").replace(/\s+/g, " ").trim();
+  }
+  function isNumberish(text) { return /^[₱$\-–—]?\s*[\d,.]+\s*[a-zA-Z%]{0,6}$/.test(text) || text === "—" || text === "-"; }
 
-  function paginate(table) {
-    if (table.hasAttribute("data-no-paginate") || table.dataset.paged) return;
-    var body = table.tBodies[0];
-    if (!body) return;
-    var rows = Array.prototype.slice.call(body.rows);
-    if (rows.length <= PAGE_SIZE) return;
-    table.dataset.paged = "1";
+  /* The filter bar + pager for one set of rows.
+     o = { rows, anchor (bar goes before it, pager after), filterable,
+           pageable, columns: [{name, values: rowIndex -> text}],
+           dates: rowIndex -> text holding the date (or null), dateName } */
+  function filterKit(o) {
+    var rows = o.rows, anchor = o.anchor, filterable = o.filterable, pageable = o.pageable;
     var page = 0, size = PAGE_SIZE;
     try { size = parseInt(localStorage.getItem("amamio.pageSize"), 10) || PAGE_SIZE; } catch (e) {}
 
-    var bar = document.createElement("div");
-    bar.className = "pager no-print";
-    bar.innerHTML =
+    var info = rows.map(function (r, i) {
+      return { row: r, text: r.textContent.replace(/\s+/g, " ").toLowerCase(),
+               date: o.dates ? cellDate(o.dates(i) || "") : "",
+               cells: (o.columns || []).map(function (c) { return c.values(i) || ""; }) };
+    });
+    var hasDates = filterable && info.filter(function (x) { return x.date; }).length >= Math.max(2, info.length * 0.5);
+    var cats = [];
+    if (filterable) {
+      (o.columns || []).forEach(function (c, ci) {
+        var vals = info.map(function (x) { return x.cells[ci]; }).filter(Boolean);
+        if (!vals.length || vals.filter(cellDate).length || vals.filter(isNumberish).length >= vals.length * 0.6) return;
+        var distinct = {};
+        vals.forEach(function (v) { if (v.length <= 32) distinct[v] = (distinct[v] || 0) + 1; });
+        var keys = Object.keys(distinct);
+        if (keys.length >= 2 && keys.length <= 8 && keys.length < vals.length &&
+            keys.reduce(function (n, k) { return n + distinct[k]; }, 0) >= vals.length * 0.9 && cats.length < 3) {
+          cats.push({ i: ci, name: c.name || "Value", values: keys.sort() });
+        }
+      });
+    }
+
+    // A short table with nothing to pick from (no dates, no short lists)
+    // gets no bar — a search box over 3–5 rows adds nothing.
+    if (filterable && !hasDates && !cats.length && rows.length < 6) filterable = false;
+    if (!filterable && !pageable) return;
+    var state = { q: "", from: "", to: "", cats: {} };
+    var bar = null, clearBtn = null, none = null;
+    if (filterable) {
+      bar = document.createElement("div");
+      bar.className = "tf-bar no-print";
+      var html = '<label class="tf-search"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+                 '<input type="search" class="tf-q" placeholder="Search…" aria-label="Search these rows" autocomplete="off"></label>';
+      if (hasDates) {
+        var dateName = o.dateName || "Date";
+        html += '<div class="tf-pill tf-dates" role="group" aria-label="' + esc(dateName) + '">' +
+                '<span class="tf-pill-label"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg> ' + esc(dateName) + '</span>' +
+                '<input type="date" class="tf-from" aria-label="' + esc(dateName) + ' from">' +
+                '<span class="tf-arrow" aria-hidden="true">→</span>' +
+                '<input type="date" class="tf-to" aria-label="' + esc(dateName) + ' to"></div>';
+      }
+      cats.forEach(function (c, i) {
+        html += '<label class="tf-pill"><span class="tf-pill-label">' + esc(c.name) + '</span><select class="tf-cat" data-i="' + i + '" aria-label="' + esc(c.name) + '">' +
+                '<option value="">All</option>' + c.values.map(function (v) { return "<option>" + esc(v) + "</option>"; }).join("") +
+                "</select></label>";
+      });
+      html += '<button type="button" class="tf-clear" hidden><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg> Clear</button>';
+      bar.innerHTML = html;
+      anchor.parentNode.insertBefore(bar, anchor);
+      none = document.createElement("div");
+      none.className = "tf-none";
+      none.hidden = true;
+      none.textContent = "Nothing matches these filters.";
+      anchor.parentNode.insertBefore(none, anchor.nextSibling);
+      clearBtn = bar.querySelector(".tf-clear");
+    }
+
+    var pager = document.createElement("div");
+    pager.className = "pager no-print";
+    pager.innerHTML =
       '<span class="pager-left"><label class="pager-size">Show <select aria-label="Rows per page">' +
-        '<option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="100000">All</option>' +
+        '<option value="10">10</option><option value="15">15</option><option value="25">25</option><option value="50">50</option>' +
         "</select> entries</label>" +
       '<span class="pager-info" aria-live="polite"></span></span>' +
       '<span class="pager-controls">' +
@@ -198,17 +647,15 @@
         '<span class="pager-page"></span>' +
         '<button type="button" class="pager-btn" data-dir="1" aria-label="Next page">Next &rsaquo;</button>' +
       "</span>";
-
-    var anchor = table.closest(".table-wrap") || table;
-    anchor.parentNode.insertBefore(bar, anchor.nextSibling);
-
-    var info = bar.querySelector(".pager-info");
-    var label = bar.querySelector(".pager-page");
-    var prev = bar.querySelector('[data-dir="-1"]');
-    var next = bar.querySelector('[data-dir="1"]');
-    var sizeBox = bar.querySelector(".pager-size select");
+    (none || anchor).parentNode.insertBefore(pager, (none || anchor).nextSibling);
+    var sizeBox = pager.querySelector(".pager-size select");
+    if (!pageable) pager.querySelector(".pager-size").hidden = true;
     if (!sizeBox.querySelector('option[value="' + size + '"]')) size = PAGE_SIZE;
     sizeBox.value = String(size);
+    if (!pageable) size = 100000;
+    var infoEl = pager.querySelector(".pager-info"), label = pager.querySelector(".pager-page");
+    var controls = pager.querySelector(".pager-controls");
+    var prev = pager.querySelector('[data-dir="-1"]'), next = pager.querySelector('[data-dir="1"]');
     sizeBox.addEventListener("change", function () {
       size = parseInt(sizeBox.value, 10) || PAGE_SIZE;
       try { localStorage.setItem("amamio.pageSize", String(size)); } catch (e) {}
@@ -216,36 +663,161 @@
       render();
     });
 
+    function passes(x) {
+      if (state.q && !state.q.split(/\s+/).every(function (w) { return x.text.indexOf(w) !== -1; })) return false;
+      if (state.from && (!x.date || x.date < state.from)) return false;
+      if (state.to && (!x.date || x.date > state.to)) return false;
+      for (var k in state.cats) {
+        if (state.cats[k] && x.cells[cats[k].i] !== state.cats[k]) return false;
+      }
+      return true;
+    }
+    function filtering() {
+      return !!(state.q || state.from || state.to ||
+                Object.keys(state.cats).some(function (k) { return state.cats[k]; }));
+    }
     function render() {
-      var pages = Math.max(1, Math.ceil(rows.length / size));
+      var active = filtering();
+      var match = info.filter(function (x) { return !active || passes(x); }).map(function (x) { return x.row; });
+      (o.extraRows || []).forEach(function (r) { r.classList.toggle("is-filtered-out", active); });
+      rows.forEach(function (r) { r.classList.toggle("is-filtered-out", active && match.indexOf(r) === -1); });
+      var total = match.length;
+      var pages = Math.max(1, Math.ceil(total / size));
       page = Math.min(Math.max(page, 0), pages - 1);
-      var start = page * size;
-      var end = Math.min(start + size, rows.length);
-      rows.forEach(function (row, i) {
-        row.classList.toggle("is-paged-out", i < start || i >= end);
-      });
-      info.innerHTML = "Showing <b>" + (start + 1) + "&ndash;" + end +
-        "</b> of <b>" + rows.length + "</b>";
+      var start = page * size, end = Math.min(start + size, total);
+      rows.forEach(function (r) { r.classList.remove("is-paged-out"); });
+      match.forEach(function (r, i) { r.classList.toggle("is-paged-out", i < start || i >= end); });
+      infoEl.innerHTML = total
+        ? "Showing <b>" + (start + 1) + "&ndash;" + end + "</b> of <b>" + total + "</b>" +
+          (active ? ' <span class="tf-of">(filtered from ' + rows.length + ")</span>" : "")
+        : "No matches";
       label.textContent = "Page " + (page + 1) + " of " + pages;
       prev.disabled = page === 0;
       next.disabled = page >= pages - 1;
+      controls.hidden = pages <= 1;
+      if (none) none.hidden = total > 0;
+      if (clearBtn) clearBtn.hidden = !active;
+      if (filterable) anchor.hidden = total === 0;
     }
-
     function go(delta) {
       page += delta;
       render();
-      // Keep the top of the table in view after changing page.
-      var top = anchor.getBoundingClientRect().top;
+      var top = (bar || anchor).getBoundingClientRect().top;
       if (top < 80) window.scrollBy({ top: top - 90, behavior: "smooth" });
     }
-
     prev.addEventListener("click", function () { go(-1); });
     next.addEventListener("click", function () { go(1); });
+
+    if (bar) {
+      var q = bar.querySelector(".tf-q");
+      var from = bar.querySelector(".tf-from"), to = bar.querySelector(".tf-to");
+      q.addEventListener("input", function () { state.q = q.value.toLowerCase().trim(); page = 0; render(); });
+      [from, to].forEach(function (inp) {
+        if (!inp) return;
+        inp.addEventListener("change", function () {
+          state.from = from.value; state.to = to.value;
+          page = 0; render();
+        });
+      });
+      bar.querySelectorAll(".tf-cat").forEach(function (sel) {
+        sel.addEventListener("change", function () { state.cats[sel.getAttribute("data-i")] = sel.value; page = 0; render(); });
+      });
+      clearBtn.addEventListener("click", function () {
+        state = { q: "", from: "", to: "", cats: {} };
+        bar.querySelectorAll("input, select").forEach(function (el) { el.value = ""; });
+        page = 0; render();
+      });
+    }
     render();
+  }
+
+  function markSetFilters(bar) {
+    bar.querySelectorAll(".tf-pill").forEach(function (p) {
+      var on = Array.prototype.some.call(p.querySelectorAll("input, select:not([data-kind])"),
+                                         function (el) { return !!el.value; });
+      p.classList.toggle("is-set", on);
+    });
+  }
+  ["change", "input"].forEach(function (type) {
+    document.addEventListener(type, function (e) {
+      var bar = e.target.closest && e.target.closest(".tf-bar");
+      if (bar) markSetFilters(bar);
+    });
+  });
+  document.addEventListener("click", function (e) {
+    var clear = e.target.closest && e.target.closest(".tf-clear");
+    if (clear) setTimeout(function () { markSetFilters(clear.closest(".tf-bar")); }, 0);
+  });
+
+  function paginate(table) {
+    if (table.dataset.paged) return;
+    var body = table.tBodies[0];
+    if (!body) return;
+    var rows = Array.prototype.slice.call(body.rows);
+    var isDoc = table.classList.contains("doc-table");
+    var heads = table.tHead && table.tHead.rows.length
+      ? Array.prototype.slice.call(table.tHead.rows[table.tHead.rows.length - 1].cells) : [];
+    // Only plain data rows take part (not a "nothing here" row across the table).
+    var dataRows = rows.filter(function (r) { return !heads.length || r.cells.length >= heads.length; });
+    var extra = rows.filter(function (r) { return dataRows.indexOf(r) === -1; });
+    var filterable = !isDoc && !table.hasAttribute("data-no-filter") && dataRows.length >= FILTER_MIN_ROWS &&
+                     heads.length > 1 && !body.querySelector("input:not([type=hidden]), select, textarea");
+    var pageable = !table.hasAttribute("data-no-paginate") && rows.length > PAGE_SIZE;
+    if (!filterable && !pageable) return;
+    table.dataset.paged = "1";
+    // The date column: the first one mostly holding dates.
+    var dateCol = -1;
+    heads.forEach(function (th, ci) {
+      if (dateCol > -1) return;
+      var vals = dataRows.map(function (r) { return cellText(r.cells[ci]); }).filter(Boolean);
+      if (vals.length && vals.filter(cellDate).length >= vals.length * 0.6) dateCol = ci;
+    });
+    filterKit({
+      rows: filterable ? dataRows : rows, extraRows: filterable ? extra : [],
+      anchor: table.closest(".table-wrap") || table, filterable: filterable, pageable: pageable,
+      dates: dateCol > -1 ? function (i) { return cellText(dataRows[i].cells[dateCol]); } : null,
+      dateName: dateCol > -1 ? cellText(heads[dateCol]) : "",
+      columns: heads.map(function (th, ci) {
+        return { name: cellText(th), values: function (i) { return ci === dateCol ? "" : cellText(dataRows[i].cells[ci]); } };
+      })
+    });
+  }
+
+  // A .queue list: its rows are the .queue-item children.
+  function listTools(list) {
+    if (list.dataset.paged) return;
+    if (list.querySelector("input:not([type=hidden]), select, textarea")) return;     // a list you type into
+    var rows = Array.prototype.filter.call(list.children, function (el) { return el.classList.contains("queue-item"); });
+    // data-no-filter: the page has its own search — no filter bar, but still
+    // 10 per page (its search shows every match while in use).
+    var ownSearch = list.hasAttribute("data-no-filter") || !!list.closest("[data-no-filter]");
+    var filterable = !ownSearch && rows.length >= FILTER_MIN_ROWS, pageable = rows.length > PAGE_SIZE;
+    if (!filterable && !pageable) return;
+    list.dataset.paged = "1";
+    var badges = rows.map(function (r) {
+      return Array.prototype.map.call(r.querySelectorAll(".badge, .st-chip, .urg-chip"), cellText);
+    });
+    var most = badges.reduce(function (n, b) { return Math.max(n, b.length); }, 0);
+    var cols = [];
+    for (var k = 0; k < Math.min(most, 3); k++) {
+      (function (k) {
+        var vals = badges.map(function (b) { return b[k] || ""; });
+        var urgency = vals.some(function (v) { return /^(Normal|Urgent|Critical)$/.test(v); });
+        cols.push({ name: urgency ? "Urgency" : (k === most - 1 ? "Status" : "Type"),
+                    values: function (i) { return vals[i]; } });
+      })(k);
+    }
+    filterKit({
+      rows: rows, anchor: list, filterable: filterable, pageable: pageable,
+      dates: function (i) { return rows[i].textContent.replace(/\s+/g, " "); },
+      dateName: list.getAttribute("data-date-label") || "Date",
+      columns: cols
+    });
   }
 
   function paginateAll(root) {
     (root || document).querySelectorAll("table.table, table.doc-table[data-paginate]").forEach(paginate);
+    (root || document).querySelectorAll(".queue").forEach(listTools);
   }
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () { paginateAll(); });
@@ -368,7 +940,8 @@
     nav.className = "wz-nav";
     var cancelHref = form.getAttribute("data-cancel");
     nav.innerHTML =
-      '<button type="button" class="btn btn-ghost" data-wz-back>Back</button>' +
+      '<button type="button" class="btn btn-ghost btn-back" data-wz-back>' +
+        '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Back</button>' +
       (cancelHref ? '<a class="btn btn-ghost" data-wz-cancel href="' + esc(cancelHref) + '">Cancel</a>' : "") +
       '<span class="wz-spacer"></span>' +
       '<button type="button" class="btn btn-primary" data-wz-next>Next</button>' +
@@ -528,6 +1101,8 @@
         var ok = fieldsOf(s).every(function (el) { return el.checkValidity(); });
         if (!ok) { e.preventDefault(); go(vis[i]); validate(s); return; }
       }
+      // All good: ask "are you sure?" first (Alerts, above).
+      if (askBeforeSubmit(e, form)) return;
       // Fields in skipped steps must not be submitted.
       steps.forEach(function (s, i) {
         if (vis.indexOf(i) === -1) {
@@ -892,6 +1467,84 @@
       }
     }, true);
   })();
+
+  /* ---- Typable dropdowns: <select data-typable> ----
+     The select stays the real field (hidden; its name, value, "change"
+     event, page scripts and the wizard's review all keep working); a
+     searchable box (the combo above) sits in front of it.  The empty option
+     (e.g. "All", "Not listed") is the first entry and the placeholder;
+     disabled options are left out.  Leaving the box with text that matches
+     no option puts back the current choice.  Also used for the long
+     filters of the card tables (Supplier, and any filter of 9+ choices). */
+  function typableSelect(sel) {
+    if (sel.__typable) return;
+    sel.__typable = true;
+    var opts = [], empty = "";
+    Array.prototype.forEach.call(sel.options, function (o) {
+      if (o.disabled) return;
+      if (o.value === "") { empty = o.textContent.trim(); opts.unshift({ v: "", l: empty }); return; }
+      var g = o.parentNode && o.parentNode.tagName === "OPTGROUP" ? o.parentNode.label : "";
+      opts.push({ v: o.value, l: o.textContent.trim(), g: g });
+    });
+    var combo = document.createElement("div");
+    combo.className = "combo typable" + (sel.closest(".tf-pill") ? " tf-combo" : "");
+    combo.setAttribute("data-combo", "");
+    combo.__options = opts;
+    var input = document.createElement("input");
+    input.type = "text";
+    input.className = "combo-input";
+    input.autocomplete = "off";
+    input.placeholder = empty || "Type to search…";
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-expanded", "false");
+    input.setAttribute("aria-label", sel.getAttribute("aria-label") ||
+      (sel.id && document.querySelector('label[for="' + sel.id + '"]') || {}).textContent || "Search");
+    if (sel.id) {
+      input.id = sel.id + "_search";
+      var lab = document.querySelector('label[for="' + sel.id + '"]');
+      if (lab) lab.setAttribute("for", input.id);
+    }
+    if (sel.required) { input.required = true; sel.required = false; }
+    sel.parentNode.insertBefore(combo, sel);
+    combo.appendChild(input);
+    combo.appendChild(sel);
+    sel.hidden = true;
+    sel.tabIndex = -1;
+    function textOf() {
+      var o = sel.options[sel.selectedIndex];
+      return o && sel.value !== "" ? o.textContent.trim() : "";
+    }
+    function show() { input.value = textOf(); input.disabled = sel.disabled; }
+    sel.__syncTypable = show;
+    function set(v) {
+      if (sel.value === v) return;
+      sel.value = v;
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    combo.addEventListener("combo:pick", function (e) { set(e.detail.v); show(); });
+    input.addEventListener("input", function () { if (!input.value.trim()) set(""); });
+    // Text that names no option: back to the current choice.
+    input.addEventListener("blur", function () {
+      setTimeout(function () {
+        var q = input.value.trim().toLowerCase();
+        var hit = opts.filter(function (o) { return o.l.toLowerCase() === q; })[0];
+        if (hit) set(hit.v);
+        show();
+      }, 0);
+    });
+    sel.addEventListener("change", show);
+    // A page script may disable the select (e.g. "own harvest").
+    if (window.MutationObserver) new MutationObserver(show).observe(sel, { attributes: true, attributeFilter: ["disabled"] });
+    show();
+  }
+  window.typableSelect = typableSelect;
+  whenReady(function () {
+    document.querySelectorAll("select[data-typable]").forEach(typableSelect);
+    // Card-table filters: Supplier always, any other with 9+ choices.
+    document.querySelectorAll("[data-ct] select[data-ct-filter]").forEach(function (s) {
+      if (/supplier/.test(s.getAttribute("data-ct-filter")) || s.options.length > 9) typableSelect(s);
+    });
+  });
 
   /* ---- Calendar for every <input type="date"> ----
      The browser's own date popup can't be styled, so date fields open this
@@ -1269,6 +1922,7 @@
       if (m) m.classList.remove("open");
     },
     fetchJSON: fetchJSON,
+    swal: swal,
     paginate: paginateAll
   };
 })();

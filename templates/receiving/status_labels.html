@@ -15,7 +15,7 @@
   @media print { .status-word { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 </style>
 <div class="no-print">
-  <a class="back-link" href="{{ url_for('receiving.batch', batch_id=batch.id) }}">{{ icon('arrow-left', 15) }} {{ batch.ref_no }}</a>
+  <a class="back-link" href="{{ url_for('receiving.batch', batch_id=batch.id) }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ batch.ref_no }}</span></a>
   <div class="page-head">
     <div>
       <h1 class="page-title">Status labels</h1>

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Add new {{ kind_label|lower }}{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('additions.index') }}">{{ icon('arrow-left', 15) }} New Records</a>
+<a class="back-link" href="{{ url_for('additions.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> New Records</span></a>
 
 {% set chosen = form.category or (categories[0] if kind == 'material' else '') %}
 <form method="post" class="wizard" data-wizard data-submit-label="Send for approval"
@@ -80,7 +80,7 @@
       <div class="form-grid cols-2">
         <div class="form-row">
           <label class="form-label" for="supplier_id">Usual supplier</label>
-          <select id="supplier_id" name="supplier_id">
+          <select id="supplier_id" name="supplier_id" data-typable>
             <option value="">— None yet —</option>
             {% for s in suppliers %}<option value="{{ s.id }}" {{ 'selected' if form.supplier_id == s.id|string }}>{{ supplier_label(s, suppliers) }}</option>{% endfor %}
           </select>

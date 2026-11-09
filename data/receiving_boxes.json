@@ -643,40 +643,86 @@
     "declared_qty": 150.0,
     "lot_no": "LEMON-2026-11-002",
     "supplier_lot": "LEM-1016",
-    "expiry_date": "",
-    "mfg_date": "",
+    "expiry_date": "2026-11-10",
+    "mfg_date": "2026-11-09",
     "packaging_condition": "Good / intact",
     "temperature_c": 26.5,
-    "good_qty": null,
+    "good_qty": 150.0,
     "unusable_qty": 0.0,
     "unusable_reason": "",
     "damaged_qty": 0.0,
     "damage_reason": "",
-    "cleaned": false,
-    "visual_inspection": "",
-    "coa_check": "",
-    "sampling_test": "",
-    "acceptance_status": "",
+    "cleaned": true,
+    "visual_inspection": "Pass",
+    "coa_check": "Complete",
+    "sampling_test": "Passed",
+    "acceptance_status": "Accepted",
     "nonconformity": "",
-    "action_taken": "",
+    "action_taken": "Accepted",
     "verified_by_name": "",
-    "inspection_no": "",
-    "visual_description": "",
-    "checklist": {},
-    "test_parameter": "",
-    "test_spec": "",
-    "test_result": "",
-    "test_method": "",
-    "checked_by": null,
-    "checked_at": null,
-    "status": "Awaiting Inspection",
-    "stage": "Receiving Area",
+    "inspection_no": "INS-2026-0011",
+    "visual_description": "cac",
+    "checklist": {
+      "identity": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "quantity": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "packaging": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "cleanliness": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "pest": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "odor": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "lot": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "dates": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "coa": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "transport": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "test": {
+        "result": "Pass",
+        "remarks": ""
+      }
+    },
+    "test_parameter": "ee",
+    "test_spec": "ee",
+    "test_result": "e",
+    "test_method": "ee",
+    "checked_by": 3,
+    "checked_at": "2026-11-09T07:32:58.303891+00:00",
+    "status": "Accepted",
+    "stage": "Storage Area",
     "location": "Receiving Area",
     "released_to": "",
-    "released_at": null,
+    "released_at": "2026-11-09T09:06:51.639661+00:00",
     "received_by": 3,
     "created_at": "2026-11-08T13:02:46.806893+00:00",
-    "id": 13
+    "id": 13,
+    "checklist_lane": "raw"
   },
   {
     "batch_id": 6,
@@ -691,10 +737,198 @@
     "declared_qty": 150.0,
     "lot_no": "LEMON-2026-11-002",
     "supplier_lot": "LEM-1016",
-    "expiry_date": "",
-    "mfg_date": "",
+    "expiry_date": "2026-11-10",
+    "mfg_date": "2026-11-09",
     "packaging_condition": "Good / intact",
     "temperature_c": 26.5,
+    "good_qty": 150.0,
+    "unusable_qty": 0.0,
+    "unusable_reason": "",
+    "damaged_qty": 0.0,
+    "damage_reason": "",
+    "cleaned": true,
+    "visual_inspection": "Pass",
+    "coa_check": "Complete",
+    "sampling_test": "Passed",
+    "acceptance_status": "Accepted",
+    "nonconformity": "",
+    "action_taken": "Accepted",
+    "verified_by_name": "",
+    "inspection_no": "INS-2026-0012",
+    "visual_description": "asx",
+    "checklist": {
+      "identity": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "quantity": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "packaging": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "cleanliness": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "pest": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "odor": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "lot": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "dates": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "coa": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "transport": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "test": {
+        "result": "Pass",
+        "remarks": ""
+      }
+    },
+    "test_parameter": "as",
+    "test_spec": "asc",
+    "test_result": "asc",
+    "test_method": "asc",
+    "checked_by": 3,
+    "checked_at": "2026-11-09T07:42:51.796419+00:00",
+    "status": "Accepted",
+    "stage": "Storage Area",
+    "location": "Receiving Area",
+    "released_to": "",
+    "released_at": null,
+    "received_by": 3,
+    "created_at": "2026-11-08T13:02:46.847862+00:00",
+    "id": 14,
+    "checklist_lane": "raw"
+  },
+  {
+    "batch_id": 7,
+    "box_code": "RB-15",
+    "seq": 1,
+    "material_id": 1,
+    "material_name": "Raw Honey",
+    "unit": "kg",
+    "po_id": 2,
+    "po_line_no": 1,
+    "track_mode": "weight",
+    "declared_qty": 2.0,
+    "lot_no": "RAWHONEY-2026-11-001",
+    "supplier_lot": "",
+    "expiry_date": "2026-11-13",
+    "mfg_date": "2026-11-03",
+    "packaging_condition": "",
+    "temperature_c": null,
+    "good_qty": 2.0,
+    "unusable_qty": 0.0,
+    "unusable_reason": "",
+    "damaged_qty": 0.0,
+    "damage_reason": "",
+    "cleaned": true,
+    "visual_inspection": "Pass",
+    "coa_check": "Complete",
+    "sampling_test": "Passed",
+    "acceptance_status": "Accepted",
+    "nonconformity": "e",
+    "action_taken": "Accepted",
+    "verified_by_name": "",
+    "inspection_no": "INS-2026-0013",
+    "visual_description": "qwe",
+    "checklist": {
+      "identity": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "quantity": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "packaging": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "cleanliness": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "pest": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "odor": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "lot": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "dates": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "coa": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "transport": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "test": {
+        "result": "Pass",
+        "remarks": ""
+      }
+    },
+    "test_parameter": "12",
+    "test_spec": "12",
+    "test_result": "123",
+    "test_method": "qwe1",
+    "checked_by": 3,
+    "checked_at": "2026-11-09T09:35:02.629448+00:00",
+    "status": "Accepted",
+    "stage": "Storage Area",
+    "location": "Receiving Area",
+    "released_to": "",
+    "released_at": null,
+    "received_by": 3,
+    "created_at": "2026-11-09T09:32:59.032231+00:00",
+    "id": 15,
+    "checklist_lane": "raw"
+  },
+  {
+    "batch_id": 7,
+    "box_code": "RB-16",
+    "seq": 2,
+    "material_id": 5,
+    "material_name": "Calamansi",
+    "unit": "kg",
+    "po_id": 2,
+    "po_line_no": 2,
+    "track_mode": "weight",
+    "declared_qty": 11.0,
+    "lot_no": "CALAMANSI-2026-11-002",
+    "supplier_lot": "",
+    "expiry_date": "",
+    "mfg_date": "",
+    "packaging_condition": "",
+    "temperature_c": null,
     "good_qty": null,
     "unusable_qty": 0.0,
     "unusable_reason": "",
@@ -723,7 +957,197 @@
     "released_to": "",
     "released_at": null,
     "received_by": 3,
-    "created_at": "2026-11-08T13:02:46.847862+00:00",
-    "id": 14
+    "created_at": "2026-11-09T09:32:59.132294+00:00",
+    "id": 16
+  },
+  {
+    "batch_id": 8,
+    "box_code": "RB-17",
+    "seq": 1,
+    "material_id": 1,
+    "material_name": "Raw Honey",
+    "unit": "kg",
+    "po_id": null,
+    "po_line_no": null,
+    "track_mode": "weight",
+    "declared_qty": 22.0,
+    "lot_no": "RAWHONEY-2026-11-002",
+    "supplier_lot": "",
+    "expiry_date": "",
+    "mfg_date": "",
+    "packaging_condition": "",
+    "temperature_c": null,
+    "good_qty": null,
+    "unusable_qty": 0.0,
+    "unusable_reason": "",
+    "damaged_qty": 0.0,
+    "damage_reason": "",
+    "cleaned": false,
+    "visual_inspection": "",
+    "coa_check": "",
+    "sampling_test": "",
+    "acceptance_status": "",
+    "nonconformity": "",
+    "action_taken": "",
+    "verified_by_name": "",
+    "inspection_no": "",
+    "visual_description": "",
+    "checklist": {},
+    "test_parameter": "",
+    "test_spec": "",
+    "test_result": "",
+    "test_method": "",
+    "checked_by": null,
+    "checked_at": null,
+    "status": "Awaiting Inspection",
+    "stage": "Receiving Area",
+    "location": "Receiving Area",
+    "released_to": "",
+    "released_at": null,
+    "received_by": 3,
+    "created_at": "2026-11-09T09:38:20.366505+00:00",
+    "id": 17
+  },
+  {
+    "batch_id": 9,
+    "box_code": "RB-18",
+    "seq": 1,
+    "material_id": 2,
+    "material_name": "Lemon",
+    "unit": "pc",
+    "po_id": 1,
+    "po_line_no": 1,
+    "track_mode": "piece",
+    "declared_qty": 360.0,
+    "lot_no": "LEMON-2026-11-003",
+    "supplier_lot": "",
+    "expiry_date": "2026-11-11",
+    "mfg_date": "2026-11-09",
+    "packaging_condition": "",
+    "temperature_c": null,
+    "good_qty": 360.0,
+    "unusable_qty": 0.0,
+    "unusable_reason": "",
+    "damaged_qty": 0.0,
+    "damage_reason": "",
+    "cleaned": true,
+    "visual_inspection": "Pass",
+    "coa_check": "Complete",
+    "sampling_test": "Passed",
+    "acceptance_status": "Accepted",
+    "nonconformity": "",
+    "action_taken": "Accepted",
+    "verified_by_name": "",
+    "inspection_no": "INS-2026-0014",
+    "visual_description": "qwdqwd",
+    "checklist": {
+      "identity": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "quantity": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "packaging": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "cleanliness": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "pest": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "odor": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "lot": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "dates": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "coa": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "transport": {
+        "result": "Pass",
+        "remarks": ""
+      },
+      "test": {
+        "result": "Pass",
+        "remarks": ""
+      }
+    },
+    "test_parameter": "11",
+    "test_spec": "22",
+    "test_result": "22",
+    "test_method": "22",
+    "checked_by": 3,
+    "checked_at": "2026-11-09T13:03:11.652334+00:00",
+    "status": "Accepted",
+    "stage": "Storage Area",
+    "location": "Receiving Area",
+    "released_to": "",
+    "released_at": null,
+    "received_by": 3,
+    "created_at": "2026-11-09T12:34:33.774491+00:00",
+    "id": 18,
+    "checklist_lane": "raw"
+  },
+  {
+    "batch_id": 9,
+    "box_code": "RB-19",
+    "seq": 2,
+    "material_id": 3,
+    "material_name": "Ginger",
+    "unit": "kg",
+    "po_id": 1,
+    "po_line_no": 2,
+    "track_mode": "weight",
+    "declared_qty": 10.0,
+    "lot_no": "GINGER-2026-11-003",
+    "supplier_lot": "",
+    "expiry_date": "",
+    "mfg_date": "",
+    "packaging_condition": "",
+    "temperature_c": null,
+    "good_qty": null,
+    "unusable_qty": 0.0,
+    "unusable_reason": "",
+    "damaged_qty": 0.0,
+    "damage_reason": "",
+    "cleaned": false,
+    "visual_inspection": "",
+    "coa_check": "",
+    "sampling_test": "",
+    "acceptance_status": "",
+    "nonconformity": "",
+    "action_taken": "",
+    "verified_by_name": "",
+    "inspection_no": "",
+    "visual_description": "",
+    "checklist": {},
+    "test_parameter": "",
+    "test_spec": "",
+    "test_result": "",
+    "test_method": "",
+    "checked_by": null,
+    "checked_at": null,
+    "status": "Awaiting Inspection",
+    "stage": "Receiving Area",
+    "location": "Receiving Area",
+    "released_to": "",
+    "released_at": null,
+    "received_by": 3,
+    "created_at": "2026-11-09T12:34:33.858662+00:00",
+    "id": 19
   }
 ]

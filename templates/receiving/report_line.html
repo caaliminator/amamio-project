@@ -3,7 +3,7 @@
 {% block title %}{{ r.material_name }} · {{ r.mrr_no }}{% endblock %}
 {% block content %}
 <div class="toolbar no-print">
-  <a class="back-link" style="margin:0" href="{{ back }}">{{ icon('arrow-left', 15) }} Receiving &amp; Inspection Report</a>
+  <a class="back-link" style="margin:0" href="{{ back }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Receiving &amp; Inspection Report</span></a>
   <div class="flex gap-sm wrap">
     <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.batch', batch_id=r.batch_id) }}">Delivery {{ r.mrr_no }}</a>
     <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.mrr', batch_id=r.batch_id) }}">Receiving report (MRR)</a>

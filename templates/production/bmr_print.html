@@ -3,7 +3,7 @@
 {% block title %}BMR {{ rec.batch_no }}{% endblock %}
 {% block content %}
 <div class="toolbar no-print">
-  <a class="back-link" style="margin:0" href="{{ url_for('production.batch', batch_id=rec.id) }}">{{ icon('arrow-left', 15) }} {{ rec.batch_no }}</a>
+  <a class="back-link" style="margin:0" href="{{ url_for('production.batch', batch_id=rec.id) }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ rec.batch_no }}</span></a>
   <button class="btn btn-primary" type="button" onclick="window.print()">{{ icon('printer', 15) }} Print</button>
 </div>
 

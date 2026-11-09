@@ -203,7 +203,7 @@ def count():
                                               if services.material_category(m) == k])
                        for k in CATEGORY_KEYS},
         system=svc.system_closing(materials, periods),
-        recent=svc.count_rows(limit=4))
+        recent=svc.count_rows(limit=24))
 
 
 @supplies_bp.route("/report")

@@ -1,23 +1,34 @@
 {% extends "base.html" %}
 {% block title %}Receive a delivery{% endblock %}
 {% block content %}
+{% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead, ct_nothing with context %}
 <div class="focus">
-<a class="back-link" href="{{ url_for('receiving.index') }}">{{ icon('arrow-left', 15) }} Receiving Area</a>
+<a class="back-link" href="{{ url_for('receiving.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Receiving Area</span></a>
 
 <h1 class="page-title">Which purchase order is this delivery for?</h1>
 <p class="page-sub">Match it with the PO no. on the supplier's delivery receipt. The supplier and the items ordered will be filled in for you.</p>
 
-<div class="queue mb">
+{% set suppliers = orders|map(attribute='supplier_name')|reject('none')|unique|sort %}
+<div data-ct="choose-po" class="mb">
+{{ ct_topbar(search="Search PO no., suppliers, items…", dates=[('data-date', 'Expected')],
+             filters=[('data-supplier', 'Supplier', suppliers)]) }}
+{% call ct_box('orders', 'Open purchase orders', 'Approved orders with goods still to come.',
+               'green-soft', 'orders', orders|length, ['Purchase order', 'Still to come', 'Expected', ''],
+               'minmax(220px, 2fr) minmax(220px, 2.4fr) minmax(130px, 1fr) minmax(120px, auto)',
+               tabbed=false, empty='No purchase order here matches.') %}
   {% for po in orders %}
-  <a class="queue-item" href="{{ url_for('receiving.new', po=po.id) }}">
-    <span class="code" style="min-width:96px">{{ po.po_no }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ po.supplier_name }}</span>
-      <span class="queue-sub">Still to come: {{ po.summary }}{% if po.expected_delivery %} · expected {{ po.expected_delivery }}{% endif %}</span>
-    </span>
-    <span class="queue-go">Receive {{ icon('arrow-right', 14) }}</span>
-  </a>
+    {% set href = url_for('receiving.new', po=po.id) %}
+    {% call ct_row('orders', href=href, date=po.expected_delivery,
+                   search=(po.po_no or '') ~ ' ' ~ (po.supplier_name or '') ~ ' ' ~ (po.summary or ''),
+                   data={'supplier': po.supplier_name}) %}
+      {{ ct_lead('orders', po.supplier_name or '—', href, code=po.po_no) }}
+      <div role="cell" class="prt-date">{{ po.summary }}</div>
+      <div role="cell" class="prt-date">{{ po.expected_delivery|longdate if po.expected_delivery else '—' }}</div>
+      <div role="cell" class="prt-cell-end"><a class="btn btn-primary btn-sm" href="{{ href }}">Receive {{ icon('arrow-right', 14) }}</a></div>
+    {% endcall %}
   {% endfor %}
+{% endcall %}
+{{ ct_nothing("Try other words or dates — or receive it without a purchase order below.") }}
 </div>
 
 <a class="queue-item" href="{{ url_for('receiving.new', po='none') }}">

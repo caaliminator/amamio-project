@@ -2,7 +2,7 @@
 {% block title %}MRR {{ batch.ref_no }}{% endblock %}
 {% block content %}
 <div class="toolbar no-print">
-  <a class="back-link" style="margin:0" href="{{ url_for('receiving.batch', batch_id=batch.id) }}">{{ icon('arrow-left', 15) }} {{ batch.ref_no }}</a>
+  <a class="back-link" style="margin:0" href="{{ url_for('receiving.batch', batch_id=batch.id) }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ batch.ref_no }}</span></a>
   <button class="btn btn-primary" type="button" onclick="window.print()">{{ icon('printer', 15) }} Print</button>
 </div>
 

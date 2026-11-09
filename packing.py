@@ -78,7 +78,7 @@ def index():
                   key=lambda x: x.get("created_at", ""), reverse=True)
     waiting = [_run_row(r) for r in runs if r.get("status") == "Packed"]
     in_progress = [_run_row(r) for r in runs if r.get("status") == "In Progress"]
-    recent = [_run_row(r) for r in runs if services.is_dispatched(r)][:8]
+    recent = [_run_row(r) for r in runs if services.is_dispatched(r)][:50]
     return render_template(
         "packing/index.html", waiting=waiting, in_progress=in_progress,
         recent=recent, period=period,

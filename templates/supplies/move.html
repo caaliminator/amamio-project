@@ -9,7 +9,7 @@
   .bt-new { font-size: 1.05rem; }
 </style>
 {% set back = url_for('supplies.item', material_id=form.material_id) if form.material_id else url_for('supplies.index', cat=preset_cat or none) %}
-<a class="back-link" href="{{ back }}">{{ icon('arrow-left', 15) }} {{ 'Back to the item' if form.material_id else 'Supplies In / Out' }}</a>
+<a class="back-link" href="{{ back }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ 'the item' if form.material_id else 'Supplies In / Out' }}</span></a>
 
 <form method="post" action="{{ url_for('supplies.move') }}" class="wizard" id="supForm" data-wizard
       data-wizard-start="{{ start }}" data-submit-label="Save" data-cancel="{{ back }}">

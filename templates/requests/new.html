@@ -5,7 +5,7 @@
   .sup-info { margin-top: 6px; padding: 6px 10px; border-radius: 8px; background: var(--raise-3); font-size: .8rem; color: var(--muted); }
   .sup-info[hidden] { display: none; }
 </style>
-<a class="back-link" href="{{ url_for('requests.index') }}">{{ icon('arrow-left', 15) }} Purchase Requests</a>
+<a class="back-link" href="{{ url_for('requests.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Purchase Requests</span></a>
 
 {% macro item_card(line) %}
 <div class="line-card" data-line>

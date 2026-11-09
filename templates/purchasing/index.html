@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Purchase Orders{% endblock %}
 {% block content %}
+{% from "purchasing/_cards.html" import po_head, po_card with context %}
+{% from "requests/_cards.html" import pr_head, pr_card with context %}
 <div class="page-head">
   <div>
     <h1 class="page-title">Purchase Orders</h1>
@@ -15,27 +17,6 @@
   <div class="figure"><div class="figure-label">POs for final approval (Super Admin)</div><div class="figure-value">{{ counts.for_final }}</div></div>
   <div class="figure"><div class="figure-label">Approved, waiting for delivery</div><div class="figure-value">{{ counts.approved }}</div></div>
 </div>
-
-<div class="section-label">Approved requests waiting for a PO ({{ awaiting|length }})</div>
-{% if awaiting %}
-<div class="queue mb">
-  {% for r in awaiting %}
-  <a class="queue-item" href="{{ url_for('purchasing.new', request_id=r.id) }}">
-    <span class="code" style="min-width:96px">{{ r.pr_no }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ r.purpose or r.summary }}</span>
-      <span class="queue-sub">{{ r.lines }} approved item(s) · {{ r.department or '—' }}{% if r.needed_by %} · needed {{ r.needed_by }}{% endif %}</span>
-    </span>
-    <span class="queue-go">Prepare PO {{ icon('arrow-right', 14) }}</span>
-  </a>
-  {% endfor %}
-</div>
-{% else %}
-<div class="card mb"><div class="empty" style="padding:24px">
-  <div class="empty-title">Nothing waiting</div>
-  <p class="muted">Approve a purchase request under <a href="{{ url_for('approvals.index') }}">Approvals</a> and it shows up here.</p>
-</div></div>
-{% endif %}
 {% endif %}
 
 <div class="toolbar">
@@ -44,23 +25,114 @@
     <a href="{{ url_for('purchasing.index', show='all') }}" class="{{ 'is-active' if show != 'open' }}">All POs</a>
   </div>
 </div>
-{% if orders %}
-<div class="queue">
-  {% for po in orders %}
-  <a class="queue-item" href="{{ url_for('purchasing.detail', po_id=po.id) }}">
-    <span class="code" style="min-width:96px">{{ po.po_no }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ po.supplier_name }}</span>
-      <span class="queue-sub">{{ po['items']|length }} item(s) · PO date {{ po.po_date }}{% if po.expected_delivery %} · expected {{ po.expected_delivery }}{% endif %}{% if po.payment_terms %} · {{ po.payment_terms }}{% endif %}</span>
+
+{% if awaiting or groups %}
+{# A tab per stage — "Needs a PO" (approved requests to order), then the
+   POs by stage — each its own table of cards that open to their items.
+   Runs on the shared card-table component (app.js "Card tables"). #}
+<div data-ct="orders">
+<div class="prt-topbar">
+  <div class="prt-tabs" role="tablist" aria-label="Stages">
+    {% if awaiting %}
+    <button type="button" class="prt-tab tone-blue" role="tab" data-tab="needs" aria-selected="false" tabindex="-1">
+      <span class="prt-tab-ico">{{ icon('orders', 16) }}</span><span class="prt-tab-name">Needs a PO</span>
+      <span class="prt-tab-count" data-count>{{ awaiting|length }}</span></button>
+    {% endif %}
+    {% for g in groups %}
+    <button type="button" class="prt-tab tone-{{ g.tone }}" role="tab" data-tab="{{ g.key }}" aria-selected="false" tabindex="-1">
+      <span class="prt-tab-ico">{{ icon(g.icon, 16) }}</span><span class="prt-tab-name">{{ g.title.split(' — ')[0] }}</span>
+      <span class="prt-tab-count" data-count>{{ g.rows|length }}</span></button>
+    {% endfor %}
+  </div>
+  <div class="tf-bar prt-filters">
+    <label class="tf-search">{{ icon('search', 15) }}
+      <input type="search" class="ct-search" placeholder="Search POs, suppliers, items…" autocomplete="off" aria-label="Search purchase orders"></label>
+    <div class="tf-pill tf-dates" role="group" aria-label="Date">
+      <span class="tf-pill-label">{{ icon('calendar', 15) }}</span>
+      <select class="tf-kind ct-datekind" data-kind aria-label="Which date">
+        <option value="data-date">PO date</option><option value="data-delivery">Delivery</option><option value="data-needed">Needed by</option>
+      </select>
+      <span class="tf-sep" aria-hidden="true"></span>
+      <input type="date" class="ct-from" aria-label="From">
+      <span class="tf-arrow" aria-hidden="true">→</span>
+      <input type="date" class="ct-to" aria-label="To">
+    </div>
+    {% if suppliers|length > 1 %}
+    <label class="tf-pill"><span class="tf-pill-label">Supplier</span>
+      <select data-ct-filter="data-supplier" aria-label="Supplier"><option value="">All</option>
+        {% for s in suppliers %}<option>{{ s }}</option>{% endfor %}</select></label>
+    {% endif %}
+    <label class="tf-pill"><span class="tf-pill-label">Payment</span>
+      <select data-ct-filter="data-paid" aria-label="Payment"><option value="">All</option>
+        <option>Unpaid</option><option>Partly paid</option><option>Paid</option></select></label>
+    <button type="button" class="tf-clear ct-clear" hidden>{{ icon('close', 13) }} Clear</button>
+  </div>
+  <div class="prt-topbar-tools">
+    <label class="prt-show">Show
+      <select class="ct-size" aria-label="Rows per page in each table"><option value="10">10</option><option value="15">15</option><option value="25">25</option><option value="50">50</option></select>
+      entries</label>
+  </div>
+</div>
+
+{% if awaiting %}
+<section class="prt-box prt-stage-card tone-blue" data-stage-card="needs" role="tabpanel" hidden>
+  <div class="prt-final-head">
+    <span class="prt-final-icon">{{ icon('orders', 18) }}</span>
+    <div>
+      <h2 class="prt-final-title">Approved requests waiting for a PO <span class="pr-group-count">{{ awaiting|length }}</span></h2>
+      <div class="prt-final-sub">{{ 'Fully approved; open one and press Prepare PO.' if can('po_prepare') else 'Fully approved; the Admin prepares the PO.' }}</div>
+    </div>
+  </div>
+  <div class="prt" role="table" aria-label="Approved requests waiting for a PO">
+    {{ pr_head() }}
+    {% for r in awaiting %}{{ pr_card(r, 'needs', prepare_po=can('po_prepare')) }}{% endfor %}
+    <div class="prt-empty" data-none hidden>No request here matches.</div>
+  </div>
+  <div class="prt-foot">
+    <span class="prt-info" data-info aria-live="polite"></span>
+    <span class="pager-controls" data-controls>
+      <button type="button" class="pager-btn" data-prev>&lsaquo; Previous</button>
+      <span class="pager-page" data-page></span>
+      <button type="button" class="pager-btn" data-next>Next &rsaquo;</button>
     </span>
-    <b class="nowrap">{{ po.grand_total|peso }}</b>
-    <span class="badge {{ po_badge.get(po.status, 'badge-muted') }}">{{ po.status }}</span>
-  </a>
-  {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% for g in groups %}
+<section class="prt-box prt-stage-card tone-{{ g.tone }}" data-stage-card="{{ g.key }}" role="tabpanel" hidden>
+  <div class="prt-final-head">
+    <span class="prt-final-icon">{{ icon(g.icon, 18) }}</span>
+    <div>
+      <h2 class="prt-final-title">{{ g.title }} <span class="pr-group-count">{{ g.rows|length }}</span></h2>
+      <div class="prt-final-sub">{{ g.sub }}</div>
+    </div>
+  </div>
+  <div class="prt po-table" role="table" aria-label="{{ g.title }}">
+    {{ po_head() }}
+    {% for p in g.rows %}{{ po_card(p, g.key) }}{% endfor %}
+    <div class="prt-empty" data-none hidden>No purchase order here matches.</div>
+  </div>
+  <div class="prt-foot">
+    <span class="prt-info" data-info aria-live="polite"></span>
+    <span class="pager-controls" data-controls>
+      <button type="button" class="pager-btn" data-prev>&lsaquo; Previous</button>
+      <span class="pager-page" data-page></span>
+      <button type="button" class="pager-btn" data-next>Next &rsaquo;</button>
+    </span>
+  </div>
+</section>
+{% endfor %}
+<div class="card prt-nothing ct-nothing" hidden><div class="empty">
+  <div class="empty-title">Nothing matches</div>
+  <p class="muted">Try other words or dates — the tabs show how many each stage has.</p>
+</div></div>
 </div>
 {% else %}
 <div class="card"><div class="empty" style="padding:24px">
+  <div class="empty-icon">{{ icon('orders', 30) }}</div>
   <div class="empty-title">{{ 'No open purchase orders' if show == 'open' else 'No purchase orders yet' }}</div>
+  <p class="muted">Approve a purchase request under <a href="{{ url_for('approvals.index') }}">Approvals</a>; it shows up here to be ordered.</p>
 </div></div>
 {% endif %}
 {% endblock %}

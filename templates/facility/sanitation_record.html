@@ -2,7 +2,7 @@
 {% block title %}Cleaning {{ rec.record_date }}{% endblock %}
 {% block content %}
 <div class="focus">
-<a class="back-link" href="{{ url_for('facility.sanitation') }}">{{ icon('arrow-left', 15) }} Cleaning &amp; Sanitation</a>
+<a class="back-link" href="{{ url_for('facility.sanitation') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Cleaning &amp; Sanitation</span></a>
 
 <div class="record-head">
   <div>
@@ -62,7 +62,7 @@
     <dt>Phase</dt><dd>{{ rec.phase }}</dd>
     <dt>Conducted by</dt><dd>{{ rec.conducted_by }}</dd>
     <dt>Inspected by</dt><dd>{{ rec.inspected_by }}</dd>
-    {% if rec.remarks %}<dt>Remarks</dt><dd>{{ rec.remarks }}</dd>{% endif %}
+    {% if rec.remarks %}<dt>Remarks</dt><dd><span class="note-inline">{{ rec.remarks }}</span></dd>{% endif %}
     <dt>Recorded by</dt><dd>{{ rec.recorded_by_name }} · {{ rec.created }}</dd>
   </dl>
   <a class="btn btn-ghost btn-sm mt" href="{{ url_for('facility.sanitation_print', **{'from': rec.record_date, 'to': rec.record_date}) }}">{{ icon('printer', 15) }} Print this day</a>

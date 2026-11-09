@@ -3,7 +3,7 @@
 {% block content %}
 <div class="flex gap mb" style="justify-content: space-between; flex-wrap: wrap;">
   <h1 class="page-title" style="margin: 0;">New Sales Order</h1>
-  <a class="btn btn-ghost" href="{{ url_for('orders.index') }}">Back to orders</a>
+  <a class="btn btn-ghost btn-back" href="{{ url_for('orders.index') }}">{{ icon('arrow-left', 15) }} Back to orders</a>
 </div>
 
 {% if not customers %}

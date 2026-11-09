@@ -2,7 +2,7 @@
 {% block title %}{{ ncr.report_no }}{% endblock %}
 {% block content %}
 <div class="toolbar no-print">
-  <a class="back-link" style="margin:0" href="{{ url_for('receiving.ncr', ncr_id=ncr.id) }}">{{ icon('arrow-left', 15) }} {{ ncr.report_no }}</a>
+  <a class="back-link" style="margin:0" href="{{ url_for('receiving.ncr', ncr_id=ncr.id) }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ ncr.report_no }}</span></a>
   <button class="btn btn-primary" type="button" onclick="window.print()">{{ icon('printer', 15) }} Print</button>
 </div>
 

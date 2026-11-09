@@ -107,8 +107,10 @@
             {{ u.email or '—' }}{% if u.phone %}<span class="cell-sub">{{ u.phone }}</span>{% endif %}
           </td>
           <td>
-            <form method="post" action="{{ url_for('auth.change_role', id=u.id) }}">
-              <select name="role" onchange="this.form.submit()" style="width:168px"
+            <form method="post" action="{{ url_for('auth.change_role', id=u.id) }}"
+                  data-confirm="Change {{ u.name }}'s role?" data-confirm-label="Change the role"
+                  data-confirm-text="What they can open changes at once." data-reset-on-cancel>
+              <select name="role" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()" style="width:168px"
                       {{ 'disabled' if u.role == 'super_admin' and not can_manage_super }}>
                 {% for key in roles %}
                   {% if key != 'super_admin' or can_manage_super or u.role == 'super_admin' %}

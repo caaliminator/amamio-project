@@ -29,21 +29,18 @@ def _row(r):
 @module_required("additions")
 def index():
     user = current_user()
-    show = request.args.get("show") or "waiting"
+    # Every record is on the page, a tab per status (the card-table kit);
+    # ?show= only picks the tab it opens on.
+    show = request.args.get("show") or ""
     if show not in SHOW:
-        show = "waiting"
+        show = ""
     rows = sorted(db.read("creation_requests"),
                   key=lambda r: r.get("created_at") or "", reverse=True)
-    counts = {"waiting": sum(1 for r in rows if r.get("status") == adds.PENDING),
-              "approved": sum(1 for r in rows if r.get("status") == adds.APPROVED),
-              "rejected": sum(1 for r in rows if r.get("status") == adds.REJECTED),
-              "all": len(rows)}
-    wanted = {"waiting": adds.PENDING, "approved": adds.APPROVED,
-              "rejected": adds.REJECTED}.get(show)
-    if wanted:
-        rows = [r for r in rows if r.get("status") == wanted]
     return render_template("additions/index.html", rows=[_row(r) for r in rows],
-                           show=show, counts=counts, can_add=adds.can_add(user),
+                           show=show, kinds=adds.KINDS,
+                           statuses=(adds.PENDING, adds.APPROVED, adds.REJECTED,
+                                     adds.WITHDRAWN),
+                           can_add=adds.can_add(user),
                            can_decide=adds.can_decide(user))
 
 

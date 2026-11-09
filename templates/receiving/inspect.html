@@ -1,11 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Inspect {{ box.box_code }}{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for(lane.endpoint) }}">{{ icon('arrow-left', 15) }} {{ lane.label }}</a>
+{# Opened from a delivery page (back): saving returns to that delivery. #}
+{% if back %}
+<a class="back-link" href="{{ url_for('receiving.batch', batch_id=back) }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ box.batch_ref }}</span></a>
+{% else %}
+<a class="back-link" href="{{ url_for(lane.endpoint) }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ lane.label }}</span></a>
+{% endif %}
 
 <form method="post" class="wizard" data-wizard data-wizard-start="{{ start }}"
-      data-submit-label="Save inspection" data-cancel="{{ url_for('receiving.box', box_id=box.id) }}" id="inspectForm" enctype="multipart/form-data">
+      data-submit-label="Save inspection" data-cancel="{{ url_for('receiving.batch', batch_id=back) if back else url_for('receiving.box', box_id=box.id) }}" id="inspectForm" enctype="multipart/form-data">
   <input type="hidden" name="has_losses" id="has_losses" value="0">
+  {% if back %}<input type="hidden" name="back" value="{{ back }}">{% endif %}
 
   <section class="wz-step" data-title="Is this the right box?" data-no-review
            data-hint="Check the code on the label matches before you start.">
@@ -23,7 +29,7 @@
           </div>
         </div>
       </div>
-      {% if waiting_count > 1 %}<p class="muted small mt">{{ waiting_count - 1 }} more box(es) are waiting after this one.</p>{% endif %}
+      {% if waiting_count > 1 %}<p class="muted small mt">{{ waiting_count - 1 }} more box(es){{ ' of this delivery' if back }} are waiting after this one.</p>{% endif %}
     </div>
   </section>
 
@@ -135,7 +141,7 @@
               {% if key == 'dates' %}
               <span class="chk-dates">
                 <label><span>Manufactured</span>
-                  <input type="date" name="mfg_date" value="{{ form.mfg_date or batch_dates[0] }}" data-review-label="Manufactured"></label>
+                  <input type="date" name="mfg_date" value="{{ form.mfg_date or batch_dates[0] }}" max="{{ today }}" data-review-label="Manufactured"></label>
                 <label><span>Expiry / best before</span>
                   <input type="date" name="expiry_date" value="{{ form.expiry_date or batch_dates[1] }}" data-review-label="Expiry / best before"></label>
               </span>
@@ -241,8 +247,9 @@
            data-hint="This is the {{ lane.form }} for {{ box.box_code }}. Check it, then save — your name goes on it as the inspector.">
     <div class="wz-body is-bare">
       {% if waiting_count > 1 %}
-      <label class="check-row mt"><input type="checkbox" name="then" value="next" checked data-review-skip> Go straight to the next box after saving</label>
+      <label class="check-row mt"><input type="checkbox" name="then" value="next" checked data-review-skip> Go straight to the next box {{ 'of this delivery ' if back }}after saving</label>
       {% endif %}
+      {% if back %}<p class="muted small mt">{{ 'After the last box (or straight away if you untick this)' if waiting_count > 1 else 'After saving' }}, you go back to delivery {{ box.batch_ref }}.</p>{% endif %}
     </div>
   </section>
 </form>
@@ -331,6 +338,20 @@
       // Date marking "Pass" means the dates were checked: the expiry is needed.
       var dates = form.querySelector('[name=chk_dates]:checked');
       var exp = form.querySelector('[name=expiry_date]');
+      var mfg = form.querySelector('[name=mfg_date]');
+      // The dates are checked here, not only when saving.
+      if (mfg && mfg.value && mfg.value > {{ today|tojson }}) {
+        e.preventDefault();
+        e.detail.message = "The manufacturing date can't be in the future — pick it again on the calendar.";
+        mfg.focus();
+        return;
+      }
+      if (mfg && exp && mfg.value && exp.value && exp.value < mfg.value) {
+        e.preventDefault();
+        e.detail.message = "The expiry date can't be before the manufacturing date.";
+        exp.focus();
+        return;
+      }
       if (dates && dates.value === "Pass" && exp && !exp.value) {
         e.preventDefault();
         e.detail.message = "Date marking is Pass — pick the expiry / best-before date on the calendar, or mark it N/A.";

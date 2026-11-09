@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Record products IN / OUT{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('product_moves.index') }}">{{ icon('arrow-left', 15) }} Products In / Out</a>
+<a class="back-link" href="{{ url_for('product_moves.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Products In / Out</span></a>
 
 <form method="post" action="{{ url_for('product_moves.move') }}" class="wizard" id="pmForm" data-wizard
       data-wizard-start="{{ start }}" data-submit-label="Save" data-cancel="{{ url_for('product_moves.index') }}">

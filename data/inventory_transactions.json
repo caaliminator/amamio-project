@@ -4728,5 +4728,55 @@
     "user_id": 4,
     "timestamp": "2026-11-08T14:17:59.265827+00:00",
     "id": 473
+  },
+  {
+    "item_type": "material",
+    "item_id": 2,
+    "change_qty": 150.0,
+    "txn_type": "received",
+    "reference_id": "RB-13",
+    "user_id": 3,
+    "timestamp": "2026-11-09T07:32:58.327603+00:00",
+    "id": 474
+  },
+  {
+    "item_type": "material",
+    "item_id": 2,
+    "change_qty": 150.0,
+    "txn_type": "received",
+    "reference_id": "RB-14",
+    "user_id": 3,
+    "timestamp": "2026-11-09T07:42:51.822119+00:00",
+    "id": 475
+  },
+  {
+    "item_type": "material",
+    "item_id": 1,
+    "change_qty": 27.5,
+    "txn_type": "qc_passed",
+    "reference_id": "HC-7",
+    "user_id": 3,
+    "timestamp": "2026-11-09T09:14:05.579198+00:00",
+    "id": 476
+  },
+  {
+    "item_type": "material",
+    "item_id": 1,
+    "change_qty": 2.0,
+    "txn_type": "received",
+    "reference_id": "RB-15",
+    "user_id": 3,
+    "timestamp": "2026-11-09T09:35:02.653507+00:00",
+    "id": 477
+  },
+  {
+    "item_type": "material",
+    "item_id": 2,
+    "change_qty": 360.0,
+    "txn_type": "received",
+    "reference_id": "RB-18",
+    "user_id": 3,
+    "timestamp": "2026-11-09T13:03:11.676409+00:00",
+    "id": 478
   }
 ]

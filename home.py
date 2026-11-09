@@ -4,6 +4,7 @@ Each role sees only the few things it does, as big task cards (with a count
 when something is waiting), then a short "Waiting for you" list.  Admins also
 get a handful of headline figures.  Nothing here moves data; it only reads.
 """
+import re
 from datetime import date, timedelta
 
 from flask import url_for
@@ -182,8 +183,12 @@ def tasks_for(user, c):
                   primary=bool(c["approvals"])),
             _task("Sales reports", "What sold, on which platform, week by week",
                   "chart", "platforms.index", primary=not c["approvals"]),
-            _task("Purchase orders", "Approved requests to order from the supplier",
-                  "orders", "purchasing.index", count=c["awaiting_po"]),
+            (_task("Purchase orders", "Approved requests to order from the supplier",
+                   "orders", "purchasing.index", count=c["awaiting_po"])
+             if can(user, "po_prepare") else
+             _task("Purchase orders", "POs waiting for your final approval",
+                   "orders", "purchasing.index",
+                   count=sum(1 for p in db.read("purchase_orders") if pur.can_approve(user, p)))),
             _task("Receiving & inspection", "Deliveries and boxes on the floor",
                   "receiving", "receiving.index", count=c["awaiting"]),
         ]
@@ -199,13 +204,40 @@ def tasks_for(user, c):
     return t
 
 
+# Where each "waiting for you" item belongs: (area, icon), by its page.
+WAITING_AREAS = [
+    ("receiving.batches", "Stock", "calendar"),
+    ("receiving.", "Receiving & Inspection", "receiving"),
+    ("honey.", "Honey", "honey"),
+    ("production.", "Production", "production"),
+    ("packing.", "Packing", "packing"),
+    ("approvals.", "Approvals", "approvals"),
+    ("purchasing.", "Purchasing", "orders"),
+    ("assets.", "Equipment", "tools"),
+    ("supplies.", "Supplies", "swap"),
+    ("facility.", "Facility", "sparkle"),
+]
+# How pressing it is (the colour of its count): items not listed are "normal".
+WAITING_TONE = {"receiving.ncr_list": "danger", "receiving.batches": "danger",
+                "approvals.index": "warn", "supplies.index": "warn",
+                "assets.index": "warn", "facility.sanitation": "warn"}
+
+
 def waiting_for(user, c):
-    """A short list of things that need someone's attention."""
+    """A short list of things that need someone's attention: the count, what
+    it is, the area it belongs to, and where to open it."""
     items = []
 
     def add(ok, text, sub, endpoint, **args):
         if ok:
+            m = re.match(r"^(\d+)\s+(.*)$", text)
+            area, ico = next(((a, i) for prefix, a, i in WAITING_AREAS
+                              if endpoint.startswith(prefix)), ("General", "info"))
             items.append({"title": text, "sub": sub,
+                          "count": int(m.group(1)) if m else None,
+                          "label": (m.group(2) if m else text),
+                          "area": area, "icon": ico,
+                          "tone": WAITING_TONE.get(endpoint, "normal"),
                           "url": url_for(endpoint, **args)})
 
     add(can(user, "receiving") and c["expected_pos"],
@@ -247,7 +279,7 @@ def waiting_for(user, c):
         "Disburse or hand to the courier", "packing.index")
     add(can(user, "approvals") and c["approvals"],
         "%d request(s) / PO(s) to approve" % c["approvals"], "", "approvals.index")
-    add(can(user, "purchasing") and c["awaiting_po"],
+    add(can(user, "po_prepare") and c["awaiting_po"],
         "%d approved request(s) waiting for a PO" % c["awaiting_po"],
         "Prepare the purchase order for the supplier", "purchasing.index")
     add(can(user, "assets") and c["maintenance_due"],

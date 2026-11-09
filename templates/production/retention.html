@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Retention Samples{% endblock %}
 {% block content %}
+{% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead, ct_nothing with context %}
 <div class="page-head">
   <div>
     <h1 class="page-title">Retention Samples</h1>
@@ -18,41 +19,61 @@
   <div class="figure"><div class="figure-label">Disposed</div><div class="figure-value">{{ stats.disposed }}</div></div>
 </div>
 
-<div class="toolbar">
-  <div class="seg">
-    <a href="{{ url_for('production.retention') }}" class="{{ 'is-active' if show == 'retained' }}">Retained</a>
-    <a href="{{ url_for('production.retention', show='due') }}" class="{{ 'is-active' if show == 'due' }}">Due for disposal{% if stats.due %} ({{ stats.due }}){% endif %}</a>
-    <a href="{{ url_for('production.retention', show='disposed') }}" class="{{ 'is-active' if show == 'disposed' }}">Disposed</a>
-  </div>
-</div>
-
 {% if samples %}
-<div class="queue">
-  {% for s in samples %}
-  {% set kept = s.status != 'Disposed' %}
-  <{{ 'a' if kept else 'div' }} class="queue-item" {% if kept %}href="{{ url_for('production.retention_dispose', sample_id=s.id) }}"{% endif %}>
-    <span class="task-icon" style="width:40px;height:40px">{{ icon('retention', 18) }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ s.product_name }} · {{ s.qty|qty(s.unit) }}</span>
-      <span class="queue-sub"><span class="code">{{ s.batch_no }}</span> · produced {{ s.prod_date }} · expires {{ s.exp_date }}
-        {% if not kept %} · disposed {{ s.disposal_date }}{% endif %}</span>
-    </span>
-    {% if not kept %}
-      <span class="badge badge-muted">Disposed</span>
-    {% elif s.due %}
-      <span class="badge badge-danger">Expired — dispose</span>
-    {% else %}
-      <span class="queue-go">Dispose {{ icon('arrow-right', 14) }}</span>
-    {% endif %}
-  </{{ 'a' if kept else 'div' }}>
+{% set retained = samples|rejectattr('status', 'equalto', 'Disposed')|list %}
+{% set due = samples|selectattr('due')|list %}
+{% set disposed = samples|selectattr('status', 'equalto', 'Disposed')|list %}
+{% set groups = [
+  ('retained', 'Retained', 'Units kept back and not yet disposed of.', 'blue', 'retention', retained),
+  ('due', 'Due for disposal', 'Past their expiry — dispose of them and record it.', 'red', 'alert', due),
+  ('disposed', 'Disposed', 'Samples already disposed of.', 'done', 'check', disposed)] %}
+{% set tabs = [] %}
+{% for key, label, sub, tone, ico, rows in groups if rows or key == 'retained' %}{% set _ = tabs.append({'key': key, 'label': label, 'icon': ico, 'tone': tone, 'count': rows|length}) %}{% endfor %}
+{% set products = samples|map(attribute='product_name')|reject('none')|unique|sort %}
+
+<div data-ct="retention">
+{{ ct_topbar(tabs=tabs, search="Search products, batch no.…", dates=[('data-date', 'Produced'), ('data-exp', 'Expires'), ('data-disposed', 'Disposed')],
+             filters=[('data-product', 'Product', products)]) }}
+
+{% for key, label, sub, tone, ico, rows in groups if rows or key == 'retained' %}
+{% call ct_box(key, label, sub, tone, ico, rows|length, ['Sample', 'Quantity', 'Produced', 'Expires', 'Status', ''],
+               'minmax(200px, 2fr) minmax(85px, .9fr) minmax(110px, 1fr) minmax(110px, 1fr) minmax(140px, 1.2fr) minmax(90px, auto)',
+               empty='No sample here matches.') %}
+  {% for s in rows %}
+    {% set kept = s.status != 'Disposed' %}
+    {% set href = url_for('production.retention_dispose', sample_id=s.id) if kept else '' %}
+    {% call ct_row(key, href=href, date=s.prod_date,
+                   search=(s.product_name or '') ~ ' ' ~ (s.batch_no or '') ~ ' ' ~ (s.description or ''),
+                   data={'product': s.product_name, 'exp': (s.exp_date or '')[:10], 'disposed': (s.disposal_date or '')[:10]}) %}
+      {{ ct_lead('retention', s.product_name or '—', href, code=s.batch_no) }}
+      <div role="cell" class="prt-num">{{ s.qty|qty(s.unit) }}</div>
+      <div role="cell" class="prt-date">{{ s.prod_date|longdate if s.prod_date else '—' }}</div>
+      <div role="cell" class="prt-date">{{ s.exp_date|longdate if s.exp_date else '—' }}</div>
+      <div role="cell">
+        {% if not kept %}<span class="st-chip tone-done">Disposed</span><div class="prt-small">{{ s.disposal_date|longdate if s.disposal_date else '' }}</div>
+        {% elif s.due %}<span class="st-chip tone-red">Expired — dispose</span>
+        {% else %}<span class="st-chip tone-blue">Retained</span>{% endif %}
+      </div>
+      <div role="cell" class="prt-cell-end">{% if kept %}<a class="btn {{ 'btn-primary' if s.due else 'btn-ghost' }} btn-sm" href="{{ href }}">Dispose {{ icon('arrow-right', 14) }}</a>{% endif %}</div>
+    {% endcall %}
+  {% else %}
+    <div class="empty" style="padding:24px">
+      <div class="empty-icon">{{ icon('retention', 30) }}</div>
+      <div class="empty-title">No retention samples kept</div>
+      <p class="muted">Keep a few units from every finished batch so it can be re-tested if a customer reports a problem.</p>
+      <a class="btn btn-primary mt" href="{{ url_for('production.retention_new') }}">Keep a retention sample</a>
+    </div>
   {% endfor %}
+{% endcall %}
+{% endfor %}
+{{ ct_nothing() }}
 </div>
 {% else %}
 <div class="card"><div class="empty">
   <div class="empty-icon">{{ icon('retention', 30) }}</div>
-  <div class="empty-title">{{ {'due': 'Nothing is due for disposal', 'disposed': 'No samples disposed yet'}.get(show, 'No retention samples kept') }}</div>
+  <div class="empty-title">No retention samples kept</div>
   <p class="muted">Keep a few units from every finished batch so it can be re-tested if a customer reports a problem.</p>
-  {% if show == 'retained' %}<a class="btn btn-primary mt" href="{{ url_for('production.retention_new') }}">Keep a retention sample</a>{% endif %}
+  <a class="btn btn-primary mt" href="{{ url_for('production.retention_new') }}">Keep a retention sample</a>
 </div></div>
 {% endif %}
 {% endblock %}

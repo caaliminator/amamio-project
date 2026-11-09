@@ -173,7 +173,7 @@ SCHEMA = {
             "ar_no": SHORT, "ar_proof": STR,    # acknowledgement receipt no. + its file
             "received_by": FK, "status": SHORT,
             "remarks": TEXT, "discrepancies": TEXT,
-            "box_count": "INT NULL", "total_declared": NUM, "total_good": NUM,
+            "box_count": "INT NULL", "container_count": "INT NULL", "total_declared": NUM, "total_good": NUM,
             "total_unusable": NUM, "total_damaged": NUM,
             "inventory_updated_by": FK, "inventory_updated_at": TS,
             # Quick Control Check, answered when the receipt is closed
@@ -263,10 +263,15 @@ SCHEMA = {
             "disposition": SHORT, "allocated_to": STR, "allocated_at": TS,
             "allocated_kg": NUM, "remaining_kg": NUM,
             "material_id": FK, "created_by": FK, "created_at": TS,
+            # Received at the Receiving Area as part of a delivery (and a PO
+            # line): the same delivery as the PO's other items.
+            "receiving_batch_id": FK, "po_id": FK, "po_line_no": "INT NULL",
         },
         "children": {"allocations": "honey_allocations"},
         "foreign_keys": {"supplier_id": "suppliers", "qc_by": "users",
-                         "material_id": "raw_materials", "created_by": "users"},
+                         "material_id": "raw_materials", "created_by": "users",
+                         "receiving_batch_id": "receiving_batches",
+                         "po_id": "purchase_orders"},
     },
     # Where a container's honey went: PASS honey to selling products, FAILED
     # honey to the products that can still use it.

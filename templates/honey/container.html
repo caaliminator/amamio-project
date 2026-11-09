@@ -2,7 +2,7 @@
 {% block title %}{{ c.container_code }}{% endblock %}
 {% block content %}
 <div class="focus">
-<a class="back-link" href="{{ url_for('honey.index') }}">{{ icon('arrow-left', 15) }} Honey Inspection</a>
+<a class="back-link" href="{{ url_for('honey.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Honey Inspection</span></a>
 
 <div class="record-head">
   <div class="qr-inline">
@@ -34,48 +34,119 @@
   </div>
 
   {% if c.remaining_kg > 0 %}
-  <form method="post" action="{{ url_for('honey.allocate', container_id=c.id) }}" class="card mb">
-    <div class="card-title">Send honey to a product
-      <span class="muted">— {{ 'PASSED' if c.status == 'Pass' else 'FAILED' }} honey goes to these</span></div>
-    <div class="chip-choices mb">
-      {% for p in products %}
-      <label class="chip-choice"><input type="radio" name="product" value="{{ p }}" required {{ 'checked' if products|length == 1 }}><span>{{ p }}</span></label>
-      {% endfor %}
-    </div>
-    <div class="form-row" style="max-width:320px">
-      <label class="form-label" for="kg">How much was used?</label>
-      <div class="big-field">
-        <input type="number" id="kg" name="kg" step="0.01" min="0.01" max="{{ c.remaining_kg }}" required value="{{ '%g'|format(c.remaining_kg) }}" inputmode="decimal">
-        <span class="unit">kg</span>
+  {# Where the honey goes: a card per product, then how much. #}
+  <form method="post" action="{{ url_for('honey.allocate', container_id=c.id) }}" class="card mb bx-card">
+    <div class="bx-head">
+      <span class="bx-ico">{{ icon('production', 18) }}</span>
+      <div>
+        <h2 class="bx-title">Send honey to a product</h2>
+        <div class="bx-sub">{{ 'PASSED' if c.status == 'Pass' else 'FAILED' }} honey can go to the products below — <b>{{ c.remaining_kg|qty('kg') }}</b> left in this container.</div>
       </div>
     </div>
-    <button class="btn btn-primary" type="submit">Save</button>
+    <div class="choice-grid cols-3 bx-moves">
+      {% for p in products %}
+      <label class="choice">
+        <input type="radio" name="product" value="{{ p }}" required {{ 'checked' if products|length == 1 }}>
+        <span class="choice-card"><span class="choice-icon">{{ icon('honey', 20) }}</span>
+          <span class="choice-title">{{ p }}</span></span>
+      </label>
+      {% endfor %}
+    </div>
+    <div class="hy-amount">
+      <div class="form-row">
+        <label class="form-label" for="kg">How much was used?</label>
+        <div class="big-field">
+          <input type="number" id="kg" name="kg" step="0.01" min="0.01" max="{{ c.remaining_kg }}" required value="{{ '%g'|format(c.remaining_kg) }}" inputmode="decimal">
+          <span class="unit">kg</span>
+        </div>
+      </div>
+      <div class="hy-quick" role="group" aria-label="Quick amounts">
+        <button type="button" class="btn btn-ghost btn-sm" data-kg="{{ '%g'|format(c.remaining_kg) }}">All ({{ c.remaining_kg|qty('kg') }})</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-kg="{{ '%g'|format((c.remaining_kg / 2)|round(2)) }}">Half</button>
+      </div>
+    </div>
+    <div class="flex bx-actions">
+      <button class="btn btn-primary" type="submit">{{ icon('check', 15) }} Save</button>
+    </div>
   </form>
   {% endif %}
 
   {% if c.allocations %}
-  <div class="section-label">Used in</div>
-  <div class="queue mb">
-    {% for a in c.allocations %}
-    <div class="queue-item">
-      <span class="queue-main"><span class="queue-title">{{ a.product }}</span><span class="queue-sub">{{ a.at }} · {{ a.by }}</span></span>
-      <b>{{ a.kg|qty('kg') }}</b>
-    </div>
+  {% from "_ct.html" import ct_box, ct_row, ct_lead with context %}
+  <div data-ct="honey-used" class="mb">
+  {% call ct_box('used', 'Used in', 'Where the honey from this container went.', 'green-soft', 'honey', c.allocations|length,
+                 ['Product', 'When', 'By', 'Amount'],
+                 'minmax(220px, 2.2fr) minmax(140px, 1fr) minmax(120px, 1fr) minmax(100px, auto)', tabbed=false) %}
+    {% for al in c.allocations %}
+      {% call ct_row('used', date=al.allocated_at, search=al.product ~ ' ' ~ (al.by or '')) %}
+        {{ ct_lead('production', al.product) }}
+        <div role="cell" class="prt-date">{{ al.at }}</div>
+        <div role="cell" class="prt-date">{{ al.by or '—' }}</div>
+        <div role="cell" class="prt-num prt-cell-end">{{ al.kg|qty('kg') }}</div>
+      {% endcall %}
     {% endfor %}
+  {% endcall %}
   </div>
   {% endif %}
 
-  <div class="card">
-    <div class="card-title">Quality check</div>
-    <dl class="review-list">
-      <dt>Result</dt><dd>{{ 'PASS' if c.status == 'Pass' else 'FAILED' }}</dd>
-      <dt>Checked by</dt><dd>{{ c.qc_by }} · {{ c.qc_at }}</dd>
-      {% if c.qc_notes %}<dt>Notes</dt><dd>{{ c.qc_notes }}</dd>{% endif %}
-      {% if c.harvest_date %}<dt>Harvested</dt><dd>{{ c.harvest_date }}</dd>{% endif %}
-      {% if c.gross_weight_kg %}<dt>Gross / tare</dt><dd>{{ c.gross_weight_kg|qty('kg') }} / {{ c.tare_weight_kg|qty('kg') }}</dd>{% endif %}
-      <dt>QR code carries</dt><dd class="small" style="font-weight:500">{{ qr_text }}</dd>
-    </dl>
+  <div class="bx-grid">
+    <section class="card bx-card">
+      <div class="bx-head">
+        <span class="bx-ico">{{ icon('honey', 18) }}</span>
+        <div><h2 class="bx-title">Container</h2>
+          <div class="bx-sub">From {{ c.supplier_name or c.source or '—' }}</div></div>
+      </div>
+      <dl class="bx-facts">
+        <div class="bx-fact"><dt>Batch</dt><dd class="bx-mono">{{ c.batch_ref or '—' }}</dd></div>
+        <div class="bx-fact"><dt>Received</dt><dd>{{ c.received_date|longdate if c.received_date else '—' }}</dd></div>
+        <div class="bx-fact"><dt>Harvested</dt><dd>{{ c.harvest_date|longdate if c.harvest_date else '—' }}</dd></div>
+        <div class="bx-fact"><dt>Net weight</dt><dd>{{ c.net_weight_kg|qty('kg') }}</dd></div>
+        {% if c.gross_weight_kg %}<div class="bx-fact"><dt>Gross / tare</dt><dd>{{ c.gross_weight_kg|qty('kg') }} <span class="bx-note">/ {{ c.tare_weight_kg|qty('kg') }}</span></dd></div>{% endif %}
+        {% if c.po_no %}
+        <div class="bx-fact"><dt>Purchase order</dt><dd>{% if can('purchasing') %}<a href="{{ url_for('purchasing.detail', po_id=c.po_id) }}">{{ c.po_no }}</a>{% else %}{{ c.po_no }}{% endif %}{% if c.po_line_no %} <span class="bx-note">line {{ c.po_line_no }}</span>{% endif %}</dd></div>
+        <div class="bx-fact"><dt>On the PO</dt><dd>{% if c.status == 'Failed' %}<span class="st-chip tone-red">Rejected</span>{% elif c.status == 'Pass' %}<span class="st-chip tone-green">Received</span>{% else %}<span class="st-chip tone-amber">Being checked</span>{% endif %}</dd></div>
+        {% endif %}
+        {% if c.delivery_ref %}<div class="bx-fact"><dt>Delivery</dt><dd>{% if can('receiving') %}<a href="{{ url_for('receiving.batch', batch_id=c.receiving_batch_id) }}">{{ c.delivery_ref }}</a>{% else %}{{ c.delivery_ref }}{% endif %}</dd></div>{% endif %}
+      </dl>
+    </section>
+
+    <section class="card bx-card">
+      <div class="bx-head">
+        <span class="bx-ico">{{ icon('inspect', 18) }}</span>
+        <div><h2 class="bx-title">Quality check</h2>
+          <div class="bx-sub">Moisture and appearance decide where the honey goes.</div></div>
+      </div>
+      <dl class="bx-facts">
+        <div class="bx-fact"><dt>Result</dt><dd><span class="badge {{ c.badge }}">{{ 'PASS' if c.status == 'Pass' else 'FAILED' }}</span></dd></div>
+        <div class="bx-fact"><dt>Moisture</dt><dd>{{ c.moisture_pct }}%</dd></div>
+        <div class="bx-fact"><dt>Appearance</dt><dd>{{ c.appearance or '—' }}</dd></div>
+        <div class="bx-fact"><dt>Routed to</dt><dd>{{ c.disposition or '—' }}</dd></div>
+        <div class="bx-fact"><dt>Checked by</dt><dd>{{ c.qc_by or '—' }}</dd></div>
+        <div class="bx-fact"><dt>Checked on</dt><dd>{{ c.qc_at or '—' }}</dd></div>
+        {% if c.qc_notes %}<div class="bx-fact is-wide"><dt>Notes</dt><dd><span class="note-inline">{{ c.qc_notes }}</span></dd></div>{% endif %}
+      </dl>
+    </section>
   </div>
+
+  <section class="card bx-card bx-qr">
+    <div class="bx-head">
+      <span class="bx-ico">{{ icon('qr', 18) }}</span>
+      <div><h2 class="bx-title">QR label</h2><div class="bx-sub">What scanning this container's QR code shows.</div></div>
+    </div>
+    <code class="bx-qr-text">{{ qr_text }}</code>
+  </section>
 {% endif %}
 </div>
+<script>
+(function () {
+  // "All" / "Half" fill in the amount.
+  document.querySelectorAll(".hy-quick [data-kg]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var kg = document.getElementById("kg");
+      kg.value = b.getAttribute("data-kg");
+      kg.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  });
+})();
+</script>
 {% endblock %}

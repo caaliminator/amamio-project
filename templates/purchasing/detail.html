@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}PO {{ po.po_no }}{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('purchasing.index') }}">{{ icon('arrow-left', 15) }} Purchase Orders</a>
+<a class="back-link" href="{{ url_for('purchasing.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Purchase Orders</span></a>
 
 <div class="record-head">
   <div>
@@ -36,7 +36,7 @@
 {% set waiting = lines | selectattr('pending') | list %}
 <div class="next-action">
   <div class="next-action-text"><b>Waiting for the delivery</b><span>The Receiving Team Head receives it against this PO. Once everything ordered passes inspection, the PO is marked delivered by itself. If the supplier sent less and nothing more is coming, close it here.</span></div>
-  {% if not waiting and can('purchasing') %}
+  {% if not waiting and can('po_prepare') %}
   <form method="post" action="{{ url_for('purchasing.delivered', po_id=po.id) }}"
         data-confirm="Close PO {{ po.po_no }} as delivered with what has been received so far?">
     <button class="btn btn-ghost" type="submit">Close as delivered</button>
@@ -65,7 +65,7 @@
   <div class="card-title">Received against this PO</div>
   <div class="table-wrap">
     <table class="table" data-no-paginate>
-      <thead><tr><th>Item</th><th>Description</th><th class="num">Ordered</th><th class="num">Received &amp; accepted</th><th>Being inspected</th></tr></thead>
+      <thead><tr><th>Item</th><th>Description</th><th class="num">Ordered</th><th class="num">Received &amp; accepted</th><th>Being inspected</th><th>Rejected</th></tr></thead>
       <tbody>
         {% for it in lines %}
         <tr>
@@ -74,6 +74,7 @@
           <td class="num nowrap">{{ it.qty|qty(it.unit) }}</td>
           <td class="num nowrap"><span class="{{ 'gold' if it.received >= it.qty else '' }}">{{ it.received|qty }} of {{ it.qty|qty(it.unit) }}</span></td>
           <td>{{ it.pending|qty(it.unit) if it.pending else '—' }}</td>
+          <td>{% if it.rejected %}<span class="st-chip tone-red">{{ it.rejected|qty(it.unit) }}</span>{% else %}—{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -84,16 +85,26 @@
 {% endif %}
 
 {% if deliveries %}
-<div class="section-label">Deliveries received against this PO</div>
-<div class="queue mb">
+{% from "_ct.html" import ct_box, ct_row, ct_lead with context %}
+{% set dlv_tone = {'Open': 'amber', 'For Closing': 'blue', 'Completed': 'green', 'Cancelled': 'red'} %}
+{% set can_open = can('receiving') %}
+<div data-ct="po-deliveries" class="mb">
+{% call ct_box('deliveries', 'Deliveries received against this PO', 'Each delivery recorded in the Receiving Area.', 'green-soft', 'receiving', deliveries|length,
+               ['Delivery', 'Received', 'Boxes', 'Accepted so far', 'Status'] + ([''] if can_open else []),
+               'minmax(200px, 2fr) minmax(120px, 1fr) 80px minmax(120px, 1fr) minmax(140px, 1fr)' ~ (' minmax(90px, auto)' if can_open else ''),
+               tabbed=false) %}
   {% for b in deliveries %}
-  <a class="queue-item" {% if can('receiving') %}href="{{ url_for('receiving.batch', batch_id=b.id) }}"{% endif %}>
-    <span class="code" style="min-width:72px">{{ b.ref_no }}</span>
-    <span class="queue-main"><span class="queue-title">{{ b.received_date }} · {{ b.box_count or 0 }} box(es)</span>
-      <span class="queue-sub">{% if b.delivery_ref %}DR {{ b.delivery_ref }} · {% endif %}{{ b.total_good|qty }} accepted so far</span></span>
-    <span class="badge {{ 'badge-ok' if b.status == 'Completed' else 'badge-warn' }}">{{ 'Awaiting inspection' if b.status == 'Open' else b.status }}</span>
-  </a>
+    {% set b_url = url_for('receiving.batch', batch_id=b.id) if can_open else '' %}
+    {% call ct_row('deliveries', href=b_url, date=b.received_date, search=b.ref_no ~ ' ' ~ (b.delivery_ref or '')) %}
+      {% call ct_lead('receiving', b.ref_no, b_url) %}{% if b.delivery_ref %}DR {{ b.delivery_ref }}{% endif %}{% endcall %}
+      <div role="cell" class="prt-date">{{ b.received_date or '—' }}</div>
+      <div role="cell" class="prt-num">{{ b.box_count or 0 }}</div>
+      <div role="cell" class="prt-num">{{ b.total_good|qty }}</div>
+      <div role="cell"><span class="st-chip tone-{{ dlv_tone.get(b.status, 'done') }}">{{ 'Awaiting inspection' if b.status == 'Open' else b.status }}</span></div>
+      {% if can_open %}<div role="cell" class="prt-cell-end"><a class="btn btn-ghost btn-sm" href="{{ b_url }}">Open {{ icon('arrow-right', 14) }}</a></div>{% endif %}
+    {% endcall %}
   {% endfor %}
+{% endcall %}
 </div>
 {% endif %}
 
@@ -133,7 +144,7 @@
 
 <div class="flex gap-sm wrap">
   <a class="btn btn-ghost btn-sm" href="{{ url_for('purchasing.print_po', po_id=po.id) }}">{{ icon('printer', 14) }} Print Purchase Order</a>
-  {% if po.status in ('Prepared', 'For Final Approval', 'Approved') and can('purchasing') %}
+  {% if po.status in ('Prepared', 'For Final Approval', 'Approved') and can('po_prepare') %}
   <form method="post" action="{{ url_for('purchasing.cancel', po_id=po.id) }}"
         data-confirm="Cancel PO {{ po.po_no }}? Its items can be put on a new PO.">
     <button class="btn btn-ghost btn-sm" type="submit">Cancel PO</button>

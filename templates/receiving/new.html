@@ -2,7 +2,7 @@
 {% from "receiving/_item_fields.html" import item_fields, item_script %}
 {% block title %}Receive a delivery{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('receiving.new') if po else url_for('receiving.index') }}">{{ icon('arrow-left', 15) }} {{ 'Choose another purchase order' if po else 'Receiving Area' }}</a>
+<a class="back-link" href="{{ url_for('receiving.new') if po else url_for('receiving.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ 'Choose another purchase order' if po else 'Receiving Area' }}</span></a>
 
 {% set submitted = {} %}
 {% for l in lines if l.po_line_no %}{% set _ = submitted.update({l.po_line_no|string: l}) %}{% endfor %}
@@ -10,17 +10,43 @@
 
 <form method="post" class="wizard" id="receiveForm" data-wizard data-wizard-start="{{ start }}" enctype="multipart/form-data"
       data-submit-label="Save &amp; print QR labels" data-cancel="{{ url_for('receiving.index') }}">
+  {# The PO received against: from the address, or picked by typing its
+     number on the documents step (then its items fill the next step). #}
+  <input type="hidden" name="po" id="poId" value="{{ po.id if po else '' }}">
 
   <section class="wz-step" data-title="Who delivered it?"
-           data-hint="{{ ('For purchase order ' ~ po.po_no ~ '. Enter the day the delivery arrived at the receiving area.') if po else 'Pick the supplier and the day the delivery arrived at the receiving area.' }}">
+           data-hint="{{ ('For purchase order ' ~ po.po_no ~ '. Enter the day the delivery arrived at the receiving area.') if po else 'Type the PO number first — the supplier and the items fill themselves in. Then the day the delivery arrived.' }}">
     <div class="wz-body">
+      {# The PO first: once it is picked, most of the delivery fills itself in. #}
+      <div class="po-first">
+        <div class="form-grid cols-2">
+          <div class="form-row">
+            <label class="form-label" for="po_no">PO no.</label>
+            {% if po %}
+            <input type="text" id="po_no" name="po_no" value="{{ po.po_no }}" readonly class="locked-field">
+            {% else %}
+            <div class="combo" data-combo="openPoOptions" data-combo-new="Not an open purchase order — kept as written">
+              <input type="text" class="combo-input" id="po_no" name="po_no" maxlength="40" autocomplete="off"
+                     value="{{ form.po_no or '' }}" placeholder="{{ 'Type or pick the PO number' if open_pos else 'If the paperwork shows one' }}">
+            </div>
+            <div class="po-why" id="poWhy" role="status" hidden>{{ icon('alert', 15) }}<span></span></div>
+            {% if open_pos %}<div class="form-hint">Start here: pick the PO and the supplier, documents and items are filled in for you — honey as containers. No PO? Leave it empty.</div>{% endif %}
+            {% endif %}
+          </div>
+        </div>
+        <div class="po-loaded" id="poLoaded" hidden>
+          <span class="po-loaded-ico">{{ icon('orders', 18) }}</span>
+          <div><b id="poLoadedTitle"></b><span id="poLoadedText"></span></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="poUnload">{{ icon('close', 13) }} Not this PO</button>
+        </div>
+      </div>
       <div class="form-row">
         <label class="form-label" for="supplier_id">Supplier</label>
         {% if po %}
           <input type="hidden" name="supplier_id" value="{{ po.supplier_id or '' }}">
           <input type="text" id="supplier_id" name="supplier_display" value="{{ po.supplier_name }}" readonly class="locked-field" data-review-label="Supplier">
         {% else %}
-        <select id="supplier_id" name="supplier_id" data-review-label="Supplier">
+        <select id="supplier_id" name="supplier_id" data-review-label="Supplier" data-typable>
           <option value="">Own harvest / walk-in (no supplier)</option>
           {% for s in suppliers %}
             <option value="{{ s.id }}" {{ 'selected' if form.supplier_id == s.id|string and s.approved }}
@@ -81,19 +107,6 @@
                  placeholder="Other document, if any" class="mt-sm step-narrow" data-review-label="Other document">
         </div>
 
-        <div class="step-block">
-          <div class="form-grid cols-2">
-            <div class="form-row">
-              <label class="form-label" for="po_no">PO no.</label>
-              {% if po %}
-              <input type="text" id="po_no" name="po_no" value="{{ po.po_no }}" readonly class="locked-field">
-              {% else %}
-              <input type="text" id="po_no" name="po_no" maxlength="40" value="{{ form.po_no or '' }}" placeholder="If the paperwork shows one">
-              {% endif %}
-            </div>
-          </div>
-        </div>
-
         {# Delivery receipt, official receipt and acknowledgement receipt:
            each with its number and a picture or PDF as proof. #}
         {% set placeholders = {'dr': 'e.g. DR-88412', 'or': 'e.g. OR-10234', 'ar': 'e.g. AR-5521'} %}
@@ -129,23 +142,7 @@
   <section class="wz-step" id="itemsStep" data-title="What arrived?"
            data-hint="{{ 'These are the items still to come on this PO, with the quantity ordered filled in — change it to what actually arrived. Tick “Not in this delivery” for anything that didn’t come.' if po_lines else 'Add each item and how it came packed. Each box gets its own QR code. Several boxes of the same item with the same amount can be added in one go.' }}">
     <div class="line-cards" id="lineCards">
-      {% for l in po_lines %}
-      {% set sent = submitted.get(l.line_no|string) %}
-      <div class="line-card" data-item>
-        <div class="line-card-head">
-          <span class="line-card-num">PO line {{ l.line_no }}</span>
-          <label class="flex gap-sm small" style="align-items:center;margin:0;cursor:pointer">
-            <input type="checkbox" class="js-skip" data-review-skip> Not in this delivery
-          </label>
-        </div>
-        <p class="small mb-sm"><b>{{ l.description }}</b>{% if l.brand_model %} · {{ l.brand_model }}{% endif %}
-          <span class="muted">— ordered {{ l.qty|qty(l.unit) }}{% if l.received %}, {{ l.received|qty }} received{% endif %}{% if l.pending %}, {{ l.pending|qty }} being inspected{% endif %} · still to come <b>{{ l.remaining|qty(l.unit) }}</b></span></p>
-        <input type="hidden" name="po_line_no" value="{{ l.line_no }}">
-        {{ item_fields(sent or {'material_id': l.material_id or 'new', 'qty_per_box': '%g'|format(l.remaining), 'boxes': 1},
-                       materials, categories, category_of, track_labels, conditions,
-                       locked={'name': l.description, 'unit': l.unit or (materials|selectattr('id', 'equalto', l.material_id)|map(attribute='unit')|first)}) }}
-      </div>
-      {% endfor %}
+      {% include "receiving/_po_lines.html" %}
       {% for line in (extra_lines or ([] if po_lines else [none])) %}
       <div class="line-card" data-item>
         <div class="line-card-head">
@@ -153,7 +150,7 @@
           <button type="button" class="line-remove" data-remove-line aria-label="Remove this item">&times;</button>
         </div>
         <input type="hidden" name="po_line_no" value="">
-        {{ item_fields(line, materials, categories, category_of, track_labels, conditions) }}
+        {{ item_fields(line, materials, categories, category_of, track_labels, conditions, is_honey=is_honey) }}
       </div>
       {% endfor %}
     </div>
@@ -166,6 +163,8 @@
   </section>
 </form>
 
+<script type="application/json" id="openPoOptions">{{ po_options|tojson }}</script>
+<script type="application/json" id="poClosed">{{ (po_closed or {})|tojson }}</script>
 <template id="lineTpl">
   <div class="line-card" data-item>
     <div class="line-card-head">
@@ -173,7 +172,7 @@
       <button type="button" class="line-remove" data-remove-line aria-label="Remove this item">&times;</button>
     </div>
     <input type="hidden" name="po_line_no" value="">
-    {{ item_fields(none, materials, categories, category_of, track_labels, conditions) }}
+    {{ item_fields(none, materials, categories, category_of, track_labels, conditions, is_honey=is_honey) }}
   </div>
 </template>
 
@@ -257,4 +256,87 @@
   });
 })();
 </script>
+{% if not po %}
+<script>
+/* Typing / picking an open PO number on the documents step: its items fill
+   "What arrived?" (honey as containers), its supplier is set and locked, and
+   the delivery is saved against that PO — one delivery for everything on it.
+   Nothing already entered is lost.  "Not this PO" (or clearing the number)
+   goes back to a delivery without a PO. */
+(function () {
+  var form = document.getElementById("receiveForm");
+  var combo = document.getElementById("po_no").closest(".combo");
+  var poId = document.getElementById("poId");
+  var cards = document.getElementById("lineCards"), tpl = document.getElementById("lineTpl");
+  var addLine = document.getElementById("addLine");
+  var box = document.getElementById("poLoaded");
+  var urlFor = {{ url_for('receiving.new_po_lines', po_id=0)|tojson }}.replace(/0$/, "");
+  var loaded = null;
+  function supplier() { return document.querySelector("select#supplier_id"); }
+  function setSupplier(id, lock) {
+    var sel = supplier();
+    if (!sel) return;
+    if (id !== null) { sel.value = String(id || ""); sel.dispatchEvent(new Event("change", { bubbles: true })); }
+    sel.disabled = !!lock;
+  }
+  function freshCards(html) {
+    cards.querySelectorAll("[data-item]").forEach(function (c) { c.remove(); });
+    if (html) cards.insertAdjacentHTML("beforeend", html);
+    else cards.appendChild(tpl.content.firstElementChild.cloneNode(true));
+    cards.querySelectorAll("[data-item]").forEach(function (c) { if (window.syncItemCard) window.syncItemCard(c); });
+  }
+  function load(o) {
+    if (loaded && loaded.id === o.v) return;
+    fetch(urlFor + o.v, { headers: { "Accept": "application/json" }, credentials: "same-origin" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.error) { alert(d.error); return; }
+        loaded = d;
+        poId.value = d.id;
+        setSupplier(d.supplier_id, true);
+        freshCards(d.html);
+        var n = cards.querySelectorAll("[data-po-line]").length;
+        var honey = cards.querySelectorAll("[data-po-line].is-honey").length;
+        document.getElementById("poLoadedTitle").textContent = "Receiving against " + d.po_no + " — " + d.supplier_name;
+        document.getElementById("poLoadedText").textContent = n + " item(s) still to come are filled in on step 3" +
+          (honey ? ", " + honey + " of them honey (received as containers)" : "") + ". The supplier is set from the PO.";
+        box.hidden = false;
+        if (addLine) addLine.lastChild.textContent = " Add an item that isn’t on the PO";
+        var tick = form.querySelector('[name="docs_checked"][value="Approved PO"]');
+        if (tick) tick.checked = true;
+      })
+      .catch(function () { alert("Couldn't load that purchase order — check the connection and try again."); });
+  }
+  function unload() {
+    if (!loaded) return;
+    loaded = null;
+    poId.value = "";
+    setSupplier(null, false);
+    freshCards(null);
+    box.hidden = true;
+    if (addLine) addLine.lastChild.textContent = " Add another item";
+  }
+  combo.addEventListener("combo:pick", function (e) { load(e.detail); });
+  // A PO number that exists but can't be received: say why.
+  var closed = JSON.parse(document.getElementById("poClosed").textContent || "{}");
+  var why = document.getElementById("poWhy");
+  function explain() {
+    var t = closed[document.getElementById("po_no").value.trim().toLowerCase()];
+    why.hidden = !t;
+    if (t) why.querySelector("span").textContent = t;
+  }
+  document.getElementById("po_no").addEventListener("input", explain);
+  document.getElementById("po_no").addEventListener("change", explain);
+  document.getElementById("po_no").addEventListener("input", function () {
+    if (loaded && this.value.trim() !== loaded.po_no) unload();
+  });
+  document.getElementById("poUnload").addEventListener("click", function () {
+    unload();
+    var input = document.getElementById("po_no");
+    input.value = "";
+    input.focus();
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}

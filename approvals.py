@@ -42,9 +42,16 @@ def index():
     others = [r for r in db.read("purchase_requests")
               if pur.approval_stage(r) and not pur.can_approve(user, r)]
     others.sort(key=lambda r: r.get("created_at", ""))
+    import purchasing
+    import requests_bp
+    users = services.users_by_id()
     return render_template("approvals/index.html",
                            requests=[_queue_row(r) for r in mine],
                            others=[_queue_row(r) for r in others],
+                           pr_rows=[requests_bp.card_row(r, user, users) for r in mine],
+                           other_rows=[requests_bp.card_row(r, user, users) for r in others],
+                           po_rows=[purchasing.po_card_row(p, user) for p in orders],
+                           steps=requests_bp.PROGRESS_STEPS, po_steps=purchasing.PO_STEPS,
                            orders=orders, waiting_on=pur.waiting_on,
                            creations=adds.pending(), kinds=adds.KINDS,
                            can_decide=adds.can_decide(user),

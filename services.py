@@ -117,6 +117,44 @@ def stocked_materials(categories=None):
     return rows
 
 
+HONEY_NAMES = ("raw honey", "honey")
+# Honey is bought, ordered and received by the container; its stock (and
+# the recipes that use it) stays in kilos — each container's net weight.
+HONEY_PURCHASE_UNIT = "container"
+
+
+def is_honey_material(material=None, po_line=None):
+    """Honey is received in containers (weighed, then moisture-checked on
+    Honey Inspection), not in boxes: the raw honey item, or a PO line for
+    raw honey not stocked yet.  (Honey comb and processing honey are not.)"""
+    if material:
+        name = (material.get("name") or "").strip().lower()
+        return name in HONEY_NAMES and is_purchasable(material)
+    if po_line:
+        return (po_line.get("description") or "").strip().lower() in HONEY_NAMES
+    return False
+
+
+def purchase_unit(material):
+    """The unit an item is requested, ordered and received in: honey by the
+    container, everything else in its stock unit."""
+    if is_honey_material(material):
+        return HONEY_PURCHASE_UNIT
+    return (material or {}).get("unit") or "pc"
+
+
+HONEY_KG_UNITS = ("kg", "kgs", "kilo", "kilos", "kilogram", "kilograms")
+
+
+def honey_po_qty(container, unit):
+    """What one honey container counts for on its PO line: one container.
+    (POs made before honey was ordered by the container, in kilos, count its
+    net kilos.)"""
+    if (unit or "").strip().lower().rstrip(".") in HONEY_KG_UNITS:
+        return _to_float(container.get("net_weight_kg"))
+    return 1.0
+
+
 def is_purchasable(material):
     """False for a stock line made inside the plant, never bought from a
     supplier — e.g. "Honey for Processing (QC failed)", the honey that failed
@@ -1645,6 +1683,8 @@ def _check_delivery(supplier_id, lines, po_id):
                 return None, None, "One of the items no longer exists."
             name = material.get("name")
         if _to_float(line.get("qty_per_box")) <= 0:
+            if is_honey_material(material, po_line):
+                return None, None, "Enter the net weight of each container of %s." % name
             return None, None, "Enter how much is in each box of %s." % name
         clean.append((material, line, po_line))
     if not clean:
@@ -1717,8 +1757,22 @@ def receive_delivery(user_id, supplier_id, received_date, lines, po_no="",
         po_no=(po or {}).get("po_no") or po_no, po_id=po["id"] if po else None,
         supplier_name=(po or {}).get("supplier_name") or "",
         discrepancies=_po_discrepancies(po, clean) if po else [], **mrr)
-    boxes = []
+    boxes, containers = [], []
     for material, line, po_line in clean:
+        if is_honey_material(material):
+            made, err = log_honey_containers(
+                line.get("boxes") or 1, line.get("qty_per_box"), user_id,
+                notify=False, supplier_id=batch.get("supplier_id"),
+                source="Supplier delivery" if batch.get("supplier_id") else "Own harvest",
+                received_date=batch.get("received_date") or today_iso(),
+                harvest_date=line.get("harvest_date") or "",
+                material_id=material["id"], receiving_batch_id=batch["id"],
+                po_id=po["id"] if po else None,
+                po_line_no=po_line["line_no"] if po_line else None)
+            if err:
+                return None, [], err
+            containers.extend(made)
+            continue
         created, err = add_receiving_box(
             batch["id"], material["id"], line.get("qty_per_box"), user_id,
             count=line.get("boxes") or 1, lot_no=line.get("lot_no") or "",
@@ -1730,29 +1784,42 @@ def receive_delivery(user_id, supplier_id, received_date, lines, po_no="",
             return None, [], err
         boxes.extend(created)
 
-    batch = db.get("receiving_batches", batch["id"])
+    batch = _refresh_batch_totals(batch["id"]) if containers else db.get("receiving_batches", batch["id"])
     summary = "; ".join(
-        "%s %s in %d box(es)" % (
+        "%s %s in %d %s" % (
             material.get("name"),
-            fmt_qty(_line_total(line), material.get("unit") or ""),
-            max(1, int(_to_float(line.get("boxes"), 1))))
+            fmt_qty(_line_total(line), "kg" if is_honey_material(material) else material.get("unit") or ""),
+            max(1, int(_to_float(line.get("boxes"), 1))),
+            "container(s)" if is_honey_material(material) else "box(es)")
         for material, line, _ in clean)
     if po:
         summary += " (PO %s)" % po.get("po_no")
     notify_team({"production_head", "receiving_head"},
                 "Received at the Receiving Area — %s from %s: %s. Ready for "
-                "inspection & cleaning."
-                % (batch.get("ref_no"), batch.get("supplier_name"), summary),
+                "inspection & cleaning%s."
+                % (batch.get("ref_no"), batch.get("supplier_name"), summary,
+                   " (honey: moisture & appearance check on Honey Inspection)"
+                   if containers else ""),
                 link="/receiving/%d" % batch["id"])
     return batch, boxes, None
+
+
+def delivery_honey(batch_id):
+    """The honey containers received with this delivery."""
+    return sorted(db.query("honey_containers", receiving_batch_id=int(batch_id)),
+                  key=lambda c: c["id"])
 
 
 def _refresh_batch_totals(batch_id):
     boxes = db.query("receiving_boxes", batch_id=int(batch_id))
     accepted = [b for b in boxes if box_status(b) == BOX_ACCEPTED]
-    awaiting = [b for b in boxes if box_status(b) == BOX_AWAITING]
+    # Honey waiting for its moisture check counts as waiting for inspection.
+    honey = delivery_honey(batch_id)
+    awaiting = [b for b in boxes if box_status(b) == BOX_AWAITING] + \
+        [c for c in honey if c.get("status") not in QC_RESULTS]
     changes = {
         "box_count": len(boxes),
+        "container_count": len(honey),
         "total_declared": round(sum(_to_float(b.get("declared_qty"))
                                     for b in boxes), 3),
         "total_good": round(sum(_to_float(b.get("good_qty"))
@@ -1767,7 +1834,7 @@ def _refresh_batch_totals(batch_id):
     # Quick Control Check.  Boxes on HOLD don't block it — each has its own
     # hold report and stays segregated (SOP section 3).
     status = batch.get("status")
-    if boxes and not awaiting and status == RECEIVING_OPEN:
+    if (boxes or honey) and not awaiting and status == RECEIVING_OPEN:
         changes["status"] = RECEIVING_FOR_CLOSING
     elif awaiting and status == RECEIVING_FOR_CLOSING:
         changes["status"] = RECEIVING_OPEN
@@ -2090,6 +2157,16 @@ def move_receiving_box(box_id, stage, user_id=None, released_to=""):
     return box, None
 
 
+# The delivery documents' file fields on a receiving batch: DR, OR, AR.
+DELIVERY_DOC_FILES = ("proof", "or_proof", "ar_proof")
+
+
+def has_delivery_document(batch):
+    """True when the delivery has at least one document file attached
+    (its DR, OR or AR) — a receipt can't be closed without one."""
+    return any((batch or {}).get(f) for f in DELIVERY_DOC_FILES)
+
+
 def close_receiving_batch(batch_id, user_id=None, checks=None,
                           verified_by_name="", qa_approved_by_name=""):
     """SOP 5.8: close the receipt after the Quick Control Check.
@@ -2103,12 +2180,21 @@ def close_receiving_batch(batch_id, user_id=None, checks=None,
     if batch.get("status") == RECEIVING_CLOSED:
         return None, "This receipt is already closed."
     boxes = db.query("receiving_boxes", batch_id=int(batch_id))
-    if not boxes:
+    honey = delivery_honey(batch_id)
+    if not boxes and not honey:
         return None, "Add at least one box before closing the delivery."
     awaiting = [b for b in boxes if box_status(b) == BOX_AWAITING]
     if awaiting:
         return None, ("%d box(es) still need inspection before this receipt "
                       "can be closed." % len(awaiting))
+    unchecked = [c for c in honey if c.get("status") not in QC_RESULTS]
+    if unchecked:
+        return None, ("%d honey container(s) still need their moisture & "
+                      "appearance check before this receipt can be closed."
+                      % len(unchecked))
+    if not has_delivery_document(batch):
+        return None, ("Attach at least one delivery document (DR, OR or AR) "
+                      "before closing the receipt.")
     answers = {}
     for key, label in CONTROL_CHECKS:
         answer = (checks or {}).get(key)
@@ -2170,6 +2256,36 @@ def mrr_lines(batch):
             line["hold_qty"] += _to_float(b.get("good_qty"))
         elif status == BOX_REJECTED:
             line["rejected_qty"] += _to_float(b.get("declared_qty"))
+        else:
+            line["awaiting"] += 1
+    # Honey came in containers: one line per PO line / batch reference.
+    for c in delivery_honey(batch["id"]):
+        key = ("honey", c.get("po_line_no"), c.get("batch_ref"))
+        line = index.get(key)
+        if line is None:
+            po_line = c.get("po_line_no")
+            material = db.get("raw_materials", c.get("material_id")) if c.get("material_id") else None
+            line = index[key] = {
+                "material_name": (material or {}).get("name") or "Honey",
+                "unit": HONEY_PURCHASE_UNIT,
+                "po_line_no": po_line,
+                "po_qty": po_qty.get(po_line) if po_line and po_line not in po_seen else None,
+                "lot_no": c.get("batch_ref") or "", "expiry_date": "",
+                "boxes": 0, "actual_qty": 0.0, "accepted_qty": 0.0,
+                "hold_qty": 0.0, "rejected_qty": 0.0, "awaiting": 0, "containers": True,
+            }
+            if po_line:
+                po_seen.add(po_line)
+            lines.append(line)
+        # Counted in containers; one that failed QC is recorded as rejected
+        # (it stays on record, and its honey is kept for processing).
+        line["boxes"] += 1
+        line["actual_qty"] += 1
+        line["net_kg"] = round(line.get("net_kg", 0) + _to_float(c.get("net_weight_kg")), 3)
+        if c.get("status") == "Pass":
+            line["accepted_qty"] += 1
+        elif c.get("status") == "Failed":
+            line["rejected_qty"] += 1
         else:
             line["awaiting"] += 1
     for line in lines:
@@ -2886,7 +3002,8 @@ def honey_products_for(result):
 def create_honey_container(net_weight_kg, user_id, supplier_id=None,
                            source="Own harvest", harvest_date="",
                            received_date="", batch_ref="", gross_weight_kg=None,
-                           tare_weight_kg=None, material_id=None):
+                           tare_weight_kg=None, material_id=None,
+                           receiving_batch_id=None, po_id=None, po_line_no=None):
     net = _to_float(net_weight_kg)
     if net <= 0:
         return None, "Net weight must be greater than zero."
@@ -2918,15 +3035,19 @@ def create_honey_container(net_weight_kg, user_id, supplier_id=None,
         "material_id": int(material_id) if material_id else None,
         "created_by": user_id,
         "created_at": now_iso(),
+        "receiving_batch_id": int(receiving_batch_id) if receiving_batch_id else None,
+        "po_id": int(po_id) if po_id else None,
+        "po_line_no": int(po_line_no) if po_line_no else None,
     })
     container = db.update("honey_containers", container["id"],
                           {"container_code": container_token(container["id"])})
     return container, None
 
 
-def log_honey_containers(count, net_weight_kg, user_id, **details):
+def log_honey_containers(count, net_weight_kg, user_id, notify=True, **details):
     """Log ``count`` containers of the same weight in one go; one shared batch
-    reference so they can be traced together.  Notifies production."""
+    reference so they can be traced together.  Notifies production (unless
+    a delivery sends its own notice)."""
     try:
         count = max(1, min(int(count), 50))
     except (TypeError, ValueError):
@@ -2943,6 +3064,8 @@ def log_honey_containers(count, net_weight_kg, user_id, **details):
         if err:
             return created, err
         created.append(container)
+    if not notify:
+        return created, None
     notify_team({"production_head"},
                 "Honey received — %d container(s), %s kg in total (%s). "
                 "Ready for moisture & appearance check."
@@ -3007,6 +3130,12 @@ def record_honey_qc(container_id, result, moisture_pct, appearance, notes="",
                      reference_id=container.get("container_code"),
                      user_id=user_id)
         db.update("honey_containers", container_id, {"material_id": material_id})
+    # Received with a delivery / against a PO: both are brought up to date.
+    if container.get("receiving_batch_id"):
+        _refresh_batch_totals(container["receiving_batch_id"])
+    if container.get("po_id"):
+        import purchasing_service as pur
+        pur.sync_po_receipts(container["po_id"])
 
     notify_team({"production_head", "receiving_head"},
                 "Honey container %s %s QC (%.1f%% moisture, %s) — %s."

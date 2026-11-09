@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block title %}PR {{ row.pr_no }}{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('requests.index') }}">{{ icon('arrow-left', 15) }} Purchase Requests</a>
+{% from "_note.html" import note_card, note_text, note_hint with context %}
+<a class="back-link" href="{{ url_for('requests.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Purchase Requests</span></a>
 
 <div class="record-head">
   <div>
@@ -80,12 +81,22 @@
   </div>
 </div>
 
-<div class="card mb">
-  <div class="card-title">Requester's notes / special instructions</div>
-  <p>{{ req.notes or (req.remarks if req.type != 'general') or '—' }}</p>
-  {% if req.type == 'production' %}<p class="muted small">Ingredients for {{ req.product_name or 'a production run' }}{% if req.qty %} × {{ req.qty|qty }}{% endif %}.</p>{% endif %}
-  {% if req.check_remarks %}<div class="form-label mt">Admin's remarks (check)</div><p>{{ req.check_remarks }}</p>{% endif %}
-  {% if req.remarks and req.type == 'general' %}<div class="form-label mt">Approver's remarks</div><p>{{ req.remarks }}</p>{% endif %}
+<div class="note-grid mb">
+  {% call note_card("Requester's notes / special instructions", "requests", who=row.requested_by, when=row.date_requested) %}
+    {{ note_text(req.notes or (req.remarks if req.type != 'general'), "No notes from the requester.") }}
+    {% if req.type == 'production' %}{{ note_hint("Ingredients for " ~ (req.product_name or 'a production run') ~ ((" × " ~ (req.qty|qty)) if req.qty else '') ~ ".") }}{% endif %}
+  {% endcall %}
+  {% if req.checked_by_name or req.check_remarks %}
+  {% call note_card("Checked by the Admin", "approvals", who=req.checked_by_name, when=(req.checked_at or '')[:10], tone="green") %}
+    {{ note_text(req.check_remarks, "No remarks from the Admin.") }}
+  {% endcall %}
+  {% endif %}
+  {% if req.remarks and req.type == 'general' %}
+  {% call note_card("Approver's remarks", "check", who=req.approved_by_name, when=(req.decided_at or '')[:10],
+                    tone=('red' if req.status == 'Rejected' else 'green')) %}
+    {{ note_text(req.remarks) }}
+  {% endcall %}
+  {% endif %}
 </div>
 
 <div class="card mb">
@@ -100,17 +111,25 @@
 </div>
 
 {% if orders %}
-<div class="section-label">Purchase orders</div>
-<div class="queue mb">
+{% from "_ct.html" import ct_box, ct_row, ct_lead with context %}
+{% set badge_tone = {'badge-warn': 'amber', 'badge-ok': 'green', 'badge-danger': 'red'} %}
+<div data-ct="request-pos" class="mb">
+{% call ct_box('orders', 'Purchase orders', 'Purchase orders made from this request.', 'blue', 'orders', orders|length,
+               ['Purchase order', 'Items', 'PO date', 'Expected', 'Total', 'Status'],
+               'minmax(220px, 2.2fr) 70px minmax(120px, 1fr) minmax(120px, 1fr) minmax(110px, .9fr) minmax(130px, auto)',
+               tabbed=false) %}
   {% for po in orders %}
-  <a class="queue-item" href="{{ url_for('purchasing.detail', po_id=po.id) }}">
-    <span class="code" style="min-width:96px">{{ po.po_no }}</span>
-    <span class="queue-main"><span class="queue-title">{{ po.supplier_name }}</span>
-      <span class="queue-sub">{{ po['items']|length }} item(s) · PO date {{ po.po_date }}{% if po.expected_delivery %} · expected {{ po.expected_delivery }}{% endif %}</span></span>
-    <b class="nowrap">{{ po.grand_total|peso }}</b>
-    <span class="badge {{ po_badge.get(po.status, 'badge-muted') }}">{{ po.status }}</span>
-  </a>
+    {% set po_url = url_for('purchasing.detail', po_id=po.id) %}
+    {% call ct_row('orders', href=po_url, date=po.po_date, search=po.po_no ~ ' ' ~ po.supplier_name) %}
+      {{ ct_lead('orders', po.supplier_name, po_url, code=po.po_no) }}
+      <div role="cell" class="prt-num">{{ po['items']|length }}</div>
+      <div role="cell" class="prt-date">{{ po.po_date or '—' }}</div>
+      <div role="cell" class="prt-date">{{ po.expected_delivery or '—' }}</div>
+      <div role="cell" class="prt-num">{{ po.grand_total|peso }}</div>
+      <div role="cell" class="prt-cell-end"><span class="st-chip tone-{{ badge_tone.get(po_badge.get(po.status), 'done') }}">{{ po.status }}</span></div>
+    {% endcall %}
   {% endfor %}
+{% endcall %}
 </div>
 {% endif %}
 

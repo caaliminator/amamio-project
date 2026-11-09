@@ -37,11 +37,11 @@ def index():
     show = request.args.get("show") or "all"
     if show not in ("all", "out", "attention"):
         show = "all"
-    rows = svc.asset_rows(show if show != "out" else "all")
+    # Every list is on the page as a tab; ?show= only picks the first tab.
     return render_template(
         "assets/index.html", show=show,
-        groups=svc.group_assets(rows) if show != "out" else [],
-        out_rows=svc.assets_out() if show == "out" else [],
+        groups=svc.group_assets(svc.asset_rows()),
+        out_rows=svc.assets_out(),
         stats=svc.asset_summary(), due=svc.maintenance_due())
 
 
@@ -64,9 +64,9 @@ def movements():
     direction = request.args.get("direction") or ""
     if direction not in ("", "IN", "OUT"):
         direction = ""
+    # All / OUT / IN are tabs on the page; ?direction= only picks the first.
     return render_template("assets/movements.html", direction=direction,
-                           moves=svc.movement_rows(direction=direction or None,
-                                                   limit=200))
+                           moves=svc.movement_rows(limit=300))
 
 
 # --- IN / OUT ----------------------------------------------------------------

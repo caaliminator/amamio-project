@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Keep a retention sample{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('production.retention') }}">{{ icon('arrow-left', 15) }} Retention Samples</a>
+<a class="back-link" href="{{ url_for('production.retention') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Retention Samples</span></a>
 
 {% set source = form.source or ('batch' if batches else 'manual') %}
 <form method="post" class="wizard" id="retForm" data-wizard data-wizard-start="{{ start }}"

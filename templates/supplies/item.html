@@ -2,7 +2,7 @@
 {% block title %}{{ m.name }}{% endblock %}
 {% block content %}
 <div class="focus">
-<a class="back-link" href="{{ url_for('supplies.index', cat=cat) }}">{{ icon('arrow-left', 15) }} {{ cat_label }}</a>
+<a class="back-link" href="{{ url_for('supplies.index', cat=cat) }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ cat_label }}</span></a>
 
 <div class="record-head">
   <div>
@@ -58,22 +58,24 @@
 <p class="muted small mb">No batch of this item has stock left{% if b_loose > 0 %} — the {{ b_loose|qty(m.unit) }} in stock is from before batch numbers{% endif %}.</p>
 {% endif %}
 
-<div class="section-label">Last movements</div>
-{% if moves %}
-<div class="queue">
+{% from "_ct.html" import ct_box, ct_row, ct_lead with context %}
+<div data-ct="supply-moves">
+{% call ct_box('moves', 'Last movements', 'Newest first.', 'blue', 'swap', moves|length,
+               ['Movement', 'When', 'Person · reference', 'Recorded by', 'Left after'],
+               'minmax(230px, 2.2fr) minmax(130px, 1fr) minmax(140px, 1.2fr) minmax(110px, .9fr) minmax(100px, auto)',
+               tabbed=false) %}
   {% for mv in moves %}
-  <div class="queue-item">
-    <span class="badge {{ 'badge-gold' if mv.direction == 'IN' else 'badge-muted' }}" style="min-width:44px;text-align:center">{{ mv.direction }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ '+' if mv.direction == 'IN' else '−' }}{{ mv.qty|qty(mv.unit) }} · {{ mv.reason }}{% if mv.batch_no %} · <span class="nowrap">batch {{ mv.batch_no }}</span>{% endif %}</span>
-      <span class="queue-sub">{{ mv.when }}{% if mv.person %} · {{ mv.person }}{% endif %}{% if mv.reference %} · {{ mv.reference }}{% endif %}{% if mv.notes %} · {{ mv.notes }}{% endif %} · by {{ mv.recorded_by_name }}</span>
-    </span>
-    <span class="muted small nowrap">left {{ mv.balance_after|qty(mv.unit) }}</span>
-  </div>
+    {% call ct_row('moves', date=mv.moved_at, search=mv.reason ~ ' ' ~ (mv.batch_no or '') ~ ' ' ~ (mv.person or '') ~ ' ' ~ (mv.reference or '') ~ ' ' ~ (mv.notes or '')) %}
+      {% call ct_lead('in' if mv.direction == 'IN' else 'out', ('+' if mv.direction == 'IN' else '−') ~ mv.qty|qty(mv.unit) ~ ' · ' ~ mv.reason, code=mv.direction) %}{% if mv.batch_no %} <span class="nowrap">batch {{ mv.batch_no }}</span>{% endif %}{% if mv.notes %}{% if mv.batch_no %} ·{% endif %} {{ mv.notes }}{% endif %}{% endcall %}
+      <div role="cell" class="prt-date">{{ mv.when }}</div>
+      <div role="cell" class="prt-date">{{ mv.person or '—' }}{% if mv.reference %}<div class="prt-small">{{ mv.reference }}</div>{% endif %}</div>
+      <div role="cell" class="prt-date">{{ mv.recorded_by_name }}</div>
+      <div role="cell" class="prt-num prt-cell-end">{{ mv.balance_after|qty(mv.unit) }}</div>
+    {% endcall %}
+  {% else %}
+    <div class="empty" style="padding:24px"><p class="muted small">No IN / OUT recorded for this item yet.</p></div>
   {% endfor %}
+{% endcall %}
 </div>
-{% else %}
-<p class="muted small">No IN / OUT recorded for this item yet.</p>
-{% endif %}
 </div>
 {% endblock %}

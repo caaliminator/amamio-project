@@ -13,7 +13,7 @@
   .short-note { margin-top: 12px; padding: 11px 14px; border-radius: var(--radius-xs); font-size: .84rem;
     background: var(--danger-bg); color: var(--danger-ink); border: 1px solid rgba(236, 125, 108, .3); border-left: 3px solid var(--danger); }
 </style>
-<a class="back-link" href="{{ url_for('production.index') }}">{{ icon('arrow-left', 15) }} Batch Records</a>
+<a class="back-link" href="{{ url_for('production.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Batch Records</span></a>
 
 <form method="post" class="wizard" id="startForm" data-wizard data-wizard-start="{{ start }}"
       data-submit-label="Start the batch" data-cancel="{{ url_for('production.index') }}">

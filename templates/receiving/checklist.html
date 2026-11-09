@@ -2,7 +2,7 @@
 {% block title %}Inspection {{ box.inspection_no or box.box_code }}{% endblock %}
 {% block content %}
 <div class="toolbar no-print">
-  <a class="back-link" style="margin:0" href="{{ url_for('receiving.box', box_id=box.id) }}">{{ icon('arrow-left', 15) }} {{ box.box_code }}</a>
+  <a class="back-link" style="margin:0" href="{{ url_for('receiving.box', box_id=box.id) }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ box.box_code }}</span></a>
   <button class="btn btn-primary" type="button" onclick="window.print()">{{ icon('printer', 15) }} Print</button>
 </div>
 

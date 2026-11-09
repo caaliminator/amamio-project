@@ -47,27 +47,24 @@ def _row(c):
         "qc_at": services.fmt_dt(c.get("qc_at")),
         "qc_notes": c.get("qc_notes"),
         "created_at": services.fmt_dt(c.get("created_at")),
+        # Received with a delivery / on a purchase order (Receiving).
+        "receiving_batch_id": c.get("receiving_batch_id"),
+        "delivery_ref": (db.get("receiving_batches", c["receiving_batch_id"]) or {}).get("ref_no")
+        if c.get("receiving_batch_id") else "",
+        "po_id": c.get("po_id"), "po_line_no": c.get("po_line_no"),
+        "po_no": (db.get("purchase_orders", c["po_id"]) or {}).get("po_no") if c.get("po_id") else "",
     }
 
 
 @honey_bp.route("/")
 @module_required("honey")
 def index():
-    show = request.args.get("show") or "todo"
+    # Every container; the page's tabs (To do / Passed / Failed) split them.
+    # An old ?show= link still works — it is simply ignored.
     containers = sorted(db.read("honey_containers"),
                         key=lambda x: x.get("created_at", ""), reverse=True)
-    if show == "todo":
-        listed = [c for c in containers
-                  if c.get("status") == "Pending QC"
-                  or (c.get("status") in services.QC_RESULTS
-                      and services._to_float(c.get("remaining_kg",
-                                                   c.get("net_weight_kg"))) > 0)]
-    elif show in services.QC_RESULTS:
-        listed = [c for c in containers if c.get("status") == show]
-    else:
-        listed = containers
-    return render_template("honey/index.html", containers=[_row(c) for c in listed],
-                           summary=services.honey_summary(), show=show,
+    return render_template("honey/index.html", containers=[_row(c) for c in containers],
+                           summary=services.honey_summary(),
                            routing=services.honey_product_totals())
 
 

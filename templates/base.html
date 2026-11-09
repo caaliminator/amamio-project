@@ -47,6 +47,12 @@
         <span class="brand-sub">{{ nav_subtitle }}</span>
       </span>
     </a>
+    {# The burger folds the sidebar to a rail of icons on a computer, and
+       closes the slide-in menu on a phone (app.js). #}
+    <button type="button" class="side-burger" id="navMini" aria-pressed="false"
+            aria-label="Collapse menu" aria-controls="navLinks">
+      <span class="burger-lines" aria-hidden="true"><span></span><span></span><span></span></span>
+    </button>
   </div>
 
   {# Each category is a group, open by default so every page is in view.
@@ -95,11 +101,8 @@
   <div class="sidebar-foot">
     {# The AI Assistant link is hidden while the sidebar shows only the
        purchasing flow; the floating button still opens it. #}
-    <button type="button" class="side-link side-link-btn side-collapse" id="navMini" aria-pressed="false">
-      <span class="side-ico">{{ icon('chevron-down', 18, 'side-collapse-ico') }}</span>
-      <span class="side-text">Collapse menu</span>
-    </button>
-    <a class="side-link" href="{{ url_for('auth.logout') }}">
+    <a class="side-link" href="{{ url_for('auth.logout') }}" data-confirm="Log out now?"
+       data-confirm-text="You'll need your username and password to sign in again." data-confirm-label="Log out">
       <span class="side-ico">{{ icon('logout', 18) }}</span>
       <span class="side-text">Log out</span>
     </a>

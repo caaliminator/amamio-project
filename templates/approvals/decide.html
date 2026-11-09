@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Review PR {{ req.pr_label }}{% endblock %}
 {% block content %}
+{% from "_note.html" import note_card, note_text, note_hint with context %}
 <style>
   .approve-reject-cell { white-space: nowrap; text-align: center !important; width: 1%; }
   .table input.qty-input { width: 7rem; margin-left: auto; display: block; text-align: right; }
 </style>
-<a class="back-link" href="{{ url_for('approvals.index') }}">{{ icon('arrow-left', 15) }} Approvals</a>
+<a class="back-link" href="{{ url_for('approvals.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Approvals</span></a>
 
 <div class="record-head">
   <div>
@@ -23,19 +24,20 @@
   <span class="track-step is-{{ 'now' if stage == 'final' else '' }}">Approved by Super Admin</span>
 </div>
 
-{% if stage == 'final' %}
-<div class="card mb">
-  <div class="card-title">Checked by {{ req.checked_by_name or 'the Admin' }}{% if req.checked_at %} · {{ req.checked_at[:10] }}{% endif %}</div>
-  <p>{{ req.check_remarks or 'No remarks.' }}</p>
-  <p class="muted small">The quantities below are what the Admin approved. Change them or tick Reject before giving the final approval.</p>
-</div>
-{% endif %}
-
-{% if req.notes or req.remarks %}
-<div class="card mb">
-  <div class="card-title">Requester's notes / special instructions</div>
-  <p>{{ req.notes or req.remarks }}</p>
-  {% if req.type == 'production' %}<p class="muted small">For {{ req.product_name or 'a production run' }}{% if req.qty %} × {{ req.qty|qty }}{% endif %}.</p>{% endif %}
+{% if stage == 'final' or req.notes or req.remarks %}
+<div class="note-grid mb">
+  {% if stage == 'final' %}
+  {% call note_card("Checked by the Admin", "approvals", who=req.checked_by_name, when=(req.checked_at or '')[:10], tone="green") %}
+    {{ note_text(req.check_remarks, "No remarks from the Admin.") }}
+    {{ note_hint("The quantities below are what the Admin approved. Change them or tick Reject before giving the final approval.") }}
+  {% endcall %}
+  {% endif %}
+  {% if req.notes or req.remarks %}
+  {% call note_card("Requester's notes / special instructions", "requests", who=req.requested_by_name, when=req.date_requested) %}
+    {{ note_text(req.notes or req.remarks) }}
+    {% if req.type == 'production' %}{{ note_hint("For " ~ (req.product_name or 'a production run') ~ ((" × " ~ (req.qty|qty)) if req.qty else '') ~ ".") }}{% endif %}
+  {% endcall %}
+  {% endif %}
 </div>
 {% endif %}
 

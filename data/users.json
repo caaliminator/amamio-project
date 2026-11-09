@@ -12,9 +12,10 @@
     "phone": "",
     "team": "Super Admin",
     "active": true,
-    "last_login": null,
+    "last_login": "2026-11-09T12:30:43.536815+00:00",
     "created_at": "2026-11-08T13:02:39.405520+00:00",
-    "id": 1
+    "id": 1,
+    "signature": "1-signature-7ef54cef.png"
   },
   {
     "first_name": "Liza",
@@ -29,9 +30,10 @@
     "phone": "",
     "team": "Admin",
     "active": true,
-    "last_login": "2026-11-08T14:15:38.122099+00:00",
+    "last_login": "2026-11-09T12:29:48.999414+00:00",
     "created_at": "2026-11-08T13:02:39.686604+00:00",
-    "id": 2
+    "id": 2,
+    "signature": "2-signature-45755c5f.png"
   },
   {
     "first_name": "Jerome",
@@ -46,9 +48,10 @@
     "phone": "",
     "team": "Receiving Team Head",
     "active": true,
-    "last_login": null,
+    "last_login": "2026-11-09T12:31:20.064622+00:00",
     "created_at": "2026-11-08T13:02:40.022313+00:00",
-    "id": 3
+    "id": 3,
+    "signature": "3-signature-0b992c9c.png"
   },
   {
     "first_name": "Maria",
@@ -63,11 +66,12 @@
     "phone": "",
     "team": "Production Team Head",
     "active": true,
-    "last_login": "2026-11-08T13:09:20.561946+00:00",
+    "last_login": "2026-11-09T09:27:48.910783+00:00",
     "created_at": "2026-11-08T13:02:40.312311+00:00",
     "id": 4,
     "theme": "light",
-    "hide_notes": false
+    "hide_notes": false,
+    "signature": "4-signature-2c1feffc.png"
   },
   {
     "first_name": "Angelica",
@@ -84,7 +88,8 @@
     "active": true,
     "last_login": null,
     "created_at": "2026-11-08T13:02:40.609758+00:00",
-    "id": 5
+    "id": 5,
+    "signature": "5-signature-4b7da2ae.png"
   },
   {
     "first_name": "Joy",
@@ -101,7 +106,8 @@
     "active": true,
     "last_login": null,
     "created_at": "2026-11-08T13:02:40.940203+00:00",
-    "id": 6
+    "id": 6,
+    "signature": "6-signature-1c8e7f41.png"
   },
   {
     "first_name": "Mark Anthony",
@@ -118,7 +124,8 @@
     "active": true,
     "last_login": null,
     "created_at": "2026-11-08T13:02:41.307715+00:00",
-    "id": 7
+    "id": 7,
+    "signature": "7-signature-143f646f.png"
   },
   {
     "first_name": "Ronaldo",
@@ -135,7 +142,8 @@
     "active": true,
     "last_login": null,
     "created_at": "2026-11-08T13:02:41.717457+00:00",
-    "id": 8
+    "id": 8,
+    "signature": "8-signature-9eef4b29.png"
   },
   {
     "first_name": "Theresa",
@@ -150,9 +158,10 @@
     "phone": "",
     "team": "Finance Admin",
     "active": true,
-    "last_login": "2026-11-08T14:13:30.473862+00:00",
+    "last_login": "2026-11-09T09:24:17.930013+00:00",
     "created_at": "2026-11-08T13:02:42.115189+00:00",
-    "id": 9
+    "id": 9,
+    "signature": "9-signature-41cde1f6.png"
   },
   {
     "first_name": "Kristine",
@@ -167,9 +176,10 @@
     "phone": "",
     "team": "Customer Service Admin",
     "active": true,
-    "last_login": null,
+    "last_login": "2026-11-09T09:25:16.560372+00:00",
     "created_at": "2026-11-08T13:02:42.486822+00:00",
-    "id": 10
+    "id": 10,
+    "signature": "10-signature-1091f6b3.png"
   },
   {
     "first_name": "Paolo",
@@ -184,8 +194,9 @@
     "phone": "",
     "team": "Sales Marketing Admin",
     "active": true,
-    "last_login": null,
+    "last_login": "2026-11-09T09:25:44.027440+00:00",
     "created_at": "2026-11-08T13:02:42.878411+00:00",
-    "id": 11
+    "id": 11,
+    "signature": "11-signature-55c1120d.png"
   }
 ]

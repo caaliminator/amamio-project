@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Profile — {{ u.name }}{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('auth.users') }}">{{ icon('arrow-left', 15) }} Users &amp; Profiles</a>
+<a class="back-link" href="{{ url_for('auth.users') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Users &amp; Profiles</span></a>
 
 <div class="page-head">
   <div class="profile-head">
@@ -120,6 +120,9 @@
       </div>
       <input type="file" name="signature" accept="image/png,image/jpeg,image/webp" data-preview="sigPreview" data-empty="sigEmpty">
       <div class="form-hint">Sign in dark ink on plain white paper and take a clear photo or scan — or use a PNG with a transparent background. The paper is removed and the picture trimmed to the signature automatically when saved.</div>
+      <button class="btn btn-sm btn-ghost mt-sm" type="submit" name="action" value="make_signature" formnovalidate
+              data-confirm="{{ 'Replace the e-signature of ' ~ u.name ~ ' with a cursive one?' if signature_url else 'Make a cursive e-signature for ' ~ u.name ~ '?' }}"
+              data-confirm-text="Drawn from the name in a handwriting font — upload the real signature any time.">{{ icon('sparkle', 14) }} {{ 'Replace with a cursive signature' if signature_url else 'Make a cursive signature' }}</button>
       {% if signature_url %}
       <button class="btn btn-sm btn-ghost mt-sm" type="submit" name="action" value="remove_signature" formnovalidate
               data-confirm="Remove the e-signature of {{ u.name }}? Forms will print without it.">Remove e-signature</button>

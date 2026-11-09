@@ -1,0 +1,38 @@
+{# Note cards: remarks, notes and instructions shown the same way everywhere.
+
+   {% from "_note.html" import note_card, note_text, note_hint with context %}
+   {% call note_card("Checked by the Admin", "approvals", who=name, when=date) %}
+     {{ note_text(remarks, "No remarks.") }}
+     {{ note_hint("The quantities below are what the Admin approved.") }}
+   {% endcall %}
+
+   tone: gold (default), green, blue, red — the icon and the quote's edge. #}
+
+{% macro note_card(title, icon_name='info', who=none, when=none, tone='gold') %}
+<section class="note-card tone-{{ tone }}">
+  <div class="note-head">
+    <span class="note-ico">{{ icon(icon_name, 17) }}</span>
+    <div class="note-head-text">
+      <div class="note-label">{{ title }}</div>
+      {% if who %}
+        {% set parts = who.split() %}
+        <div class="note-who"><span class="note-avatar" aria-hidden="true">{{ ((parts[0][0] if parts else '') ~ (parts[-1][0] if parts|length > 1 else ''))|upper }}</span>{{ who }}</div>
+      {% endif %}
+    </div>
+    {% if when %}<span class="note-when">{{ icon('calendar', 13) }}{{ when|longdate }}</span>{% endif %}
+  </div>
+  <div class="note-body">{{ caller() }}</div>
+</section>
+{% endmacro %}
+
+{# The note itself, as a quote; when there is none, a quiet "No remarks." #}
+{% macro note_text(text, empty='No remarks.', label=none) %}
+  {% if label %}<div class="note-sublabel">{{ label }}</div>{% endif %}
+  {% if text %}<blockquote class="note-quote">{{ text }}</blockquote>
+  {% else %}<p class="note-empty">{{ empty }}</p>{% endif %}
+{% endmacro %}
+
+{# A line of guidance under the note (not part of it). #}
+{% macro note_hint(text) %}
+  <p class="note-hint">{{ icon('info', 14) }}<span>{{ text }}</span></p>
+{% endmacro %}

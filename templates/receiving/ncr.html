@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block title %}{{ ncr.report_no }}{% endblock %}
 {% block content %}
+{% from "_note.html" import note_hint with context %}
 <div class="focus">
-<a class="back-link" href="{{ url_for('receiving.ncr_list') }}">{{ icon('arrow-left', 15) }} Hold &amp; Rejection Reports</a>
+<a class="back-link" href="{{ url_for('receiving.ncr_list') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Hold &amp; Rejection Reports</span></a>
 
 <div class="record-head">
   <div>
@@ -27,36 +28,53 @@
   <span class="track-step is-{{ 'done' if ncr.status == 'Closed' else ('now' if ncr.disposition else '') }}">Closed</span>
 </div>
 
-<div class="card mb">
-  <div class="card-title">A–B. Nonconformity &amp; findings</div>
-  <dl class="review-list">
-    <dt>Type</dt><dd>{{ (ncr.nc_types + ([ 'Other: ' ~ ncr.nc_other ] if ncr.nc_other else []))|join(', ') }}</dd>
-    <dt>Findings</dt><dd>{{ ncr.findings or '—' }}</dd>
-    <dt>Lot / batch</dt><dd>{{ ncr.lot_no or '—' }}</dd>
-    <dt>Reported by</dt><dd>{{ ncr.reported_by_name }}{% if ncr.department %} · {{ ncr.department }}{% endif %} · {{ ncr.created }}</dd>
+{# Each part of the report: a lettered card that says where it stands. #}
+{% macro part_head(letter, title, sub, state) %}
+  <div class="bx-head ncr-head">
+    <span class="bx-ico ncr-letter is-{{ state }}">{{ letter }}</span>
+    <div><h2 class="bx-title">{{ title }}</h2>{% if sub %}<div class="bx-sub">{{ sub }}</div>{% endif %}</div>
+    <span class="st-chip tone-{{ {'done': 'green', 'now': 'amber', 'wait': 'done'}[state] }} ncr-state">{{ {'done': 'Done', 'now': 'To do', 'wait': 'Waiting'}[state] }}</span>
+  </div>
+{% endmacro %}
+
+<section class="card bx-card mb">
+  {{ part_head('A–B', 'Nonconformity & findings', 'What was wrong, as found at inspection.', 'done') }}
+  <dl class="bx-facts">
+    <div class="bx-fact is-wide"><dt>Type</dt><dd>
+      {% for t in ncr.nc_types %}<span class="st-chip tone-red ncr-type">{{ t }}</span>{% endfor %}
+      {% if ncr.nc_other %}<span class="st-chip tone-red ncr-type">Other: {{ ncr.nc_other }}</span>{% endif %}
+      {% if not ncr.nc_types and not ncr.nc_other %}—{% endif %}</dd></div>
+    <div class="bx-fact is-wide"><dt>Findings</dt><dd>{% if ncr.findings %}<span class="note-inline">{{ ncr.findings }}</span>{% else %}—{% endif %}</dd></div>
+    <div class="bx-fact"><dt>Lot / batch</dt><dd class="bx-mono">{{ ncr.lot_no or '—' }}</dd></div>
+    <div class="bx-fact"><dt>Raised as</dt><dd>{{ 'HOLD' if ncr.raised_as == 'Hold' else 'REJECTED' }} <span class="bx-note">· {{ ncr.qty_affected|qty(ncr.unit) }}</span></dd></div>
+    <div class="bx-fact"><dt>Reported by</dt><dd>{{ ncr.reported_by_name }}{% if ncr.department %} <span class="bx-note">{{ ncr.department }}</span>{% endif %}</dd></div>
+    <div class="bx-fact"><dt>Reported on</dt><dd>{{ ncr.created }}</dd></div>
   </dl>
-</div>
+</section>
 
 {# C. Containment — by the receiving area #}
 {% if ncr.contained_at %}
-<div class="card mb">
-  <div class="card-title">C. Immediate containment</div>
-  <dl class="review-list">
-    <dt>Done</dt><dd>{{ ncr.containment|join(' · ') }}</dd>
-    <dt>Hold / quarantine location</dt><dd>{{ ncr.hold_location }}</dd>
-    <dt>Quantity segregated</dt><dd>{{ ncr.qty_segregated|qty(ncr.unit) }}</dd>
-    <dt>Tag no.</dt><dd>{{ ncr.tag_no or '—' }}</dd>
-    <dt>Recorded by</dt><dd>{{ ncr.contained_by_name }} · {{ ncr.contained }}</dd>
+<section class="card bx-card mb">
+  {{ part_head('C', 'Immediate containment', 'Tagged, segregated and blocked from production.', 'done') }}
+  <dl class="bx-facts">
+    <div class="bx-fact is-wide"><dt>Done</dt><dd class="bx-tally">{% for c in ncr.containment %}<span class="bx-pill is-pass">{{ icon('check', 13) }} {{ c }}</span>{% endfor %}</dd></div>
+    <div class="bx-fact"><dt>Hold / quarantine location</dt><dd>{{ ncr.hold_location }}</dd></div>
+    <div class="bx-fact"><dt>Quantity segregated</dt><dd>{{ ncr.qty_segregated|qty(ncr.unit) }}</dd></div>
+    <div class="bx-fact"><dt>Tag no.</dt><dd class="bx-mono">{{ ncr.tag_no or '—' }}</dd></div>
+    <div class="bx-fact"><dt>Recorded by</dt><dd>{{ ncr.contained_by_name }} <span class="bx-note">· {{ ncr.contained }}</span></dd></div>
   </dl>
-</div>
+</section>
 {% elif ncr.status != 'Closed' %}
-<form method="post" action="{{ url_for('receiving.ncr_contain', ncr_id=ncr.id) }}" class="card mb">
-  <div class="card-title">C. Immediate containment</div>
-  <p class="small muted">Stop normal receiving for this material: tag it, move it to the HOLD / quarantine area and block it from production.</p>
-  {% for c in containment %}
-  <label class="check-row"><input type="checkbox" name="containment" value="{{ c }}"> {{ c }}{% if loop.index <= 3 %} <span class="req">*</span>{% endif %}</label>
-  {% endfor %}
-  <div class="form-grid cols-2 mt-sm">
+<form method="post" action="{{ url_for('receiving.ncr_contain', ncr_id=ncr.id) }}" class="card bx-card mb">
+  {{ part_head('C', 'Immediate containment', 'Stop normal receiving for this material: tag it, move it to the HOLD / quarantine area and block it from production.', 'now') }}
+  <div class="form-label">What was done <span class="muted small">— the first three are required</span></div>
+  <div class="tick-grid">
+    {% for c in containment %}
+    <label class="tick-tile"><input type="checkbox" name="containment" value="{{ c }}">
+      <span>{{ icon('check', 14) }}</span><b>{{ c }}{% if loop.index <= 3 %} <i class="req">*</i>{% endif %}</b></label>
+    {% endfor %}
+  </div>
+  <div class="form-grid cols-2 mt">
     <div class="form-row">
       <label class="form-label" for="hold_location">Hold / quarantine location <span class="req">*</span></label>
       <input type="text" id="hold_location" name="hold_location" maxlength="80" required placeholder="e.g. Quarantine rack Q-1">
@@ -73,56 +91,70 @@
       </div>
     </div>
   </div>
-  <button class="btn btn-primary" type="submit">Save containment</button>
+  <div class="flex bx-actions">
+    <button class="btn btn-primary" type="submit">{{ icon('check', 15) }} Save containment</button>
+  </div>
 </form>
 {% endif %}
 
 {# D. Disposition — QA / authorized approver #}
+{% set disp_icons = {'release': 'check', 'conditional': 'clipboard', 'rework': 'tools', 'return': 'truck', 'replace': 'swap', 'credit': 'wallet', 'dispose': 'x-circle'} %}
 {% if ncr.disposition %}
-<div class="card mb">
-  <div class="card-title">D. Disposition</div>
-  <dl class="review-list">
-    <dt>Decision</dt><dd><b>{{ ncr.disposition_label }}</b>{% if ncr.accepted_qty %} — {{ ncr.accepted_qty|qty(ncr.unit) }} released to stock{% endif %}</dd>
-    {% if ncr.disposition_details %}<dt>Details / reference</dt><dd>{{ ncr.disposition_details }}</dd>{% endif %}
-    {% if ncr.justification %}<dt>Technical justification</dt><dd>{{ ncr.justification }}</dd>{% endif %}
-    {% if ncr.supplier_response %}<dt>Supplier corrective action</dt><dd>{{ ncr.supplier_response }}</dd>{% endif %}
-    <dt>QA / authorized approval</dt><dd>{{ ncr.qa_approved_by_name }} · recorded by {{ ncr.disposed_by_name }} · {{ ncr.disposed }}</dd>
+<section class="card bx-card mb">
+  {{ part_head('D', 'Disposition', 'Decided by QA / an authorized approver.', 'done') }}
+  <dl class="bx-facts">
+    <div class="bx-fact is-wide"><dt>Decision</dt><dd><span class="ncr-decision">{{ icon(disp_icons.get(ncr.disposition, 'check'), 15) }} {{ ncr.disposition_label }}</span>{% if ncr.accepted_qty %} <span class="bx-note">— {{ ncr.accepted_qty|qty(ncr.unit) }} released to stock</span>{% endif %}</dd></div>
+    {% if ncr.disposition_details %}<div class="bx-fact is-wide"><dt>Details / reference</dt><dd>{{ ncr.disposition_details }}</dd></div>{% endif %}
+    {% if ncr.justification %}<div class="bx-fact is-wide"><dt>Technical justification</dt><dd><span class="note-inline">{{ ncr.justification }}</span></dd></div>{% endif %}
+    {% if ncr.supplier_response %}<div class="bx-fact is-wide"><dt>Supplier corrective action</dt><dd>{{ ncr.supplier_response }}</dd></div>{% endif %}
+    <div class="bx-fact"><dt>QA / authorized approval</dt><dd>{{ ncr.qa_approved_by_name }}</dd></div>
+    <div class="bx-fact"><dt>Recorded by</dt><dd>{{ ncr.disposed_by_name }} <span class="bx-note">· {{ ncr.disposed }}</span></dd></div>
   </dl>
-</div>
+</section>
 {% elif ncr.contained_at %}
   {% if can_decide %}
-  <form method="post" action="{{ url_for('receiving.ncr_dispose', ncr_id=ncr.id) }}" class="card mb" id="disposeForm">
-    <div class="card-title">D. Disposition <span class="muted">— QA / authorized approver</span></div>
-    {% for key, label, releases in dispositions if not releases or box_status != 'Rejected' %}
-    <label class="check-row"><input type="radio" name="disposition" value="{{ key }}" required data-releases="{{ 1 if releases else 0 }}" data-justify="{{ 1 if key in needs_justification else 0 }}"> {{ label }}
-      {% if releases %}<span class="muted small">— usable part joins stock</span>{% endif %}
-      {% if key == 'rework' %}<span class="muted small">(QA approval required)</span>{% endif %}</label>
-    {% endfor %}
-    <div class="form-row mt-sm" id="acceptedRow" style="display:none">
+  <form method="post" action="{{ url_for('receiving.ncr_dispose', ncr_id=ncr.id) }}" class="card bx-card mb" id="disposeForm">
+    {{ part_head('D', 'Disposition', 'QA / an authorized approver decides what happens to the material.', 'now') }}
+    <div class="choice-grid cols-3 ncr-choices">
+      {% for key, label, releases in dispositions if not releases or box_status != 'Rejected' %}
+      {% set title, _, sub = label.partition(' — ') %}
+      <label class="choice">
+        <input type="radio" name="disposition" value="{{ key }}" required data-releases="{{ 1 if releases else 0 }}" data-justify="{{ 1 if key in needs_justification else 0 }}">
+        <span class="choice-card"><span class="choice-icon">{{ icon(disp_icons.get(key, 'check'), 18) }}</span>
+          <span><span class="choice-title">{{ title }}</span>
+            <span class="choice-sub">{% if sub %}{{ sub[:1]|upper ~ sub[1:] }}. {% endif %}{% if releases %}The usable part joins stock.{% else %}Nothing joins stock.{% endif %}{% if key == 'rework' %} QA approval required.{% endif %}</span></span></span>
+      </label>
+      {% endfor %}
+    </div>
+    <div class="form-row mt" id="acceptedRow" style="display:none">
       <label class="form-label" for="accepted_qty">Quantity accepted</label>
-      <div class="big-field">
+      <div class="big-field" style="max-width:320px">
         <input type="number" id="accepted_qty" name="accepted_qty" step="0.001" min="0" inputmode="decimal" value="{{ '%g'|format((good_qty or 0)|float) }}">
         <span class="unit">{{ ncr.unit }}</span>
       </div>
       <div class="form-hint">After sorting, enter what passed. The rest is written off as can't be used.</div>
     </div>
-    <div class="form-row" id="justifyRow" style="display:none">
+    <div class="form-row mt" id="justifyRow" style="display:none">
       <label class="form-label" for="justification">Technical justification <span class="req">*</span></label>
       <textarea id="justification" name="justification" rows="2" placeholder="Why this is acceptable, and the conditions"></textarea>
     </div>
-    <div class="form-row">
-      <label class="form-label" for="disposition_details">Disposition details / reference</label>
-      <input type="text" id="disposition_details" name="disposition_details" maxlength="200" placeholder="e.g. RTS slip no., credit memo no., COA received">
-    </div>
-    <div class="form-row">
-      <label class="form-label" for="supplier_response">Supplier corrective action / response</label>
-      <input type="text" id="supplier_response" name="supplier_response" maxlength="300">
+    <div class="form-grid cols-2 mt">
+      <div class="form-row">
+        <label class="form-label" for="disposition_details">Disposition details / reference</label>
+        <input type="text" id="disposition_details" name="disposition_details" maxlength="200" placeholder="e.g. RTS slip no., credit memo no., COA received">
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="supplier_response">Supplier corrective action / response</label>
+        <input type="text" id="supplier_response" name="supplier_response" maxlength="300">
+      </div>
     </div>
     <div class="form-row">
       <label class="form-label" for="qa_approved_by_name">QA / authorized approval <span class="req">*</span></label>
       <input type="text" id="qa_approved_by_name" name="qa_approved_by_name" maxlength="120" required value="{{ with_position(name=me_name) }}">
     </div>
-    <button class="btn btn-primary" type="submit">Save disposition</button>
+    <div class="flex bx-actions">
+      <button class="btn btn-primary" type="submit">{{ icon('check', 15) }} Save disposition</button>
+    </div>
   </form>
   <script>
   (function () {
@@ -140,38 +172,50 @@
   })();
   </script>
   {% else %}
-  <div class="card mb"><div class="card-title">D. Disposition</div>
-    <p class="small muted" style="margin:0">Waiting for QA / an authorized approver to decide: release, return, replace, credit / refund, rework / sort, conditional acceptance or dispose.</p></div>
+  <section class="card bx-card mb">
+    {{ part_head('D', 'Disposition', 'Waiting for QA / an authorized approver to decide: release, return, replace, credit / refund, rework / sort, conditional acceptance or dispose.', 'wait') }}
+  </section>
   {% endif %}
+{% else %}
+<section class="card bx-card mb ncr-later">
+  {{ part_head('D', 'Disposition', 'QA decides once the material is contained.', 'wait') }}
+</section>
 {% endif %}
 
 {# E. Closure #}
 {% if ncr.status == 'Closed' %}
-<div class="card mb">
-  <div class="card-title">E. Closure</div>
-  <dl class="review-list">
-    <dt>Closure verified by</dt><dd>{{ ncr.closure_verified_by_name }}</dd>
-    <dt>Date closed</dt><dd>{{ ncr.closed }} · {{ ncr.closed_by_name }}</dd>
+<section class="card bx-card mb">
+  {{ part_head('E', 'Closure', 'The disposition was carried out and verified.', 'done') }}
+  <dl class="bx-facts">
+    <div class="bx-fact"><dt>Closure verified by</dt><dd>{{ ncr.closure_verified_by_name }}</dd></div>
+    <div class="bx-fact"><dt>Date closed</dt><dd>{{ ncr.closed }} <span class="bx-note">· {{ ncr.closed_by_name }}</span></dd></div>
   </dl>
-</div>
+</section>
 {% elif ncr.disposition %}
-<form method="post" action="{{ url_for('receiving.ncr_close', ncr_id=ncr.id) }}" class="card mb">
-  <div class="card-title">E. Closure</div>
-  <p class="small muted">Close the report once the disposition is carried out (returned, replaced, disposed…).</p>
-  {% if not ncr.supplier_response %}
-  <div class="form-row">
-    <label class="form-label" for="supplier_response_close">Supplier corrective action / response</label>
-    <input type="text" id="supplier_response_close" name="supplier_response" maxlength="300">
+<form method="post" action="{{ url_for('receiving.ncr_close', ncr_id=ncr.id) }}" class="card bx-card mb">
+  {{ part_head('E', 'Closure', 'Close the report once the disposition is carried out (returned, replaced, disposed…).', 'now') }}
+  <div class="form-grid cols-2">
+    {% if not ncr.supplier_response %}
+    <div class="form-row">
+      <label class="form-label" for="supplier_response_close">Supplier corrective action / response</label>
+      <input type="text" id="supplier_response_close" name="supplier_response" maxlength="300">
+    </div>
+    {% endif %}
+    <div class="form-row">
+      <label class="form-label" for="closure_verified_by_name">Closure verified by <span class="req">*</span></label>
+      <input type="text" id="closure_verified_by_name" name="closure_verified_by_name" maxlength="120" required value="{{ with_position(name=me_name) }}">
+    </div>
   </div>
-  {% endif %}
-  <div class="form-row">
-    <label class="form-label" for="closure_verified_by_name">Closure verified by <span class="req">*</span></label>
-    <input type="text" id="closure_verified_by_name" name="closure_verified_by_name" maxlength="120" required value="{{ with_position(name=me_name) }}">
+  <div class="flex bx-actions">
+    <button class="btn btn-primary" type="submit">{{ icon('check', 15) }} Close report</button>
   </div>
-  <button class="btn btn-primary" type="submit">Close report</button>
 </form>
+{% else %}
+<section class="card bx-card mb ncr-later">
+  {{ part_head('E', 'Closure', 'Closed once the disposition is carried out.', 'wait') }}
+</section>
 {% endif %}
 
-<p class="small muted">Materials on HOLD or REJECTED must stay identified and physically segregated. They must not be issued to production unless formally released by authorized QA personnel.</p>
+{{ note_hint('Materials on HOLD or REJECTED must stay identified and physically segregated. They must not be issued to production unless formally released by authorized QA personnel.') }}
 </div>
 {% endblock %}

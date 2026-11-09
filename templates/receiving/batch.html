@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block title %}{{ batch.ref_no }}{% endblock %}
 {% block content %}
+{% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead, ct_nothing with context %}
 <div class="focus-wide">
-<a class="back-link" href="{{ url_for('receiving.index') }}">{{ icon('arrow-left', 15) }} Receiving Area</a>
+<a class="back-link" href="{{ url_for('receiving.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Receiving Area</span></a>
 
 <div class="record-head">
   <div>
@@ -24,8 +25,12 @@
 
 {# The delivery documents (DR, OR, AR): number and picture / PDF of each,
    shown here and added or replaced. #}
-<div class="card mb proof-card">
+<div class="card mb proof-card{{ ' is-missing-doc' if not has_doc and batch.status != 'Completed' }}" id="docs">
   <div class="card-title">Delivery documents</div>
+  {% if not has_doc and batch.status != 'Completed' %}
+  <div class="doc-required">{{ icon('alert', 16) }}
+    <span><b>Attach at least one document</b> — the DR, OR or AR as a photo or PDF. The receipt can't be closed without one.</span></div>
+  {% endif %}
   <div class="doc-files">
     {% for key, label, number_field, file_field, _ in delivery_docs %}
     {% set file = batch[file_field] %}
@@ -51,31 +56,42 @@
 {% if batch.status == 'For Closing' %}
 <div class="next-action">
   <div class="next-action-text">
+    {% if has_doc %}
     <b>Every box is inspected — close the receipt</b>
     <span>Print the status labels, store accepted boxes, keep held / rejected ones segregated, then answer the Quick Control Check.</span>
+    {% else %}
+    <b>Every box is inspected — attach a delivery document to close the receipt</b>
+    <span>Add the DR, OR or AR file under Delivery documents above; then the receipt can be closed.</span>
+    {% endif %}
   </div>
   <div class="flex gap-sm wrap">
     <a class="btn btn-ghost" href="{{ url_for('receiving.status_labels', batch_id=batch.id) }}">{{ icon('printer', 16) }} Status labels</a>
+    {% if has_doc %}
     <a class="btn btn-primary" href="{{ url_for('receiving.close', batch_id=batch.id) }}">Close receipt</a>
+    {% else %}
+    <a class="btn btn-primary" href="#docs">{{ icon('paperclip', 15) }} Attach a document</a>
+    {% endif %}
   </div>
 </div>
 {% endif %}
 
 {% if open_ncrs %}
-<div class="card mb">
-  <div class="card-title">Hold / rejection reports still open ({{ open_ncrs|length }})</div>
-  <div class="queue">
-    {% for b in open_ncrs %}
-    <a class="queue-item" href="{{ url_for('receiving.ncr', ncr_id=b.ncr_id) }}">
-      <span class="code" style="min-width:96px">{{ b.ncr_no }}</span>
-      <span class="queue-main">
-        <span class="queue-title">{{ b.material_name }} — {{ b.box_code }}</span>
-        <span class="queue-sub">{{ b.status }}{% if b.nonconformity %} · {{ b.nonconformity }}{% endif %}</span>
-      </span>
-      <span class="badge {{ 'badge-danger' if b.ncr_status == 'Open' else 'badge-warn' }}">{{ b.ncr_status }}</span>
-    </a>
-    {% endfor %}
-  </div>
+<div data-ct="delivery-ncrs" class="mb">
+{% call ct_box('ncrs', 'Hold / rejection reports still open', 'Boxes put on hold or rejected — open a report to decide what happens to them.', 'red', 'shield', open_ncrs|length,
+               ['Report', 'Box', 'Box status', 'Nonconformity', 'Report status'],
+               'minmax(170px, 1.3fr) minmax(200px, 1.8fr) minmax(110px, .9fr) minmax(160px, 1.5fr) minmax(120px, auto)',
+               tabbed=false) %}
+  {% for b in open_ncrs %}
+    {% set ncr_url = url_for('receiving.ncr', ncr_id=b.ncr_id) %}
+    {% call ct_row('ncrs', href=ncr_url, search=(b.ncr_no or '') ~ ' ' ~ b.material_name ~ ' ' ~ b.box_code ~ ' ' ~ (b.nonconformity or '')) %}
+      {{ ct_lead('shield', b.ncr_no, ncr_url) }}
+      <div role="cell" class="prt-date">{{ b.material_name }}<div class="prt-small">{{ b.box_code }}</div></div>
+      <div role="cell" class="prt-date">{{ b.status }}</div>
+      <div role="cell" class="prt-date">{{ b.nonconformity or '—' }}</div>
+      <div role="cell" class="prt-cell-end"><span class="st-chip tone-{{ 'red' if b.ncr_status == 'Open' else 'amber' }}">{{ b.ncr_status }}</span></div>
+    {% endcall %}
+  {% endfor %}
+{% endcall %}
 </div>
 {% endif %}
 
@@ -88,7 +104,23 @@
   <div class="flex gap-sm wrap">
     <a class="btn btn-ghost" href="{{ url_for('receiving.labels', batch_id=batch.id) }}">{{ icon('printer', 16) }} Print QR labels</a>
     {% if can('inspection') %}
-    <a class="btn btn-primary" href="{{ url_for('receiving.inspect', box_id=awaiting[0].id) }}">Inspect first box</a>
+    <a class="btn btn-primary" href="{{ url_for('receiving.inspect', box_id=awaiting[0].id, back=batch.id) }}">Inspect first box</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% set honey_waiting = honey|rejectattr('status', 'in', ['Pass', 'Failed'])|list %}
+{% if honey_waiting %}
+<div class="next-action">
+  <div class="next-action-text">
+    <b>{{ honey_waiting|length }} honey container(s) waiting for the moisture &amp; appearance check</b>
+    <span>Checked on Honey Inspection; the receipt closes once every container has its result.</span>
+  </div>
+  <div class="flex gap-sm wrap">
+    <a class="btn btn-ghost" href="{{ url_for('honey.labels', only=honey|map(attribute='id')|join(',')) }}">{{ icon('printer', 16) }} Honey labels</a>
+    {% if can('honey') %}
+    <a class="btn btn-primary" href="{{ url_for('honey.qc', container_id=honey_waiting[0].id) }}">Check first container</a>
     {% endif %}
   </div>
 </div>
@@ -101,48 +133,76 @@
   <div class="figure {{ 'is-bad' if batch.total_damaged }}"><div class="figure-label">Damaged</div><div class="figure-value">{{ batch.total_damaged|qty }}</div></div>
 </div>
 
-<div class="flex-between mb-sm">
-  <div class="section-label" style="margin:8px 0">Boxes in this delivery</div>
-  <div class="flex gap-sm">
-    {% if batch.status in ('Open', 'For Closing') %}
-    <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.add_boxes', batch_id=batch.id) }}">{{ icon('plus', 14) }} Add a box</a>
-    {% endif %}
-    {% if not awaiting and boxes %}
-    <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.labels', batch_id=batch.id) }}">{{ icon('printer', 14) }} QR labels</a>
-    {% endif %}
-    {% if boxes|rejectattr('status', 'equalto', 'Awaiting Inspection')|list %}
-    <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.status_labels', batch_id=batch.id) }}">{{ icon('printer', 14) }} Status labels</a>
-    {% endif %}
-  </div>
+{% set box_tone = {'Awaiting Inspection': 'amber', 'On Hold': 'amber', 'Accepted': 'green', 'Rejected': 'red'} %}
+<div class="flex gap-sm wrap mb-sm" style="justify-content:flex-end">
+  {% if batch.status in ('Open', 'For Closing') and boxes %}
+  <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.add_boxes', batch_id=batch.id) }}">{{ icon('plus', 14) }} Add a box</a>
+  {% endif %}
+  {% if not awaiting and boxes %}
+  <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.labels', batch_id=batch.id) }}">{{ icon('printer', 14) }} QR labels</a>
+  {% endif %}
+  {% if boxes|rejectattr('status', 'equalto', 'Awaiting Inspection')|list %}
+  <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.status_labels', batch_id=batch.id) }}">{{ icon('printer', 14) }} Status labels</a>
+  {% endif %}
 </div>
 
-{% if boxes %}
-<div class="queue">
+{% if boxes or not honey %}
+<div data-ct="delivery-boxes">
+{% if boxes|length > 10 %}
+{{ ct_topbar(search="Search material, box, batch…", filters=[('data-status', 'Status', boxes|map(attribute='status')|unique|list)]) }}
+{% endif %}
+{% call ct_box('boxes', 'Boxes in this delivery', 'Open a box to see its inspection.', 'blue', 'box', boxes|length,
+               ['Box', 'Declared', 'Usable', "Can't be used · damaged", 'Where', 'Status'],
+               'minmax(190px, 2fr) minmax(80px, .8fr) minmax(80px, .8fr) minmax(120px, 1.1fr) minmax(110px, 1fr) minmax(160px, 1.2fr)',
+               tabbed=false, empty='No box here matches.') %}
   {% for box in boxes %}
-  <a class="queue-item" href="{{ url_for('receiving.box', box_id=box.id) }}">
-    <span class="code" style="min-width:58px">{{ box.box_code }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ box.material_name }} — {{ box.declared_qty|qty(box.unit) }}</span>
-      <span class="queue-sub">
-        {% if box.status == 'Awaiting Inspection' %}
-          At the {{ box.stage }}{% if box.lot_no %} · Batch {{ box.lot_no }}{% endif %}
-        {% else %}
-          {{ box.good_qty|qty(box.unit) }} usable
-          {% if box.unusable_qty %} · {{ box.unusable_qty|qty(box.unit) }} can't be used{% endif %}
-          {% if box.damaged_qty %} · {{ box.damaged_qty|qty(box.unit) }} damaged{% endif %}
-          · {{ box.stage }}
-        {% endif %}
-      </span>
-    </span>
-    <span class="badge {{ box.badge }}">{{ box.status }}</span>
-  </a>
+    {% set box_url = url_for('receiving.box', box_id=box.id, back=batch.id) %}
+    {% call ct_row('boxes', href=box_url, search=box.material_name ~ ' ' ~ box.box_code ~ ' ' ~ (box.lot_no or '') ~ ' ' ~ box.status,
+                   data={'status': box.status}) %}
+      {% call ct_lead('box', box.material_name, box_url, code=box.box_code) %}{% if box.lot_no %} Batch {{ box.lot_no }}{% endif %}{% endcall %}
+      <div role="cell" class="prt-num">{{ box.declared_qty|qty(box.unit) }}</div>
+      <div role="cell" class="prt-num">{{ '—' if box.status == 'Awaiting Inspection' else box.good_qty|qty(box.unit) }}</div>
+      <div role="cell" class="prt-date">
+        {% if box.unusable_qty %}{{ box.unusable_qty|qty(box.unit) }} can't be used{% endif %}
+        {% if box.damaged_qty %}<div class="prt-small">{{ box.damaged_qty|qty(box.unit) }} damaged</div>{% endif %}
+        {% if not box.unusable_qty and not box.damaged_qty %}—{% endif %}</div>
+      <div role="cell" class="prt-date">At the {{ box.stage }}</div>
+      <div role="cell" class="prt-cell-end"><span class="st-chip tone-{{ box_tone.get(box.status, 'done') }}">{{ box.status }}</span></div>
+    {% endcall %}
+  {% else %}
+    <div class="empty" style="padding:24px">
+      <div class="empty-title">No boxes yet</div>
+      <a class="btn btn-primary mt" href="{{ url_for('receiving.add_boxes', batch_id=batch.id) }}">Add a box</a>
+    </div>
   {% endfor %}
+{% endcall %}
+{{ ct_nothing("Try other words or another status.") if boxes|length > 10 }}
 </div>
-{% else %}
-<div class="card"><div class="empty">
-  <div class="empty-title">No boxes yet</div>
-  <a class="btn btn-primary mt" href="{{ url_for('receiving.add_boxes', batch_id=batch.id) }}">Add a box</a>
-</div></div>
+{% endif %}
+
+{% if honey %}
+{# Honey received with this delivery: containers, checked on Honey Inspection. #}
+{% set honey_tone = {'Pass': 'green', 'Failed': 'red'} %}
+<div data-ct="delivery-honey" class="mt">
+{% call ct_box('honey', 'Honey containers in this delivery', 'Weighed at receiving; moisture & appearance checked on Honey Inspection.', 'amber', 'honey', honey|length,
+               ['Container', 'Net weight', 'PO line', 'Result', ''],
+               'minmax(200px, 2fr) minmax(100px, .9fr) minmax(90px, .8fr) minmax(130px, 1fr) minmax(110px, auto)',
+               tabbed=false) %}
+  {% for c in honey %}
+    {% set c_url = url_for('honey.container', container_id=c.id) %}
+    {% call ct_row('honey', href=c_url, search=(c.container_code or '') ~ ' ' ~ (c.batch_ref or '') ~ ' ' ~ (c.status or '')) %}
+      {% call ct_lead('honey', c.container_code, c_url) %}{{ c.batch_ref }}{% endcall %}
+      <div role="cell" class="prt-num">{{ c.net_weight_kg|qty('kg') }}</div>
+      <div role="cell" class="prt-date">{{ c.po_line_no or '—' }}</div>
+      <div role="cell"><span class="st-chip tone-{{ honey_tone.get(c.status, 'amber') }}">{{ {'Pass': 'Accepted (PASS)', 'Failed': 'Rejected (failed QC)'}.get(c.status, 'Waiting for check') }}</span></div>
+      <div role="cell" class="prt-cell-end">
+        {% if c.status not in ('Pass', 'Failed') and can('honey') %}<a class="btn btn-primary btn-sm" href="{{ url_for('honey.qc', container_id=c.id) }}">Check {{ icon('arrow-right', 14) }}</a>
+        {% else %}<a class="btn btn-ghost btn-sm" href="{{ c_url }}">Open {{ icon('arrow-right', 14) }}</a>{% endif %}
+      </div>
+    {% endcall %}
+  {% endfor %}
+{% endcall %}
+</div>
 {% endif %}
 
 {% if batch.remarks or batch.discrepancies %}

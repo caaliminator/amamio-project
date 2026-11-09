@@ -9,9 +9,9 @@
   .pick-items label.is-hidden, .pick-items .pick-group.is-hidden { display: none; }
 </style>
 {% if supplier and supplier.id %}
-<a class="back-link" href="{{ url_for('suppliers.detail', supplier_id=supplier.id) }}">{{ icon('arrow-left', 15) }} {{ supplier.name }}</a>
+<a class="back-link" href="{{ url_for('suppliers.detail', supplier_id=supplier.id) }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ supplier.name }}</span></a>
 {% else %}
-<a class="back-link" href="{{ url_for('suppliers.index') }}">{{ icon('arrow-left', 15) }} Supplier Directory</a>
+<a class="back-link" href="{{ url_for('suppliers.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Supplier Directory</span></a>
 {% endif %}
 
 <form method="post" class="wizard" data-wizard data-wizard-start="{{ start }}" id="supForm"

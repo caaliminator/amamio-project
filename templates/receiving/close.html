@@ -1,13 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Close {{ batch.ref_no }}{% endblock %}
 {% block content %}
+{% from "_note.html" import note_hint with context %}
 <div class="focus">
-<a class="back-link" href="{{ url_for('receiving.batch', batch_id=batch.id) }}">{{ icon('arrow-left', 15) }} {{ batch.ref_no }}</a>
+<a class="back-link" href="{{ url_for('receiving.batch', batch_id=batch.id) }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ batch.ref_no }}</span></a>
 
 <div class="page-head">
   <div>
     <h1 class="page-title">Close the receipt</h1>
-    <p class="page-sub">{{ batch.ref_no }} · {{ batch.supplier_name }} · Quick Control Check (SOP AFP-WH-SOP-001)</p>
+    <p class="page-sub"><span class="prt-code">{{ batch.ref_no }}</span> · {{ batch.supplier_name }} · Quick Control Check (SOP AFP-WH-SOP-001)</p>
   </div>
 </div>
 
@@ -22,42 +23,160 @@
   <p class="muted">A receipt can be closed once every box has been inspected.</p>
   <a class="btn btn-primary mt" href="{{ url_for('receiving.batch', batch_id=batch.id) }}">Back to the delivery</a>
 </div></div>
+{% elif honey_unchecked %}
+<div class="card"><div class="empty">
+  <div class="empty-icon">{{ icon('honey', 30) }}</div>
+  <div class="empty-title">{{ honey_unchecked|length }} honey container(s) still need their check</div>
+  <p class="muted">A receipt can be closed once every honey container has its moisture &amp; appearance result.</p>
+  <a class="btn btn-primary mt" href="{{ url_for('receiving.batch', batch_id=batch.id) }}">Back to the delivery</a>
+</div></div>
+{% elif not has_doc %}
+<div class="card"><div class="empty">
+  <div class="empty-icon">{{ icon('paperclip', 30) }}</div>
+  <div class="empty-title">Attach a delivery document first</div>
+  <p class="muted">A receipt can be closed once at least one of its documents — the DR, OR or AR — has a photo or PDF attached.</p>
+  <a class="btn btn-primary mt" href="{{ url_for('receiving.batch', batch_id=batch.id) }}#docs">{{ icon('paperclip', 15) }} Go to the delivery documents</a>
+</div></div>
 {% else %}
+
+{# What was inspected, at a glance. #}
+<div class="figures mb">
+  <div class="figure"><div class="figure-label">Boxes in this delivery</div><div class="figure-value">{{ boxes|length }}</div></div>
+  <div class="figure {{ 'is-good' if counts['Accepted'] }}"><div class="figure-label">Accepted</div><div class="figure-value">{{ counts['Accepted'] }}</div></div>
+  <div class="figure"><div class="figure-label">On hold</div><div class="figure-value">{{ counts['On Hold'] }}</div></div>
+  <div class="figure {{ 'is-bad' if counts['Rejected'] }}"><div class="figure-label">Rejected</div><div class="figure-value">{{ counts['Rejected'] }}</div></div>
+</div>
+
 {% if held %}
-<div class="card mb" style="border-left:3px solid var(--warn, #d4a017)">
-  <div class="card-title">{{ held|length }} box(es) on HOLD</div>
-  <p class="small muted" style="margin:0">They stay tagged, segregated and unavailable for production until QA decides on their hold report. Closing the receipt doesn't release them.</p>
+<div class="close-held mb">
+  <span class="close-held-ico">{{ icon('pause', 18) }}</span>
+  <div>
+    <b>{{ held|length }} box(es) on hold</b>
+    <span>They stay tagged, segregated and unavailable for production until QA decides on their hold report. Closing the receipt doesn't release them.</span>
+  </div>
 </div>
 {% endif %}
 
-<form method="post" class="card">
-  <div class="card-title">Before closing the receipt</div>
-  {% for key, label in checks %}
-  <div class="form-row">
-    <div class="form-label">{{ label }} <span class="req">*</span></div>
-    <div class="chip-choices">
-      {% for a in answers %}
-      <label class="chip-choice"><input type="radio" name="check_{{ key }}" value="{{ a }}" required
-             {{ 'checked' if form.get('check_' ~ key) == a }}><span>{{ a }}</span></label>
-      {% endfor %}
+{% set hints = {
+  'po_dr': 'The delivery receipt matches the approved purchase order.',
+  'qty_counted': 'What arrived was counted or weighed — not taken from the DR.',
+  'quality_inspected': 'Every box went through the inspection checklist.',
+  'lot_dates': 'Batch / lot numbers and expiry dates are on the records.',
+  'status_label': 'Each box carries its Accepted, Hold or Rejected label.',
+  'records_done': 'The receiving report (MRR) and inspection records are complete.',
+  'inventory_stored': 'Accepted stock is put away; held and rejected boxes are kept apart.'} %}
+{% set rows = ((checks|length) / 2)|round(0, 'ceil')|int %}
+
+<form method="post" class="card close-form" id="closeForm">
+  <div class="close-section-head">
+    <div>
+      <div class="card-title" style="margin:0">Before closing the receipt</div>
+      <div class="muted small">Answer each step: Yes when it's done, N/A when it doesn't apply to this delivery.</div>
     </div>
   </div>
-  {% endfor %}
-  <div class="form-grid cols-2 mt">
-    <div class="form-row">
-      <label class="form-label" for="verified_by_name">Verified by <span class="req">*</span></label>
-      <input type="text" id="verified_by_name" name="verified_by_name" maxlength="80" required
-             value="{{ form.verified_by_name or '' }}">
-    </div>
-    <div class="form-row">
-      <label class="form-label" for="qa_approved_by_name">QA / authorized approval</label>
-      <input type="text" id="qa_approved_by_name" name="qa_approved_by_name" maxlength="80"
-             value="{{ form.qa_approved_by_name or '' }}">
+
+  <div class="chk-head">
+    <div class="chk-progress">
+      <div class="chk-progress-text"><b id="chkDone">0</b> of {{ checks|length }} answered <span class="chk-counts" id="chkCounts"></span></div>
+      <div class="chk-bar"><span id="chkBar"></span></div>
     </div>
   </div>
-  <p class="small muted">Any "No" keeps the receipt open — finish that step first. <b>No material may be issued to production until it has been inspected, accepted, identified, and recorded.</b></p>
-  <button class="btn btn-primary" type="submit">Close receipt</button>
+
+  <ol class="chk-list close-list" style="--rows:{{ rows }}">
+    {% for key, label in checks %}
+    <li class="chk-point{{ ' is-col-top' if loop.index == rows + 1 }}{{ ' is-left' if loop.index <= rows }}" data-point="{{ key }}">
+      <span class="chk-num">{{ loop.index }}</span>
+      <div class="chk-text">
+        <span class="chk-name">{{ label }}</span>
+        <span class="chk-req">{{ hints.get(key, '') }}</span>
+      </div>
+      <div class="seg" role="radiogroup" aria-label="{{ label }}">
+        {% for a in answers %}
+        <label class="seg-opt {{ {'Yes': 'seg-pass', 'No': 'seg-fail'}.get(a, 'seg-na') }}">
+          <input type="radio" name="check_{{ key }}" value="{{ a }}" required {{ 'checked' if form.get('check_' ~ key) == a }}><span>{{ a }}</span></label>
+        {% endfor %}
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+
+  {# Where the receipt stands, as the answers come in. #}
+  <div class="close-status is-pending" id="closeStatus" aria-live="polite">
+    <span class="close-status-ico" data-ico="pending">{{ icon('clipboard', 18) }}</span>
+    <span class="close-status-ico" data-ico="blocked" hidden>{{ icon('x-circle', 18) }}</span>
+    <span class="close-status-ico" data-ico="ready" hidden>{{ icon('check', 18) }}</span>
+    <div><b id="closeStatusTitle">Answer every step to close the receipt</b>
+      <span id="closeStatusText">Any "No" keeps the receipt open — finish that step first.</span></div>
+  </div>
+
+  <div class="close-signoff">
+    <div class="close-signoff-title">{{ icon('users', 15) }} Sign-off</div>
+    <div class="form-grid cols-2">
+      <div class="form-row">
+        <label class="form-label" for="verified_by_name">Verified by <span class="req">*</span></label>
+        <input type="text" id="verified_by_name" name="verified_by_name" maxlength="80" required
+               value="{{ form.get('verified_by_name') or current_user.name }}">
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="qa_approved_by_name">QA / authorized approval <span class="muted small">(optional)</span></label>
+        <input type="text" id="qa_approved_by_name" name="qa_approved_by_name" maxlength="80"
+               placeholder="Name of the QA / authorized person" value="{{ form.qa_approved_by_name or '' }}">
+      </div>
+    </div>
+  </div>
+
+  {{ note_hint('No material may be issued to production until it has been inspected, accepted, identified and recorded.') }}
+
+  <div class="flex close-actions">
+    <a class="btn btn-ghost" href="{{ url_for('receiving.batch', batch_id=batch.id) }}">Cancel</a>
+    <button class="btn btn-primary" type="submit" id="closeBtn" data-confirm="Close receipt {{ batch.ref_no }}?"
+            data-confirm-text="The delivery moves to Completed.">{{ icon('check', 16) }} Close receipt</button>
+  </div>
 </form>
 {% endif %}
 </div>
+
+<script>
+(function () {
+  var form = document.getElementById("closeForm");
+  if (!form) return;
+  var rows = Array.prototype.slice.call(form.querySelectorAll(".chk-point"));
+  var status = document.getElementById("closeStatus");
+  function sync() {
+    var done = 0, no = [], counts = {Yes: 0, No: 0, "N/A": 0};
+    rows.forEach(function (row) {
+      var r = (row.querySelector("input:checked") || {}).value;
+      row.classList.toggle("is-pass", r === "Yes");
+      row.classList.toggle("is-fail", r === "No");
+      row.classList.toggle("is-na", r === "N/A");
+      if (r) { done += 1; counts[r] += 1; row.classList.remove("is-missing"); }
+      if (r === "No") no.push(row.querySelector(".chk-name").textContent.trim());
+    });
+    document.getElementById("chkDone").textContent = done;
+    document.getElementById("chkBar").style.width = (done / rows.length * 100) + "%";
+    document.getElementById("chkCounts").innerHTML = done ? " · " + counts.Yes + " yes" +
+      (counts.No ? ' · <b class="bad">' + counts.No + " no</b>" : "") +
+      (counts["N/A"] ? " · " + counts["N/A"] + " N/A" : "") : "";
+    var state = no.length ? "blocked" : (done === rows.length ? "ready" : "pending");
+    status.className = "close-status is-" + state;
+    status.querySelectorAll("[data-ico]").forEach(function (i) { i.hidden = i.getAttribute("data-ico") !== state; });
+    document.getElementById("closeStatusTitle").textContent =
+      state === "blocked" ? "Not ready to close yet" :
+      state === "ready" ? "Ready to close" : "Answer every step to close the receipt";
+    document.getElementById("closeStatusText").textContent =
+      state === "blocked" ? "Still to do: " + no.join("; ") + "." :
+      state === "ready" ? "Every step is done or doesn't apply. Sign off below and close the receipt." :
+      (rows.length - done) + " step(s) left. Any \"No\" keeps the receipt open — finish that step first.";
+    document.getElementById("closeBtn").disabled = state === "blocked";
+  }
+  form.addEventListener("change", sync);
+  // A step left unanswered when saving: the browser points at it; its row
+  // is outlined too.
+  form.addEventListener("invalid", function (e) {
+    var row = e.target.closest && e.target.closest(".chk-point");
+    if (row) row.classList.add("is-missing");
+  }, true);
+  sync();
+})();
+</script>
 {% endblock %}

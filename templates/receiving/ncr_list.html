@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Hold &amp; Rejection Reports{% endblock %}
 {% block content %}
+{% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead, ct_nothing with context %}
 <div class="page-head">
   <div>
     <h1 class="page-title">Hold &amp; Rejection Reports</h1>
@@ -8,31 +9,64 @@
   </div>
 </div>
 
-<div class="toolbar">
-  <div class="seg">
-    <a href="{{ url_for('receiving.ncr_list', show='open') }}" class="{{ 'is-active' if show == 'open' }}">Open</a>
-    <a href="{{ url_for('receiving.ncr_list', show='all') }}" class="{{ 'is-active' if show != 'open' }}">All reports</a>
-  </div>
-</div>
-
 {% if rows %}
-<div class="queue">
-  {% for r in rows %}
-  <a class="queue-item" href="{{ url_for('receiving.ncr', ncr_id=r.id) }}">
-    <span class="code" style="min-width:110px">{{ r.report_no }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ r.material_name }} — {{ r.qty_affected|qty(r.unit) }} {{ 'on hold' if r.raised_as == 'Hold' else 'rejected' }}</span>
-      <span class="queue-sub">{{ r.supplier_name }} · {{ r.mrr_no }} · {{ r.box_code }} · {{ r.created }}
-        {% if r.disposition_label %} · {{ r.disposition_label }}{% elif not r.contained_at %} · containment not recorded{% endif %}</span>
-    </span>
-    <span class="badge {{ r.badge }}">{{ r.status }}</span>
-  </a>
+{% set groups = [
+  ('open', 'Open', 'Still to contain or to get the QA’s disposition.', 'red', 'alert', 'Open'),
+  ('decided', 'Dispositioned', 'The QA has decided — close the report once it is carried out.', 'amber', 'clipboard', 'Dispositioned'),
+  ('closed', 'Closed', 'Done and closed.', 'green', 'check', 'Closed')] %}
+{% set known = ['Open', 'Dispositioned', 'Closed'] %}
+{% set others = rows|rejectattr('status', 'in', known)|list %}
+{% set tabs = [] %}
+{% for key, label, sub, tone, ico, status in groups %}
+  {% set n = rows|selectattr('status', 'equalto', status)|list|length %}
+  {% if n or key == 'open' %}{% set _ = tabs.append({'key': key, 'label': label, 'icon': ico, 'tone': tone, 'count': n}) %}{% endif %}
+{% endfor %}
+{% if others %}{% set _ = tabs.append({'key': 'other', 'label': 'Other', 'icon': 'folder', 'tone': 'done', 'count': others|length}) %}{% endif %}
+{% set suppliers = rows|map(attribute='supplier_name')|reject('none')|unique|sort %}
+{% set tones = {'badge-ok': 'green', 'badge-warn': 'amber', 'badge-danger': 'red'} %}
+
+<div data-ct="ncr">
+{{ ct_topbar(tabs=tabs, search="Search reports, materials, suppliers, MRR, boxes…", dates=[('data-date', 'Raised')],
+             filters=[('data-raised', 'Raised as', ['Hold', 'Rejected']), ('data-supplier', 'Supplier', suppliers)]) }}
+
+{% set lists = [] %}
+{% for key, label, sub, tone, ico, status in groups %}{% set _ = lists.append((key, label, sub, tone, ico, rows|selectattr('status', 'equalto', status)|list)) %}{% endfor %}
+{% if others %}{% set _ = lists.append(('other', 'Other', 'Reports with an older status.', 'done', 'folder', others)) %}{% endif %}
+
+{% for key, label, sub, tone, ico, list_rows in lists %}
+{% if list_rows or key == 'open' %}
+{% call ct_box(key, label, sub, tone, ico, list_rows|length, ['Report', 'Affected', 'Delivery', 'Raised', 'Disposition', 'Status', ''],
+               'minmax(170px, 2fr) minmax(85px, 1fr) minmax(120px, 1.4fr) minmax(95px, 1fr) minmax(110px, 1.3fr) minmax(95px, 1fr) minmax(70px, auto)',
+               empty='No report here matches.') %}
+  {% for r in list_rows %}
+    {% set href = url_for('receiving.ncr', ncr_id=r.id) %}
+    {% call ct_row(key, href=href, date=r.created,
+                   search=(r.report_no or '') ~ ' ' ~ (r.material_name or '') ~ ' ' ~ (r.supplier_name or '') ~ ' ' ~ (r.mrr_no or '') ~ ' ' ~ (r.box_code or '') ~ ' ' ~ (r.disposition_label or ''),
+                   data={'supplier': r.supplier_name, 'raised': r.raised_as}) %}
+      {{ ct_lead('shield', r.material_name or '—', href, code=r.report_no) }}
+      <div role="cell" class="prt-num">{{ r.qty_affected|qty(r.unit) }}<div class="prt-small">{{ 'on hold' if r.raised_as == 'Hold' else 'rejected' }}</div></div>
+      <div role="cell" class="prt-date">{{ r.supplier_name or '—' }}<div class="prt-small">{{ r.mrr_no }} · {{ r.box_code }}</div></div>
+      <div role="cell" class="prt-date">{{ r.created }}</div>
+      <div role="cell" class="prt-date">{% if r.disposition_label %}{{ r.disposition_label }}{% elif not r.contained_at %}<span class="prt-small is-soon">Containment not recorded</span>{% else %}—{% endif %}</div>
+      <div role="cell"><span class="st-chip tone-{{ tones.get(r.badge, 'done') }}">{{ r.status }}</span></div>
+      <div role="cell" class="prt-cell-end"><a class="btn btn-ghost btn-sm" href="{{ href }}">Open {{ icon('arrow-right', 14) }}</a></div>
+    {% endcall %}
+  {% else %}
+    <div class="empty" style="padding:24px">
+      <div class="empty-icon">{{ icon('shield', 30) }}</div>
+      <div class="empty-title">No open reports</div>
+      <p class="muted">A report opens by itself when an inspected box is put on Hold or Rejected.</p>
+    </div>
   {% endfor %}
+{% endcall %}
+{% endif %}
+{% endfor %}
+{{ ct_nothing() }}
 </div>
 {% else %}
 <div class="card"><div class="empty">
   <div class="empty-icon">{{ icon('shield', 30) }}</div>
-  <div class="empty-title">{{ 'No open reports' if show == 'open' else 'No reports yet' }}</div>
+  <div class="empty-title">No reports yet</div>
   <p class="muted">A report opens by itself when an inspected box is put on Hold or Rejected.</p>
 </div></div>
 {% endif %}

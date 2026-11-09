@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Send out {{ run.run_code }}{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('packing.detail', run_id=run.id) }}">{{ icon('arrow-left', 15) }} {{ run.run_code }}</a>
+<a class="back-link" href="{{ url_for('packing.detail', run_id=run.id) }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ run.run_code }}</span></a>
 
 <form method="post" class="wizard" data-wizard data-wizard-start="{{ start }}"
       data-submit-label="Save" data-cancel="{{ url_for('packing.detail', run_id=run.id) }}">

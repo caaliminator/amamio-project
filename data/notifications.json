@@ -1134,5 +1134,373 @@
     "is_read": false,
     "created_at": "2026-11-08T14:48:32.697170+00:00",
     "id": 142
+  },
+  {
+    "user_id": 4,
+    "message": "Your purchase request 2026-11-003 was approved.",
+    "link": "/requests/3",
+    "is_read": false,
+    "created_at": "2026-11-09T01:13:54.210980+00:00",
+    "id": 143
+  },
+  {
+    "user_id": 4,
+    "message": "Your purchase request 2026-11-001 was approved.",
+    "link": "/requests/1",
+    "is_read": false,
+    "created_at": "2026-11-09T02:54:44.832734+00:00",
+    "id": 144
+  },
+  {
+    "user_id": 4,
+    "message": "PO 2026-11-001 prepared for your request 2026-11-001 (GROWER'S CHOICE INC.).",
+    "link": "/requests/1",
+    "is_read": false,
+    "created_at": "2026-11-09T04:04:43.665643+00:00",
+    "id": 145
+  },
+  {
+    "user_id": 2,
+    "message": "PO 2026-11-001 to GROWER'S CHOICE INC. (₱16,754.00) prepared by Ricardo Mendoza Villanueva — awaiting your check.",
+    "link": "/purchasing/1",
+    "is_read": false,
+    "created_at": "2026-11-09T04:04:43.678445+00:00",
+    "id": 146
+  },
+  {
+    "user_id": 1,
+    "message": "Inspected RB-13 (Lemon): 150 pc usable, 0 pc can't be used, 0 pc damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/13",
+    "is_read": false,
+    "created_at": "2026-11-09T07:32:58.426597+00:00",
+    "id": 147
+  },
+  {
+    "user_id": 2,
+    "message": "Inspected RB-13 (Lemon): 150 pc usable, 0 pc can't be used, 0 pc damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/13",
+    "is_read": false,
+    "created_at": "2026-11-09T07:32:58.426597+00:00",
+    "id": 148
+  },
+  {
+    "user_id": 3,
+    "message": "Inspected RB-13 (Lemon): 150 pc usable, 0 pc can't be used, 0 pc damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/13",
+    "is_read": true,
+    "created_at": "2026-11-09T07:32:58.426597+00:00",
+    "id": 149
+  },
+  {
+    "user_id": 4,
+    "message": "Inspected RB-13 (Lemon): 150 pc usable, 0 pc can't be used, 0 pc damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/13",
+    "is_read": false,
+    "created_at": "2026-11-09T07:32:58.426597+00:00",
+    "id": 150
+  },
+  {
+    "user_id": 1,
+    "message": "Inspected RB-14 (Lemon): 150 pc usable, 0 pc can't be used, 0 pc damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/14",
+    "is_read": false,
+    "created_at": "2026-11-09T07:42:51.913500+00:00",
+    "id": 151
+  },
+  {
+    "user_id": 2,
+    "message": "Inspected RB-14 (Lemon): 150 pc usable, 0 pc can't be used, 0 pc damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/14",
+    "is_read": false,
+    "created_at": "2026-11-09T07:42:51.913500+00:00",
+    "id": 152
+  },
+  {
+    "user_id": 3,
+    "message": "Inspected RB-14 (Lemon): 150 pc usable, 0 pc can't be used, 0 pc damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/14",
+    "is_read": false,
+    "created_at": "2026-11-09T07:42:51.913500+00:00",
+    "id": 153
+  },
+  {
+    "user_id": 4,
+    "message": "Inspected RB-14 (Lemon): 150 pc usable, 0 pc can't be used, 0 pc damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/14",
+    "is_read": false,
+    "created_at": "2026-11-09T07:42:51.913500+00:00",
+    "id": 154
+  },
+  {
+    "user_id": 1,
+    "message": "Honey container HC-7 PASSED QC (11.0% moisture, clear) — for selling.",
+    "link": "/honey/7",
+    "is_read": false,
+    "created_at": "2026-11-09T09:14:05.632519+00:00",
+    "id": 155
+  },
+  {
+    "user_id": 2,
+    "message": "Honey container HC-7 PASSED QC (11.0% moisture, clear) — for selling.",
+    "link": "/honey/7",
+    "is_read": false,
+    "created_at": "2026-11-09T09:14:05.632519+00:00",
+    "id": 156
+  },
+  {
+    "user_id": 3,
+    "message": "Honey container HC-7 PASSED QC (11.0% moisture, clear) — for selling.",
+    "link": "/honey/7",
+    "is_read": false,
+    "created_at": "2026-11-09T09:14:05.632519+00:00",
+    "id": 157
+  },
+  {
+    "user_id": 4,
+    "message": "Honey container HC-7 PASSED QC (11.0% moisture, clear) — for selling.",
+    "link": "/honey/7",
+    "is_read": false,
+    "created_at": "2026-11-09T09:14:05.632519+00:00",
+    "id": 158
+  },
+  {
+    "user_id": 4,
+    "message": "PO 2026-11-003 prepared for your request 2026-11-003 (VIGILIO ESCLITO).",
+    "link": "/requests/3",
+    "is_read": false,
+    "created_at": "2026-11-09T09:29:17.866376+00:00",
+    "id": 159
+  },
+  {
+    "user_id": 2,
+    "message": "PO 2026-11-003 to VIGILIO ESCLITO (₱2,992.04) prepared by Liza Ramos Fernandez — awaiting your check.",
+    "link": "/purchasing/2",
+    "is_read": false,
+    "created_at": "2026-11-09T09:29:17.878206+00:00",
+    "id": 160
+  },
+  {
+    "user_id": 1,
+    "message": "PO 2026-11-003 to VIGILIO ESCLITO was checked by Liza Ramos Fernandez — awaiting your final approval.",
+    "link": "/purchasing/2",
+    "is_read": false,
+    "created_at": "2026-11-09T09:29:21.870728+00:00",
+    "id": 161
+  },
+  {
+    "user_id": 2,
+    "message": "PO 2026-11-003 to VIGILIO ESCLITO is approved — print it and send it to the supplier.",
+    "link": "/purchasing/2",
+    "is_read": false,
+    "created_at": "2026-11-09T09:30:39.886425+00:00",
+    "id": 162
+  },
+  {
+    "user_id": 9,
+    "message": "PO 2026-11-003 to VIGILIO ESCLITO is issued — ₱2,992.04, Cash on delivery. It is on the supplier's ledger.",
+    "link": "/finance/due",
+    "is_read": false,
+    "created_at": "2026-11-09T09:30:39.902031+00:00",
+    "id": 163
+  },
+  {
+    "user_id": 3,
+    "message": "PO 2026-11-003 from VIGILIO ESCLITO is approved — expect the delivery on 2026-11-27.",
+    "link": "/receiving/",
+    "is_read": false,
+    "created_at": "2026-11-09T09:30:39.938923+00:00",
+    "id": 164
+  },
+  {
+    "user_id": 1,
+    "message": "Received at the Receiving Area — MRR-2026-0007 from VIGILIO ESCLITO: Raw Honey 2 kg in 1 box(es); Calamansi 11 kg in 1 box(es) (PO 2026-11-003). Ready for inspection & cleaning.",
+    "link": "/receiving/7",
+    "is_read": false,
+    "created_at": "2026-11-09T09:32:59.223498+00:00",
+    "id": 165
+  },
+  {
+    "user_id": 2,
+    "message": "Received at the Receiving Area — MRR-2026-0007 from VIGILIO ESCLITO: Raw Honey 2 kg in 1 box(es); Calamansi 11 kg in 1 box(es) (PO 2026-11-003). Ready for inspection & cleaning.",
+    "link": "/receiving/7",
+    "is_read": false,
+    "created_at": "2026-11-09T09:32:59.223498+00:00",
+    "id": 166
+  },
+  {
+    "user_id": 3,
+    "message": "Received at the Receiving Area — MRR-2026-0007 from VIGILIO ESCLITO: Raw Honey 2 kg in 1 box(es); Calamansi 11 kg in 1 box(es) (PO 2026-11-003). Ready for inspection & cleaning.",
+    "link": "/receiving/7",
+    "is_read": false,
+    "created_at": "2026-11-09T09:32:59.223498+00:00",
+    "id": 167
+  },
+  {
+    "user_id": 4,
+    "message": "Received at the Receiving Area — MRR-2026-0007 from VIGILIO ESCLITO: Raw Honey 2 kg in 1 box(es); Calamansi 11 kg in 1 box(es) (PO 2026-11-003). Ready for inspection & cleaning.",
+    "link": "/receiving/7",
+    "is_read": false,
+    "created_at": "2026-11-09T09:32:59.223498+00:00",
+    "id": 168
+  },
+  {
+    "user_id": 1,
+    "message": "Inspected RB-15 (Raw Honey): 2 kg usable, 0 kg can't be used, 0 kg damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/15",
+    "is_read": false,
+    "created_at": "2026-11-09T09:35:02.751806+00:00",
+    "id": 169
+  },
+  {
+    "user_id": 2,
+    "message": "Inspected RB-15 (Raw Honey): 2 kg usable, 0 kg can't be used, 0 kg damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/15",
+    "is_read": false,
+    "created_at": "2026-11-09T09:35:02.751806+00:00",
+    "id": 170
+  },
+  {
+    "user_id": 3,
+    "message": "Inspected RB-15 (Raw Honey): 2 kg usable, 0 kg can't be used, 0 kg damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/15",
+    "is_read": false,
+    "created_at": "2026-11-09T09:35:02.751806+00:00",
+    "id": 171
+  },
+  {
+    "user_id": 4,
+    "message": "Inspected RB-15 (Raw Honey): 2 kg usable, 0 kg can't be used, 0 kg damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/15",
+    "is_read": false,
+    "created_at": "2026-11-09T09:35:02.751806+00:00",
+    "id": 172
+  },
+  {
+    "user_id": 1,
+    "message": "Received at the Receiving Area — MRR-2026-0008 from VIGILIO ESCLITO: Raw Honey 22 kg in 1 box(es). Ready for inspection & cleaning.",
+    "link": "/receiving/8",
+    "is_read": false,
+    "created_at": "2026-11-09T09:38:20.466580+00:00",
+    "id": 173
+  },
+  {
+    "user_id": 2,
+    "message": "Received at the Receiving Area — MRR-2026-0008 from VIGILIO ESCLITO: Raw Honey 22 kg in 1 box(es). Ready for inspection & cleaning.",
+    "link": "/receiving/8",
+    "is_read": false,
+    "created_at": "2026-11-09T09:38:20.466580+00:00",
+    "id": 174
+  },
+  {
+    "user_id": 3,
+    "message": "Received at the Receiving Area — MRR-2026-0008 from VIGILIO ESCLITO: Raw Honey 22 kg in 1 box(es). Ready for inspection & cleaning.",
+    "link": "/receiving/8",
+    "is_read": false,
+    "created_at": "2026-11-09T09:38:20.466580+00:00",
+    "id": 175
+  },
+  {
+    "user_id": 4,
+    "message": "Received at the Receiving Area — MRR-2026-0008 from VIGILIO ESCLITO: Raw Honey 22 kg in 1 box(es). Ready for inspection & cleaning.",
+    "link": "/receiving/8",
+    "is_read": false,
+    "created_at": "2026-11-09T09:38:20.466580+00:00",
+    "id": 176
+  },
+  {
+    "user_id": 1,
+    "message": "PO 2026-11-001 to GROWER'S CHOICE INC. was checked by Liza Ramos Fernandez — awaiting your final approval.",
+    "link": "/purchasing/1",
+    "is_read": false,
+    "created_at": "2026-11-09T12:30:23.478696+00:00",
+    "id": 177
+  },
+  {
+    "user_id": 1,
+    "message": "PO 2026-11-001 to GROWER'S CHOICE INC. is approved — print it and send it to the supplier.",
+    "link": "/purchasing/1",
+    "is_read": false,
+    "created_at": "2026-11-09T12:30:59.531806+00:00",
+    "id": 178
+  },
+  {
+    "user_id": 9,
+    "message": "PO 2026-11-001 to GROWER'S CHOICE INC. is issued — ₱16,754.00, Cash on delivery. It is on the supplier's ledger.",
+    "link": "/finance/due",
+    "is_read": false,
+    "created_at": "2026-11-09T12:30:59.546725+00:00",
+    "id": 179
+  },
+  {
+    "user_id": 3,
+    "message": "PO 2026-11-001 from GROWER'S CHOICE INC. is approved — expect the delivery on 2026-11-12.",
+    "link": "/receiving/",
+    "is_read": false,
+    "created_at": "2026-11-09T12:30:59.580624+00:00",
+    "id": 180
+  },
+  {
+    "user_id": 1,
+    "message": "Received at the Receiving Area — MRR-2026-0009 from GROWER'S CHOICE INC.: Lemon 360 pc in 1 box(es); Ginger 10 kg in 1 box(es); Raw Honey 22 kg in 1 container(s) (PO 2026-11-001). Ready for inspection & cleaning (honey: moisture & appearance check on Honey Inspection).",
+    "link": "/receiving/9",
+    "is_read": false,
+    "created_at": "2026-11-09T12:34:34.002695+00:00",
+    "id": 181
+  },
+  {
+    "user_id": 2,
+    "message": "Received at the Receiving Area — MRR-2026-0009 from GROWER'S CHOICE INC.: Lemon 360 pc in 1 box(es); Ginger 10 kg in 1 box(es); Raw Honey 22 kg in 1 container(s) (PO 2026-11-001). Ready for inspection & cleaning (honey: moisture & appearance check on Honey Inspection).",
+    "link": "/receiving/9",
+    "is_read": false,
+    "created_at": "2026-11-09T12:34:34.002695+00:00",
+    "id": 182
+  },
+  {
+    "user_id": 3,
+    "message": "Received at the Receiving Area — MRR-2026-0009 from GROWER'S CHOICE INC.: Lemon 360 pc in 1 box(es); Ginger 10 kg in 1 box(es); Raw Honey 22 kg in 1 container(s) (PO 2026-11-001). Ready for inspection & cleaning (honey: moisture & appearance check on Honey Inspection).",
+    "link": "/receiving/9",
+    "is_read": false,
+    "created_at": "2026-11-09T12:34:34.002695+00:00",
+    "id": 183
+  },
+  {
+    "user_id": 4,
+    "message": "Received at the Receiving Area — MRR-2026-0009 from GROWER'S CHOICE INC.: Lemon 360 pc in 1 box(es); Ginger 10 kg in 1 box(es); Raw Honey 22 kg in 1 container(s) (PO 2026-11-001). Ready for inspection & cleaning (honey: moisture & appearance check on Honey Inspection).",
+    "link": "/receiving/9",
+    "is_read": false,
+    "created_at": "2026-11-09T12:34:34.002695+00:00",
+    "id": 184
+  },
+  {
+    "user_id": 1,
+    "message": "Inspected RB-18 (Lemon): 360 pc usable, 0 pc can't be used, 0 pc damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/18",
+    "is_read": false,
+    "created_at": "2026-11-09T13:03:11.784240+00:00",
+    "id": 185
+  },
+  {
+    "user_id": 2,
+    "message": "Inspected RB-18 (Lemon): 360 pc usable, 0 pc can't be used, 0 pc damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/18",
+    "is_read": false,
+    "created_at": "2026-11-09T13:03:11.784240+00:00",
+    "id": 186
+  },
+  {
+    "user_id": 3,
+    "message": "Inspected RB-18 (Lemon): 360 pc usable, 0 pc can't be used, 0 pc damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/18",
+    "is_read": false,
+    "created_at": "2026-11-09T13:03:11.784240+00:00",
+    "id": 187
+  },
+  {
+    "user_id": 4,
+    "message": "Inspected RB-18 (Lemon): 360 pc usable, 0 pc can't be used, 0 pc damaged — Accepted. Moved to the Storage Area.",
+    "link": "/receiving/box/18",
+    "is_read": false,
+    "created_at": "2026-11-09T13:03:11.784240+00:00",
+    "id": 188
   }
 ]

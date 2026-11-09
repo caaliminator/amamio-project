@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Upload sales file{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('platforms.index') }}">{{ icon('arrow-left', 15) }} Sales Reports</a>
+<a class="back-link" href="{{ url_for('platforms.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Sales Reports</span></a>
 
 <form method="post" enctype="multipart/form-data" class="wizard" data-wizard
       data-submit-label="Upload &amp; preview" data-cancel="{{ url_for('platforms.index') }}" id="uploadForm">

@@ -14,7 +14,7 @@ import profiles
 import purchasing_service as pur
 import services
 import supplier_service as sups
-from security import (current_user, is_admin, module_required,
+from security import (can, current_user, is_admin, module_required,
                       role_required)
 
 requests_bp = Blueprint("requests", __name__)
@@ -69,6 +69,16 @@ def _days_left(iso):
     except (TypeError, ValueError, AttributeError):
         return None
 URGENCY_RANK = {"Critical": 0, "Urgent": 1, "Normal": 2}
+
+
+def card_row(r, user, users=None):
+    """A purchase request as a row-card (requests/_cards.html): its row,
+    its items, and whether it waits on this user."""
+    row = _row(r, users if users is not None else services.users_by_id())
+    row["your_turn"] = pur.can_approve(user, r)
+    row["items"] = _item_rows(r, row["total"])
+    row["waiting_on"] = pur.waiting_on(r)
+    return row
 
 
 def _groups(rows, user):
@@ -126,12 +136,7 @@ def index():
         reqs = [r for r in reqs if r.get("status") in OPEN_STATUSES]
     reqs.sort(key=lambda r: r.get("created_at", ""), reverse=True)
     users = services.users_by_id()
-    rows = []
-    for r in reqs:
-        row = _row(r, users)
-        row["your_turn"] = pur.can_approve(user, r)
-        row["items"] = _item_rows(r, row["total"])
-        rows.append(row)
+    rows = [card_row(r, user, users) for r in reqs]
     return render_template("requests/index.html", show=show, rows=rows,
                            groups=_groups(rows, user), steps=PROGRESS_STEPS)
 
@@ -307,7 +312,7 @@ def _items_view(req):
         row = dict(it)
         mat = materials.get(it.get("material_id")) or {}
         row["name"] = it.get("name") or mat.get("name") or "Item %s" % it.get("item_id")
-        row["unit"] = it.get("unit") or mat.get("unit") or "pc"
+        row["unit"] = it.get("unit") or services.purchase_unit(mat)
         row["est_unit_cost"] = it.get("est_unit_cost")
         row["est_total"] = it.get("est_total")
         rows.append(row)
@@ -326,7 +331,7 @@ def detail(id):
         items=_items_view(req), orders=orders, po_badge=pur.PO_BADGE,
         status_badge=services.REQUEST_STATUS_BADGE,
         urgency_badge=services.URGENCY_BADGE,
-        can_order=is_admin(current_user()) and bool(pur.orderable_items(req)),
+        can_order=can(current_user(), "po_prepare") and bool(pur.orderable_items(req)),
         can_decide=pur.can_approve(current_user(), req),
         waiting_on=pur.waiting_on(req),
         decided_on=(req.get("decided_at") or "")[:10])

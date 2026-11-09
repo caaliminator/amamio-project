@@ -2,7 +2,7 @@
 {% block title %}{{ s.name }}{% endblock %}
 {% block content %}
 <div class="focus">
-<a class="back-link" href="{{ url_for('suppliers.index', cat=s.category if s.category != 'Other' else none) }}">{{ icon('arrow-left', 15) }} Supplier Directory</a>
+<a class="back-link" href="{{ url_for('suppliers.index', cat=s.category if s.category != 'Other' else none) }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Supplier Directory</span></a>
 
 <div class="record-head">
   <div>
@@ -57,25 +57,34 @@
   </dl>
 </div>
 
-{% if delivery_count %}
+{% if delivery_count and deliveries and can('receiving') %}
+{# The latest deliveries from this supplier, as a card table. #}
+{% from "_ct.html" import ct_box, ct_row, ct_lead with context %}
+{% set dlv_tone = {'Open': 'amber', 'For Closing': 'blue', 'Completed': 'green', 'Cancelled': 'red'} %}
+<div data-ct="supplier-deliveries">
+{% call ct_box('deliveries', 'In the system',
+               'Deliveries received: ' ~ delivery_count ~ ' · last ' ~ deliveries[0].received_date ~ (' · the latest ' ~ deliveries|length ~ ' are shown' if delivery_count > deliveries|length else ''),
+               'green-soft', 'receiving', delivery_count,
+               ['Delivery', 'Received', 'Boxes', 'Status', ''],
+               'minmax(200px, 2fr) minmax(120px, 1fr) 80px minmax(140px, 1fr) minmax(90px, auto)', tabbed=false) %}
+  {% for b in deliveries %}
+    {% set b_url = url_for('receiving.batch', batch_id=b.id) %}
+    {% call ct_row('deliveries', href=b_url, date=b.received_date, search=b.ref_no) %}
+      {{ ct_lead('receiving', b.ref_no, b_url) }}
+      <div role="cell" class="prt-date">{{ b.received_date or '—' }}</div>
+      <div role="cell" class="prt-num">{{ b.box_count or 0 }}</div>
+      <div role="cell"><span class="st-chip tone-{{ dlv_tone.get(b.status, 'done') }}">{{ b.status }}</span></div>
+      <div role="cell" class="prt-cell-end"><a class="btn btn-ghost btn-sm" href="{{ b_url }}">Open {{ icon('arrow-right', 14) }}</a></div>
+    {% endcall %}
+  {% endfor %}
+{% endcall %}
+</div>
+{% elif delivery_count %}
 <div class="card">
   <div class="card-title">In the system</div>
   <dl class="review-list">
-    {% if delivery_count %}
     <dt>Deliveries received</dt><dd>{{ delivery_count }}{% if deliveries %} · last {{ deliveries[0].received_date }}{% endif %}</dd>
-    {% endif %}
   </dl>
-  {% if deliveries and can('receiving') %}
-  <div class="queue mt">
-    {% for b in deliveries %}
-    <a class="queue-item" href="{{ url_for('receiving.batch', batch_id=b.id) }}">
-      <span class="queue-main"><span class="queue-title">{{ b.ref_no }}</span>
-      <span class="queue-sub">{{ b.received_date }} · {{ b.box_count or 0 }} box(es) · {{ b.status }}</span></span>
-      <span class="queue-go">{{ icon('arrow-right', 14) }}</span>
-    </a>
-    {% endfor %}
-  </div>
-  {% endif %}
 </div>
 {% endif %}
 </div>

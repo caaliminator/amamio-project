@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Products IN / OUT log{% endblock %}
 {% block content %}
+{% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead, ct_nothing with context %}
 <div class="focus">
-<a class="back-link" href="{{ url_for('product_moves.index') }}">{{ icon('arrow-left', 15) }} Products In / Out</a>
+<a class="back-link" href="{{ url_for('product_moves.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Products In / Out</span></a>
 <div class="page-head">
   <div>
     <h1 class="page-title">Every IN / OUT</h1>
@@ -14,17 +15,28 @@
 </div>
 
 {% if moves %}
-<div class="queue">
+<div data-ct="product-moves-log">
+{{ ct_topbar(search="Search product, reason, person, reference…", dates=[('data-date', 'Date')],
+             filters=[('data-direction', 'Direction', ['IN', 'OUT']),
+                      ('data-reason', 'Reason', moves|map(attribute='reason')|reject('none')|unique|sort|list)]) }}
+{% call ct_box('log', 'Every IN / OUT', '', 'done', 'swap', moves|length, ['Product', 'Direction', 'Reason', 'Balance after', 'Recorded'],
+               'minmax(220px, 2.2fr) 100px minmax(220px, 2fr) minmax(110px, .9fr) minmax(150px, 1.1fr)',
+               tabbed=false, empty='No movement here matches.') %}
   {% for mv in moves %}
-  <div class="queue-item">
-    <span class="badge {{ 'badge-gold' if mv.direction == 'IN' else 'badge-muted' }}" style="min-width:44px;text-align:center">{{ mv.direction }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ mv.qty|qty(mv.unit) }} · {{ mv.product_name }}</span>
-      <span class="queue-sub">{{ mv.reason }}{% if mv.person %} · {{ mv.person }}{% endif %}{% if mv.reference %} · {{ mv.reference }}{% endif %} · {{ mv.balance_after|qty(mv.unit) }} after · by {{ mv.recorded_by_name }}{% if mv.notes %} · {{ mv.notes }}{% endif %}</span>
-    </span>
-    <span class="muted small nowrap">{{ mv.when }}</span>
-  </div>
+    {% call ct_row('log', date=mv.when,
+                   search=mv.product_name ~ ' ' ~ mv.direction ~ ' ' ~ (mv.reason or '') ~ ' ' ~ (mv.person or '') ~ ' ' ~ (mv.reference or '') ~ ' ' ~ (mv.notes or '') ~ ' ' ~ (mv.recorded_by_name or ''),
+                   data={'direction': mv.direction, 'reason': mv.reason}) %}
+      {{ ct_lead('in' if mv.direction == 'IN' else 'out', mv.qty|qty(mv.unit) ~ ' · ' ~ mv.product_name) }}
+      <div role="cell"><span class="st-chip tone-{{ 'green' if mv.direction == 'IN' else 'amber' }}">{{ mv.direction }}</span></div>
+      <div role="cell" class="prt-date">{{ mv.reason }}
+        {% set extra = [mv.person, mv.reference, mv.notes]|select|list %}
+        {% if extra %}<div class="prt-small">{{ extra|join(' · ') }}</div>{% endif %}</div>
+      <div role="cell" class="prt-num">{{ mv.balance_after|qty(mv.unit) }}</div>
+      <div role="cell" class="prt-date">{{ mv.when }}<div class="prt-small">by {{ mv.recorded_by_name }}</div></div>
+    {% endcall %}
   {% endfor %}
+{% endcall %}
+{{ ct_nothing("Try other words, dates or filters.") }}
 </div>
 {% else %}
 <div class="card"><div class="empty">

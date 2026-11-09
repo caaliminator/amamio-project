@@ -2,7 +2,7 @@
 {% block title %}{{ run.run_code }}{% endblock %}
 {% block content %}
 <div class="focus">
-<a class="back-link" href="{{ url_for('packing.index') }}">{{ icon('arrow-left', 15) }} Packing &amp; Dispatch</a>
+<a class="back-link" href="{{ url_for('packing.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Packing &amp; Dispatch</span></a>
 
 <div class="record-head">
   <div class="qr-inline">
@@ -52,17 +52,20 @@
 </div>
 {% endif %}
 
-<div class="card mb">
-  <div class="card-title">Products</div>
-  <div class="queue">
-    {% for item in run['items'] %}
-    <div class="queue-item">
-      <span class="queue-main"><span class="queue-title">{{ item.name }}</span>
-        {% if item.damaged_qty or item.notes %}<span class="queue-sub">{% if item.damaged_qty %}{{ item.damaged_qty|qty }} damaged while packing{% endif %}{% if item.damaged_qty and item.notes %} · {% endif %}{{ item.notes or '' }}</span>{% endif %}</span>
-      <b>{{ item.qty|qty(item.unit) }}</b>
-    </div>
-    {% endfor %}
-  </div>
+{% from "_ct.html" import ct_box, ct_row, ct_lead with context %}
+<div data-ct="packing-products" class="mb">
+{% call ct_box('items', 'Products', 'What went into this run.', 'blue', 'packing', run['items']|length,
+               ['Product', 'Damaged while packing', 'Notes', 'Quantity'],
+               'minmax(220px, 2.2fr) minmax(130px, 1fr) minmax(150px, 1.4fr) minmax(110px, auto)', tabbed=false) %}
+  {% for item in run['items'] %}
+    {% call ct_row('items', search=item.name ~ ' ' ~ (item.notes or '')) %}
+      {{ ct_lead('box', item.name) }}
+      <div role="cell" class="prt-date">{{ (item.damaged_qty|qty ~ ' damaged') if item.damaged_qty else '—' }}</div>
+      <div role="cell" class="prt-date">{{ item.notes or '—' }}</div>
+      <div role="cell" class="prt-num prt-cell-end">{{ item.qty|qty(item.unit) }}</div>
+    {% endcall %}
+  {% endfor %}
+{% endcall %}
 </div>
 
 <div class="flex gap-sm wrap">

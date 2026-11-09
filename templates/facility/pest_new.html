@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Pest control inspection{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('facility.pest') }}">{{ icon('arrow-left', 15) }} Pest Control</a>
+<a class="back-link" href="{{ url_for('facility.pest') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Pest Control</span></a>
 
 <form method="post" class="wizard" data-wizard data-wizard-start="{{ start }}" id="pestForm"
       data-submit-label="Save inspection" data-cancel="{{ url_for('facility.pest') }}">

@@ -76,6 +76,11 @@ DEMO_EMPLOYEES = [
 
 
 def _iso(dt):
+    """A sample-history timestamp — never later than now (early in the week
+    the generated week would otherwise run into the coming days)."""
+    now = datetime.now(timezone.utc)
+    if dt.tzinfo is not None and dt > now:
+        dt = now - timedelta(minutes=5)
     return dt.isoformat()
 
 

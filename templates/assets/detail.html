@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block title %}{{ a.item_no }} {{ a.name }}{% endblock %}
 {% block content %}
+{% from "_ct.html" import ct_box, ct_row, ct_lead with context %}
 <div class="focus">
-<a class="back-link" href="{{ url_for('assets.index') }}">{{ icon('arrow-left', 15) }} Equipment &amp; Assets</a>
+<a class="back-link" href="{{ url_for('assets.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Equipment &amp; Assets</span></a>
 
 <div class="record-head">
   <div>
@@ -38,45 +39,46 @@
   </div>
 </div>
 
-<div class="section-label">Last movements</div>
-{% if moves %}
-<div class="queue mb">
+{% set chip_tone = {'Scheduled': 'amber', 'In Progress': 'blue', 'Completed': 'green-soft', 'Overdue': 'red'} %}
+<div data-ct="asset-moves">
+{% call ct_box('moves', 'Last movements', 'Newest first.', 'blue', 'swap', moves|length,
+               ['Movement', 'When', 'Who · where', 'Back by', 'Recorded by'],
+               'minmax(220px, 2.2fr) minmax(130px, 1fr) minmax(140px, 1.2fr) minmax(110px, .8fr) minmax(110px, .9fr)',
+               tabbed=false) %}
   {% for m in moves %}
-  <div class="queue-item">
-    <span class="badge {{ 'badge-gold' if m.direction == 'IN' else 'badge-muted' }}" style="min-width:44px;text-align:center">{{ m.direction }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ m.qty|qty }} {{ a.unit }} · {{ m.reason }}</span>
-      <span class="queue-sub">{{ m.when }}{% if m.person %} · {{ m.person }}{% endif %}{% if m.destination and m.destination != m.person %} · {{ m.destination }}{% endif %}{% if m.expected_return %} · back by {{ m.expected_return }}{% endif %}{% if m.notes %} · {{ m.notes }}{% endif %}</span>
-    </span>
-    <span class="muted small nowrap">{{ m.recorded_by_name }}</span>
-  </div>
+    {% call ct_row('moves', date=m.day, search=m.reason ~ ' ' ~ (m.person or '') ~ ' ' ~ (m.destination or '') ~ ' ' ~ (m.notes or '')) %}
+      {% call ct_lead('in' if m.direction == 'IN' else 'out', m.qty|qty ~ ' ' ~ a.unit ~ ' · ' ~ m.reason, code=m.direction) %}{% if m.notes %} {{ m.notes }}{% endif %}{% endcall %}
+      <div role="cell" class="prt-date">{{ m.when }}</div>
+      <div role="cell" class="prt-date">{{ m.person or '—' }}{% if m.destination and m.destination != m.person %}<div class="prt-small">{{ m.destination }}</div>{% endif %}</div>
+      <div role="cell" class="prt-date">{{ m.expected_return or '—' }}</div>
+      <div role="cell" class="prt-date">{{ m.recorded_by_name }}</div>
+    {% endcall %}
+  {% else %}
+    <div class="empty" style="padding:24px"><p class="muted small">No movements recorded yet.</p></div>
   {% endfor %}
+{% endcall %}
 </div>
-{% else %}
-<p class="muted small mb">No movements recorded yet.</p>
-{% endif %}
 
-<div class="group-head flex-between" style="display:flex;align-items:baseline">
-  <div class="section-label">Maintenance history</div>
-  <a class="small" href="{{ url_for('assets.maintenance_print', asset_id=a.id) }}">{{ icon('printer', 14) }} Print maintenance log</a>
-</div>
-{% if logs %}
-<div class="queue mb">
+{% set log_sub %}Newest first{% if log_count > logs|length %} · {{ log_count - logs|length }} older record(s) are on the printed log{% endif %} · <a href="{{ url_for('assets.maintenance_print', asset_id=a.id) }}">{{ icon('printer', 14) }} Print maintenance log</a>{% endset %}
+<div data-ct="asset-maintenance" class="mb">
+{% call ct_box('logs', 'Maintenance history', log_sub, 'amber', 'tools', log_count,
+               ['Maintenance', 'Performed', 'By', 'Cost', 'Next due', 'Status'],
+               'minmax(220px, 2.2fr) minmax(130px, 1fr) minmax(120px, 1fr) minmax(90px, .7fr) minmax(110px, .8fr) minmax(110px, auto)',
+               tabbed=false) %}
   {% for l in logs %}
-  <div class="queue-item">
-    <span class="task-icon" style="width:40px;height:40px">{{ icon('tools', 18) }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ l.type }}{% if l.description %} — {{ l.description }}{% endif %}</span>
-      <span class="queue-sub">{{ l.performed_on }}{% if l.performed_time %} {{ l.performed_time }}{% endif %}{% if l.performed_by %} · {{ l.performed_by }}{% endif %}{% if l.cost %} · {{ l.cost|peso }}{% endif %}{% if l.next_due %} · next {{ l.next_due }}{% endif %}</span>
-    </span>
-    <span class="badge {{ l.badge }}">{{ l.status }}</span>
-  </div>
+    {% call ct_row('logs', date=l.performed_on, search=l.type ~ ' ' ~ l.description ~ ' ' ~ (l.performed_by or '') ~ ' ' ~ (l.status or '')) %}
+      {% call ct_lead('tools', l.type) %}{{ l.description }}{% endcall %}
+      <div role="cell" class="prt-date">{{ l.performed_on }}{% if l.performed_time %}<div class="prt-small">{{ l.performed_time }}</div>{% endif %}</div>
+      <div role="cell" class="prt-date">{{ l.performed_by or '—' }}</div>
+      <div role="cell" class="prt-num">{{ l.cost|peso if l.cost else '—' }}</div>
+      <div role="cell" class="prt-date">{{ l.next_due or '—' }}</div>
+      <div role="cell" class="prt-cell-end"><span class="st-chip tone-{{ chip_tone.get(l.status, 'done') }}">{{ l.status }}</span></div>
+    {% endcall %}
+  {% else %}
+    <div class="empty" style="padding:24px"><p class="muted small">No maintenance logged yet.</p></div>
   {% endfor %}
-  {% if log_count > logs|length %}<p class="muted small">{{ log_count - logs|length }} older record(s) are on the printed log.</p>{% endif %}
+{% endcall %}
 </div>
-{% else %}
-<p class="muted small mb">No maintenance logged yet.</p>
-{% endif %}
 
 <div class="card">
   <div class="card-title flex-between" style="display:flex">Details <a class="small" href="{{ url_for('assets.edit', asset_id=a.id) }}">Edit</a></div>
@@ -89,7 +91,7 @@
     <dt>Contact details</dt><dd>{{ a.contact_details or '—' }}</dd>
     <dt>No. of years</dt><dd>{{ a.years_in_use|qty if a.years_in_use not in (none, '') else '—' }}</dd>
     <dt>Cost per item</dt><dd>{{ a.cost_per_item|peso if a.cost_per_item not in (none, '') else '—' }}</dd>
-    {% if a.remarks %}<dt>Remarks</dt><dd>{{ a.remarks }}</dd>{% endif %}
+    {% if a.remarks %}<dt>Remarks</dt><dd><span class="note-inline">{{ a.remarks }}</span></dd>{% endif %}
   </dl>
 </div>
 </div>

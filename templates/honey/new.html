@@ -1,7 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Log honey containers{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('honey.index') }}">{{ icon('arrow-left', 15) }} Honey Inspection</a>
+<a class="back-link" href="{{ url_for('honey.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Honey Inspection</span></a>
+
+{# Honey bought on a purchase order is received with the rest of that PO
+   (Receiving → Receive a delivery), so the PO, the delivery and this page
+   all show the same honey. #}
+{% if can('receiving') %}
+<div class="po-loaded mb" style="margin-top:0">
+  <span class="po-loaded-ico">{{ icon('orders', 18) }}</span>
+  <div><b>Honey on a purchase order?</b><span>Receive it with the rest of its PO under <a href="{{ url_for('receiving.new') }}">Receive a delivery</a> — the containers then count on the PO. Use this page for own harvest and honey without a PO.</span></div>
+</div>
+{% endif %}
 
 {# Three steps: where the honey is from, the containers (supplier, weight,
    dates on one page), then check and save. #}
@@ -30,7 +40,7 @@
         </div>
         <div class="form-row" style="margin:0;max-width:520px">
           <label class="form-label" for="supplier_id">Supplier / beekeeper</label>
-          <select id="supplier_id" name="supplier_id">
+          <select id="supplier_id" name="supplier_id" data-typable>
             <option value="">Not listed</option>
             {% if honey_suppliers %}
             <optgroup label="Supply honey">

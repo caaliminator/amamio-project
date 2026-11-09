@@ -2,7 +2,7 @@
 {% block title %}Log maintenance{% endblock %}
 {% block content %}
 {% set back = url_for('assets.detail', asset_id=chosen) if chosen else url_for('assets.index') %}
-<a class="back-link" href="{{ back }}">{{ icon('arrow-left', 15) }} {{ 'Back to the equipment' if chosen else 'Equipment & Assets' }}</a>
+<a class="back-link" href="{{ back }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ 'the equipment' if chosen else 'Equipment & Assets' }}</span></a>
 
 <form method="post" action="{{ url_for('assets.maintenance') }}" class="wizard" data-wizard id="mntForm"
       data-wizard-start="{{ start }}" data-submit-label="Save to the maintenance log" data-cancel="{{ back }}">

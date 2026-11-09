@@ -72,7 +72,7 @@
             <a class="btn btn-ghost btn-sm" href="{{ n.link }}">Open</a>
           {% endif %}
           {% if not n.is_read %}
-            <form method="post" action="{{ url_for('notifications.mark_read', note_id=n.id) }}">
+            <form method="post" action="{{ url_for('notifications.mark_read', note_id=n.id) }}" data-no-confirm>
               <button type="submit" class="btn btn-primary btn-sm">Mark read</button>
             </form>
           {% endif %}

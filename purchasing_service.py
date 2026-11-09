@@ -117,8 +117,10 @@ def item_choices():
     groups = []
     for key, label in services.MATERIAL_CATEGORIES:
         rows = [{"id": m["id"], "name": m.get("name") or "",
-                 "unit": m.get("unit") or "pc",
-                 "cost": _to_float(m.get("unit_cost")),
+                 "unit": services.purchase_unit(m),
+                 # The last cost is per stock unit — not shown for an item
+                 # bought in another unit (honey: per kg, bought by container).
+                 "cost": _to_float(m.get("unit_cost")) if services.purchase_unit(m) == (m.get("unit") or "pc") else 0,
                  "supplier": suppliers.get(m.get("supplier_id"), ""),
                  "supplier_id": m.get("supplier_id")}
                 for m in services.purchasable_materials([key])]
@@ -411,7 +413,7 @@ def order_lines(req):
              if it.get("material_id") else None) or {}
         rows.append(dict(it, name=it.get("name") or m.get("name")
                          or "Item %s" % it.get("item_id"),
-                         unit=it.get("unit") or m.get("unit") or "pc",
+                         unit=it.get("unit") or services.purchase_unit(m),
                          est_unit_cost=it.get("est_unit_cost")
                          or _to_float(m.get("unit_cost")) or None))
     return rows
@@ -741,7 +743,7 @@ _WEIGHT_UNITS = {"kg", "g"}
 
 def po_receipts(po):
     """Per PO line: accepted qty, qty still in inspection, boxes delivered."""
-    rows = {it["line_no"]: {"received": 0.0, "pending": 0.0, "boxes": 0}
+    rows = {it["line_no"]: {"received": 0.0, "pending": 0.0, "rejected": 0.0, "boxes": 0}
             for it in po.get("items") or []}
     for box in db.query("receiving_boxes", po_id=po["id"]):
         row = rows.get(box.get("po_line_no"))
@@ -753,6 +755,24 @@ def po_receipts(po):
             row["received"] += _to_float(box.get("good_qty"))
         elif status in (services.BOX_AWAITING, services.BOX_HOLD):
             row["pending"] += _to_float(box.get("declared_qty"))
+        elif status == services.BOX_REJECTED:
+            row["rejected"] += _to_float(box.get("declared_qty"))
+    # Honey on the PO came in containers: PASSED counts as received, not yet
+    # checked as still in inspection, FAILED as rejected — recorded (and
+    # reported) but not received, like a rejected box.
+    units = {it["line_no"]: it.get("unit") for it in po.get("items") or []}
+    for c in db.query("honey_containers", po_id=po["id"]):
+        row = rows.get(c.get("po_line_no"))
+        if row is None:
+            continue
+        row["boxes"] += 1
+        qty = services.honey_po_qty(c, units.get(c.get("po_line_no")))
+        if c.get("status") == "Pass":
+            row["received"] += qty
+        elif c.get("status") == "Failed":
+            row["rejected"] += qty
+        else:
+            row["pending"] += qty
     return rows
 
 
@@ -764,7 +784,7 @@ def lines_to_receive(po):
         r = receipts[it["line_no"]]
         qty = _to_float(it.get("qty"))
         rows.append(dict(it, received=r["received"], pending=r["pending"],
-                         boxes=r["boxes"],
+                         rejected=r["rejected"], boxes=r["boxes"],
                          remaining=max(0.0, round(qty - r["received"] - r["pending"], 3))))
     return rows
 

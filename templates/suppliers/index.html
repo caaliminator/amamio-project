@@ -1,20 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Supplier Directory{% endblock %}
 {% block content %}
-<style>
-  .sup-search { position: relative; flex: 1 1 260px; max-width: 420px; }
-  .sup-search input[type="search"] { padding-left: 38px; width: 100%; }
-  .sup-search .sup-ico { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; display: flex; }
-  .sup-tag { display: inline-block; padding: 1px 7px; border-radius: 6px; font-size: .68rem; font-weight: 700;
-    letter-spacing: .04em; text-transform: uppercase; background: var(--raise-3); color: var(--muted); margin-right: 6px; }
-  .sup-types { display: flex; flex-wrap: wrap; margin: 0 0 14px; gap: 6px; }
-  .chip-link { display: inline-flex; gap: 6px; align-items: center; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border);
-    font-size: .8rem; color: var(--text); text-decoration: none; }
-  .chip-link:hover { border-color: var(--gold); }
-  .chip-link.is-active { border-color: var(--gold); color: var(--gold-ink); font-weight: 600; }
-  .queue-item .sup-contact { font-size: .78rem; color: var(--muted); white-space: nowrap; max-width: 34%; overflow: hidden; text-overflow: ellipsis; }
-  @media (max-width: 640px) { .queue-item .sup-contact { display: none; } }
-</style>
+{% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead with context %}
 <div class="page-head">
   <div>
     <h1 class="page-title">Supplier Directory</h1>
@@ -35,78 +22,55 @@
 </div>
 {% endif %}
 
-<div class="tabs">
-  <a href="{{ url_for('suppliers.index', type=stype or none) }}" class="{{ 'is-active' if cat == 'All' }}">All <span class="muted">{{ counts.All }}</span></a>
-  {% for c in categories %}
-  <a href="{{ url_for('suppliers.index', cat=c, type=stype or none) }}" class="{{ 'is-active' if cat == c }}">{{ c }} <span class="muted">{{ counts[c] }}</span></a>
-  {% endfor %}
-</div>
-
-<div class="sup-types" role="group" aria-label="Supplier type">
-  <a class="chip-link {{ 'is-active' if not stype }}" href="{{ url_for('suppliers.index', cat=cat if cat != 'All' else none) }}">Any type</a>
-  {% for t in types if type_counts[t] or stype == t %}
-  <a class="chip-link {{ 'is-active' if stype == t }}" href="{{ url_for('suppliers.index', cat=cat if cat != 'All' else none, type=t) }}">{{ t }} <span class="muted">{{ type_counts[t] }}</span></a>
-  {% endfor %}
-</div>
-
-<div class="toolbar">
-  <label class="sup-search">
-    <span class="sup-ico">{{ icon("search", 16) }}</span>
-    <input type="search" id="supSearch" value="{{ q }}" placeholder="Search name, item, TIN or contact…" aria-label="Search suppliers" autocomplete="off">
-  </label>
-  <span class="muted small" id="supCount">{{ suppliers|length }} supplier{{ 's' if suppliers|length != 1 }}</span>
-</div>
-
 {% if suppliers %}
-<div class="queue" id="supList">
+{# The directory: a card table (templates/_ct.html) with category, type and
+   approval filters; ?cat= / ?type= / ?q= preset them (the script below). #}
+{% set present_cats = suppliers|map(attribute='category')|unique|list %}
+{% set cat_options = (categories|list + ['Other'])|select('in', present_cats)|list %}
+{% set present_types = suppliers|map(attribute='supplier_type')|reject('none')|unique|list %}
+{% set type_options = types|select('in', present_types)|list %}
+<div data-ct="suppliers">
+{{ ct_topbar(search="Search name, item, TIN or contact…",
+             filters=[('data-category', 'Category', cat_options),
+                      ('data-type', 'Type', type_options),
+                      ('data-approval', 'Approval', ['Approved', 'Not approved'] if suppliers|rejectattr('approved')|list else [])]) }}
+{% call ct_box('suppliers', head=['Supplier', 'Category', 'Type', 'Contact', 'Approval'],
+               cols='minmax(260px, 2.6fr) minmax(100px, .8fr) minmax(110px, .9fr) minmax(180px, 1.6fr) minmax(120px, auto)',
+               tabbed=false, empty='No supplier matches — try another word, or add the supplier.') %}
   {% for s in suppliers %}
-  <a class="queue-item" href="{{ url_for('suppliers.detail', supplier_id=s.id) }}" data-search="{{ s.search }}">
-    <span class="task-icon" style="width:40px;height:40px">{{ icon('suppliers', 18) }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ s.label }}</span>
-      <span class="queue-sub">{% if cat == 'All' %}<span class="sup-tag">{{ s.category }}</span>{% endif %}{% if s.supplier_type %}<span class="sup-tag">{{ s.supplier_type }}</span>{% endif %}{{ s.materials_supplied or 'No items listed yet' }}{% if s.tin %} · TIN {{ s.tin }}{% endif %}</span>
-    </span>
-    {% if s.contact_line %}<span class="sup-contact">{{ s.contact_line }}</span>{% endif %}
-    {% if not s.approved %}<span class="badge badge-danger">Not approved</span>{% endif %}
-  </a>
+    {% set href = url_for('suppliers.detail', supplier_id=s.id) %}
+    {% call ct_row('suppliers', href=href, search=s.search ~ ' ' ~ (s.label or '') ~ ' ' ~ s.category,
+                   data={'category': s.category, 'type': s.supplier_type or '',
+                         'approval': 'Approved' if s.approved else 'Not approved'}) %}
+      {% call ct_lead('suppliers', s.label, href) %}{{ s.materials_supplied or 'No items listed yet' }}{% if s.tin %} · TIN {{ s.tin }}{% endif %}{% endcall %}
+      <div role="cell"><span class="st-chip tone-done">{{ s.category }}</span></div>
+      <div role="cell" class="prt-date">{{ s.supplier_type or '—' }}</div>
+      <div role="cell" class="prt-date">{{ s.contact_line or '—' }}</div>
+      <div role="cell"><span class="st-chip tone-{{ 'green-soft' if s.approved else 'red' }}">{{ 'Approved' if s.approved else 'Not approved' }}</span></div>
+    {% endcall %}
   {% endfor %}
+{% endcall %}
 </div>
-<div class="card" id="supNone" style="display:none"><div class="empty">
-  <div class="empty-icon">{{ icon('search', 30) }}</div>
-  <div class="empty-title">No supplier matches</div>
-  <p class="muted">Try another word, or add the supplier.</p>
-</div></div>
+<script>
+(function () {
+  // Links like ?cat=Raw (the supplier page's "Back") open with that filter.
+  var root = document.querySelector('[data-ct="suppliers"]');
+  if (!root) return;
+  var preset = { "data-category": {{ (cat if cat != 'All' else '')|tojson }}, "data-type": {{ stype|tojson }} };
+  Object.keys(preset).forEach(function (attr) {
+    var sel = root.querySelector('select[data-ct-filter="' + attr + '"]');
+    if (sel && preset[attr]) sel.value = preset[attr];
+  });
+  var box = root.querySelector(".ct-search");
+  if (box) box.value = {{ q|tojson }};
+})();
+</script>
 {% else %}
 <div class="card"><div class="empty">
   <div class="empty-icon">{{ icon('suppliers', 30) }}</div>
-  <div class="empty-title">No {{ cat|lower if cat != 'All' else '' }} suppliers yet</div>
+  <div class="empty-title">No suppliers yet</div>
   <p class="muted">The stores and companies you buy from, with what you buy and how to reach them. New suppliers are added by the Admin and approved by the Super Admin.</p>
   {% if can_add %}<a class="btn btn-primary mt" href="{{ url_for('suppliers.new', cat=cat if cat != 'All' else none) }}">Add supplier</a>{% endif %}
 </div></div>
 {% endif %}
-
-<script>
-(function () {
-  var box = document.getElementById("supSearch");
-  var list = document.getElementById("supList");
-  if (!box || !list) return;
-  var items = Array.prototype.slice.call(list.querySelectorAll("[data-search]"));
-  var count = document.getElementById("supCount"), none = document.getElementById("supNone");
-  function run() {
-    var words = box.value.toLowerCase().split(/\s+/).filter(Boolean);
-    var shown = 0;
-    items.forEach(function (el) {
-      var text = el.getAttribute("data-search");
-      var hit = words.every(function (w) { return text.indexOf(w) !== -1; });
-      el.style.display = hit ? "" : "none";
-      if (hit) shown++;
-    });
-    count.textContent = shown + " supplier" + (shown === 1 ? "" : "s");
-    none.style.display = shown ? "none" : "";
-    list.style.display = shown ? "" : "none";
-  }
-  box.addEventListener("input", run);
-  if (box.value) run();
-})();
-</script>
 {% endblock %}

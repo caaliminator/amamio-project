@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Honey Inspection{% endblock %}
 {% block content %}
+{% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead, ct_nothing with context %}
 <div class="page-head">
   <div>
     <h1 class="page-title">Honey Inspection</h1>
@@ -18,41 +19,58 @@
   <div class="figure"><div class="figure-label">Pass rate</div><div class="figure-value">{{ summary.pass_rate }}%</div></div>
 </div>
 
-<div class="toolbar">
-  <div class="seg">
-    <a href="{{ url_for('honey.index', show='todo') }}" class="{{ 'is-active' if show == 'todo' }}">To do</a>
-    <a href="{{ url_for('honey.index', show='Pass') }}" class="{{ 'is-active' if show == 'Pass' }}">Passed</a>
-    <a href="{{ url_for('honey.index', show='Failed') }}" class="{{ 'is-active' if show == 'Failed' }}">Failed</a>
-    <a href="{{ url_for('honey.index', show='all') }}" class="{{ 'is-active' if show == 'all' }}">All</a>
-  </div>
-</div>
-
+{% set todo = [] %}
+{% for c in containers if c.status == 'Pending QC' or (c.status in ('Pass', 'Failed') and c.remaining_kg > 0) %}{% set _ = todo.append(c) %}{% endfor %}
+{% set passed = containers|selectattr('status', 'equalto', 'Pass')|list %}
+{% set failed = containers|selectattr('status', 'equalto', 'Failed')|list %}
+{% set groups = [
+  ('todo', 'To do', 'Containers to check, and checked honey not yet sent to a product.', 'amber', 'inspect', todo),
+  ('pass', 'Passed', 'Containers that PASSED the check.', 'green', 'check', passed),
+  ('failed', 'Failed', 'Containers that FAILED the check.', 'red', 'x-circle', failed)] %}
 {% if containers %}
-<div class="queue">
-  {% for c in containers %}
-  <a class="queue-item" href="{{ url_for('honey.qc', container_id=c.id) if c.status == 'Pending QC' else url_for('honey.container', container_id=c.id) }}">
-    <span class="code" style="min-width:56px">{{ c.container_code }}</span>
-    <span class="queue-main">
-      <span class="queue-title">Honey — {{ c.net_weight_kg|qty('kg') }}</span>
-      <span class="queue-sub">
-        {{ c.supplier_name or c.source }} · {{ c.batch_ref }} · received {{ c.received_date }}
-        {% if c.moisture_pct is not none %} · {{ c.moisture_pct }}% moisture{% endif %}
-        {% if c.status in ('Pass', 'Failed') and c.remaining_kg > 0 %} · {{ c.remaining_kg|qty('kg') }} not yet used{% endif %}
-      </span>
-    </span>
-    {% if c.status == 'Pending QC' %}
-      <span class="queue-go">Check {{ icon('arrow-right', 14) }}</span>
-    {% else %}
-      <span class="badge {{ c.badge }}">{{ 'PASS' if c.status == 'Pass' else 'FAILED' }}</span>
-    {% endif %}
-  </a>
+{% set tabs = [] %}
+{% for key, label, sub, tone, ico, rows in groups if rows or key == 'todo' %}{% set _ = tabs.append({'key': key, 'label': label, 'icon': ico, 'tone': tone, 'count': rows|length}) %}{% endfor %}
+{% set sources = containers|map(attribute='supplier_name')|reject('none')|list + containers|rejectattr('supplier_name')|map(attribute='source')|reject('none')|list %}
+
+<div data-ct="honey">
+{{ ct_topbar(tabs=tabs, search="Search containers, suppliers, batches…", dates=[('data-date', 'Received')],
+             filters=[('data-source', 'Supplier / source', sources|unique|sort)]) }}
+
+{% for key, label, sub, tone, ico, rows in groups if rows or key == 'todo' %}
+{% call ct_box(key, label, sub, tone, ico, rows|length, ['Container', 'From', 'Received', 'Moisture', 'Not yet used', 'Result', ''],
+               'minmax(180px, 1.8fr) minmax(130px, 1.4fr) minmax(95px, 1fr) minmax(75px, .7fr) minmax(85px, .9fr) minmax(110px, 1fr) minmax(80px, auto)',
+               empty='No container here matches.') %}
+  {% for c in rows %}
+    {% set pending = c.status == 'Pending QC' %}
+    {% set href = url_for('honey.qc', container_id=c.id) if pending else url_for('honey.container', container_id=c.id) %}
+    {% call ct_row(key, href=href, date=c.received_date,
+                   search=(c.container_code or '') ~ ' ' ~ (c.supplier_name or c.source or '') ~ ' ' ~ (c.batch_ref or '') ~ ' ' ~ c.status,
+                   data={'source': c.supplier_name or c.source}) %}
+      {{ ct_lead('honey', 'Honey — ' ~ c.net_weight_kg|qty('kg'), href, code=c.container_code) }}
+      <div role="cell" class="prt-date">{{ c.supplier_name or c.source or '—' }}{% if c.batch_ref %}<div class="prt-small">{{ c.batch_ref }}</div>{% endif %}</div>
+      <div role="cell" class="prt-date">{{ c.received_date|longdate if c.received_date else '—' }}</div>
+      <div role="cell" class="prt-num">{{ '%s%%'|format(c.moisture_pct) if c.moisture_pct is not none else '—' }}</div>
+      <div role="cell" class="prt-num">{{ c.remaining_kg|qty('kg') if c.status in ('Pass', 'Failed') and c.remaining_kg > 0 else '—' }}</div>
+      <div role="cell">{% if pending %}<span class="st-chip tone-amber">Awaiting QC</span>{% else %}<span class="st-chip tone-{{ 'green' if c.status == 'Pass' else 'red' }}">{{ 'PASS' if c.status == 'Pass' else 'FAILED' }}</span>{% endif %}</div>
+      <div role="cell" class="prt-cell-end">{% if pending %}<a class="btn btn-primary btn-sm" href="{{ href }}">Check {{ icon('arrow-right', 14) }}</a>{% else %}<a class="btn btn-ghost btn-sm" href="{{ href }}">Open {{ icon('arrow-right', 14) }}</a>{% endif %}</div>
+    {% endcall %}
+  {% else %}
+    <div class="empty" style="padding:24px">
+      <div class="empty-icon">{{ icon('honey', 30) }}</div>
+      <div class="empty-title">Nothing to do</div>
+      <p class="muted">Every container is checked and fully used.</p>
+    </div>
   {% endfor %}
+{% endcall %}
+{% endfor %}
+{{ ct_nothing() }}
 </div>
 {% else %}
 <div class="card"><div class="empty">
   <div class="empty-icon">{{ icon('honey', 30) }}</div>
-  <div class="empty-title">{{ 'Nothing to do' if show == 'todo' else 'No containers here' }}</div>
-  <p class="muted">Every container is checked and fully used.</p>
+  <div class="empty-title">No containers here</div>
+  <p class="muted">Log the honey containers when they arrive — each is then checked for moisture and appearance.</p>
+  <a class="btn btn-primary mt" href="{{ url_for('honey.new') }}">Log honey containers</a>
 </div></div>
 {% endif %}
 

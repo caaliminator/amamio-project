@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Batch Records{% endblock %}
 {% block content %}
+{% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead, ct_nothing with context %}
 <div class="page-head">
   <div>
     <h1 class="page-title">Batch Records</h1>
@@ -19,51 +20,66 @@
   <div class="figure {{ 'is-bad' if stats.disapproved }}"><div class="figure-label">Disapproved this month</div><div class="figure-value">{{ stats.disapproved }}</div></div>
 </div>
 
-{% if in_progress %}
-<div class="section-label">In progress</div>
-<div class="queue">
-  {% for b in in_progress %}
-  <a class="queue-item" href="{{ url_for('production.batch', batch_id=b.id) }}">
-    <span class="task-icon" style="width:40px;height:40px">{{ icon('production', 18) }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ b.product_name }}</span>
-      <span class="queue-sub"><span class="code">{{ b.batch_no }}</span> · {{ b.batch_size|qty(b.unit) }} · started {{ b.start_at[:16]|replace('T', ' ') }}</span>
-    </span>
-    <span class="queue-go" style="white-space:normal;text-align:right;max-width:45%">Next: {{ b.next_label }} {{ icon('arrow-right', 14) }}</span>
-  </a>
-  {% endfor %}
-</div>
-{% endif %}
+{% if in_progress or finished %}
+{% set tabs = [
+  {'key': 'progress', 'label': 'In progress', 'icon': 'production', 'tone': 'amber', 'count': in_progress|length},
+  {'key': 'finished', 'label': 'Finished batches', 'icon': 'clipboard', 'tone': 'green', 'count': finished|length}] %}
+{% set results = (in_progress + finished)|map(attribute='status_label')|reject('none')|unique|sort %}
+{% set products = (in_progress + finished)|map(attribute='product_name')|reject('none')|unique|sort %}
+{% set tones = {'badge-ok': 'green', 'badge-warn': 'amber', 'badge-danger': 'red'} %}
 
-<div class="toolbar" style="margin-top:26px">
-  <div class="section-label" style="margin:0">Finished batches</div>
-  <div class="seg">
-    <a href="{{ url_for('production.index') }}" class="{{ 'is-active' if show != 'all' }}">Recent</a>
-    <a href="{{ url_for('production.index', show='all') }}" class="{{ 'is-active' if show == 'all' }}">All</a>
-  </div>
-</div>
-{% if finished %}
-<div class="queue">
-  {% for b in finished %}
-  <a class="queue-item" href="{{ url_for('production.batch', batch_id=b.id) }}">
-    <span class="task-icon" style="width:40px;height:40px">{{ icon('clipboard', 18) }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ b.product_name }}</span>
-      <span class="queue-sub"><span class="code">{{ b.batch_no }}</span> · produced {{ b.production_date }}
-        {% if b.status == 'Completed' %} · yield {{ b.actual_yield|qty(b.unit) }} of {{ b.theoretical_yield|qty }}{% endif %}</span>
-    </span>
-    <span class="badge {{ b.badge }}">{{ b.status_label }}</span>
-  </a>
+<div data-ct="production">
+{{ ct_topbar(tabs=tabs, search="Search batch no., products…", dates=[('data-date', 'Date')],
+             filters=[('data-result', 'Status', results), ('data-product', 'Product', products)]) }}
+
+{% call ct_box('progress', 'In progress', 'Batches being made — open one to carry on with its next step.',
+               'amber', 'production', in_progress|length, ['Batch', 'Size', 'Started', 'Next step', ''],
+               'minmax(240px, 2fr) minmax(110px, 1fr) minmax(140px, 1fr) minmax(200px, 1.8fr) minmax(90px, auto)',
+               empty='No batch here matches.') %}
+  {% for b in in_progress %}
+    {% set href = url_for('production.batch', batch_id=b.id) %}
+    {% call ct_row('progress', href=href, date=b.start_at,
+                   search=(b.batch_no or '') ~ ' ' ~ (b.product_name or '') ~ ' ' ~ (b.next_label or ''),
+                   data={'result': b.status_label, 'product': b.product_name}) %}
+      {{ ct_lead('production', b.product_name or '—', href, code=b.batch_no) }}
+      <div role="cell" class="prt-num">{{ b.batch_size|qty(b.unit) }}</div>
+      <div role="cell" class="prt-date">{{ (b.start_at or '')[:16]|replace('T', ' ') or '—' }}</div>
+      <div role="cell" class="prt-date">Next: {{ b.next_label }}{% if b.steps_total %}<div class="prt-small">{{ b.steps_done }} of {{ b.steps_total }} steps done</div>{% endif %}</div>
+      <div role="cell" class="prt-cell-end"><a class="btn btn-primary btn-sm" href="{{ href }}">Open {{ icon('arrow-right', 14) }}</a></div>
+    {% endcall %}
+  {% else %}
+    <div class="empty" style="padding:24px"><div class="empty-title">No batch in progress</div>
+      <p class="muted">Start a batch when production begins.</p></div>
   {% endfor %}
+{% endcall %}
+
+{% call ct_box('finished', 'Finished batches', 'Completed or cancelled, newest first, with the QA’s disposition.',
+               'green', 'clipboard', finished|length, ['Batch', 'Produced', 'Yield', 'Status', ''],
+               'minmax(240px, 2fr) minmax(130px, 1fr) minmax(170px, 1.4fr) minmax(130px, 1fr) minmax(90px, auto)',
+               empty='No batch here matches.') %}
+  {% for b in finished %}
+    {% set href = url_for('production.batch', batch_id=b.id) %}
+    {% call ct_row('finished', href=href, date=b.production_date,
+                   search=(b.batch_no or '') ~ ' ' ~ (b.product_name or '') ~ ' ' ~ (b.status_label or ''),
+                   data={'result': b.status_label, 'product': b.product_name}) %}
+      {{ ct_lead('clipboard', b.product_name or '—', href, code=b.batch_no) }}
+      <div role="cell" class="prt-date">{{ b.production_date|longdate if b.production_date else '—' }}</div>
+      <div role="cell" class="prt-date">{% if b.status == 'Completed' %}{{ b.actual_yield|qty(b.unit) }}<div class="prt-small">of {{ b.theoretical_yield|qty }}</div>{% else %}—{% endif %}</div>
+      <div role="cell"><span class="st-chip tone-{{ tones.get(b.badge, 'done') }}">{{ b.status_label }}</span></div>
+      <div role="cell" class="prt-cell-end"><a class="btn btn-ghost btn-sm" href="{{ href }}">Open {{ icon('arrow-right', 14) }}</a></div>
+    {% endcall %}
+  {% else %}
+    <div class="empty" style="padding:24px"><div class="empty-title">No finished batches yet</div></div>
+  {% endfor %}
+{% endcall %}
+{{ ct_nothing() }}
 </div>
-{% elif not in_progress %}
+{% else %}
 <div class="card"><div class="empty">
   <div class="empty-icon">{{ icon('production', 30) }}</div>
   <div class="empty-title">No batches yet</div>
   <p class="muted">Start a batch when production begins. The system walks you through dispensing, each procedure step and the QA's release.</p>
   <a class="btn btn-primary mt" href="{{ url_for('production.start') }}">Start a batch</a>
 </div></div>
-{% else %}
-<p class="muted small">No finished batches yet.</p>
 {% endif %}
 {% endblock %}

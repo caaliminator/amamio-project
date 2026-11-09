@@ -2,7 +2,7 @@
 {% block title %}Record equipment IN / OUT{% endblock %}
 {% block content %}
 {% set back = url_for('assets.detail', asset_id=form.asset_id) if form.asset_id else url_for('assets.index') %}
-<a class="back-link" href="{{ back }}">{{ icon('arrow-left', 15) }} {{ 'Back to the equipment' if form.asset_id else 'Equipment & Assets' }}</a>
+<a class="back-link" href="{{ back }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ 'the equipment' if form.asset_id else 'Equipment & Assets' }}</span></a>
 
 <form method="post" action="{{ url_for('assets.move') }}" class="wizard" id="moveForm" data-wizard
       data-wizard-start="{{ start }}" data-submit-label="Save movement" data-cancel="{{ back }}">

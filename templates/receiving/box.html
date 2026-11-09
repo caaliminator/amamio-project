@@ -2,10 +2,10 @@
 {% block title %}{{ box.box_code }}{% endblock %}
 {% block content %}
 <div class="focus">
-{% if can('receiving') %}
-<a class="back-link" href="{{ url_for('receiving.batch', batch_id=box.batch_id) }}">{{ icon('arrow-left', 15) }} {{ box.batch_ref }}</a>
+{% if can('receiving') or back %}
+<a class="back-link" href="{{ url_for('receiving.batch', batch_id=box.batch_id) }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ box.batch_ref }}</span></a>
 {% else %}
-<a class="back-link" href="{{ url_for('receiving.inspection_supplies' if box.lane == 'supplies' else 'receiving.inspection') }}">{{ icon('arrow-left', 15) }} {{ 'Packaging & Supplies Check' if box.lane == 'supplies' else 'Raw Material Inspection' }}</a>
+<a class="back-link" href="{{ url_for('receiving.inspection_supplies' if box.lane == 'supplies' else 'receiving.inspection') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ 'Packaging & Supplies Check' if box.lane == 'supplies' else 'Raw Material Inspection' }}</span></a>
 {% endif %}
 
 <div class="record-head">
@@ -31,7 +31,7 @@
       <span>Clean the content, then count what is usable, what can't be used and what is damaged.</span>
     </div>
     {% if can_inspect %}
-      <a class="btn btn-primary" href="{{ url_for('receiving.inspect', box_id=box.id) }}">Inspect this box</a>
+      <a class="btn btn-primary" href="{{ url_for('receiving.inspect', box_id=box.id, back=back) if back else url_for('receiving.inspect', box_id=box.id) }}">Inspect this box</a>
     {% endif %}
   </div>
 {% elif box.status in ('On Hold', 'Rejected') and box.ncr_status != 'Closed' %}
@@ -70,81 +70,158 @@
 {% endif %}
 
 {% if box.status == 'Accepted' and box.stage != 'Consumed' and (can('receiving') or can_inspect) %}
-<form method="post" action="{{ url_for('receiving.move_box', box_id=box.id) }}" class="card mb">
-  <div class="card-title">Move this box <span class="muted">— it is in the {{ box.stage }}</span></div>
-  <div class="chip-choices mb">
+{# Where the box goes next: one card per place, the FEFO-held ones greyed. #}
+{% set stage_info = {
+  'Receiving Area': ('receiving', 'Back to the receiving area.'),
+  'Storage Area': ('box', 'Kept in the warehouse until it is needed.'),
+  'Production Area': ('production', 'Issued to production for use.'),
+  'Consumed': ('check', 'Used up — the box is finished.')} %}
+<form method="post" action="{{ url_for('receiving.move_box', box_id=box.id) }}" class="card mb bx-card" id="moveForm">
+  <div class="bx-head">
+    <span class="bx-ico">{{ icon('swap', 18) }}</span>
+    <div>
+      <h2 class="bx-title">Move this box</h2>
+      <div class="bx-sub">Now in the <b>{{ box.stage }}</b> — pick where it goes next.</div>
+    </div>
+  </div>
+  <div class="choice-grid cols-3 bx-moves">
     {% for s in stages if s != box.stage %}
       {% set held_back = fefo_first and s in ('Production Area', 'Consumed') %}
-      <label class="chip-choice" {{ 'style=opacity:.45' if held_back }}><input type="radio" name="stage" value="{{ s }}" required {{ 'disabled' if held_back }}><span>{{ s }}</span></label>
+      {% set info = stage_info.get(s, ('box', '')) %}
+      <label class="choice{{ ' is-held' if held_back }}">
+        <input type="radio" name="stage" value="{{ s }}" required {{ 'disabled' if held_back }}>
+        <span class="choice-card"><span class="choice-icon">{{ icon(info[0], 20) }}</span>
+          <span><span class="choice-title">{{ s }}</span>
+            <span class="choice-sub">{% if held_back %}Use {{ fefo_first.box_code }} first — {{ 'it expires earlier' if fefo_first.expiry_date else 'it arrived earlier' }}.{% else %}{{ info[1] }}{% endif %}</span></span></span>
+      </label>
     {% endfor %}
   </div>
-  <button class="btn btn-primary btn-sm" type="submit">Move</button>
+  <div class="flex bx-actions">
+    <button class="btn btn-primary" type="submit" data-confirm="Move {{ box.box_code }}?">{{ icon('swap', 15) }} Move box</button>
+  </div>
 </form>
 {% endif %}
 
-<div class="card">
-  <div class="card-title">Details</div>
-  <dl class="review-list">
-    <dt>Delivery</dt><dd>{{ box.batch_ref }}{% if box.po_no %} · PO {{ box.po_no }}{% endif %}{% if box.delivery_ref %} · DR {{ box.delivery_ref }}{% endif %}</dd>
-    <dt>Batch no.</dt><dd>{% if box.lot_no %}<a href="{{ url_for('receiving.batches', show='all', q=box.lot_no) }}">{{ box.lot_no }}</a>{% else %}—{% endif %}{% if box.supplier_lot %} <span class="muted small">· supplier lot {{ box.supplier_lot }}</span>{% endif %}</dd>
-    {% if box.mfg_date %}<dt>Manufactured</dt><dd>{{ box.mfg_date|longdate }}</dd>{% endif %}
-    {% if box.expiry_date %}<dt>Expiry / best before</dt><dd>{{ box.expiry_date|longdate }}</dd>{% endif %}
-    <dt>Expiry</dt><dd>{{ box.expiry_date or '—' }}</dd>
-    <dt>Packaging condition</dt><dd>{{ box.packaging_condition or '—' }}</dd>
-    <dt>Temperature</dt><dd>{{ box.temperature_c|qty('°C') if box.temperature_c not in (none, '') else '—' }}</dd>
-    {% if box.status != 'Awaiting Inspection' %}
-    {% if box.inspection_no %}<dt>Inspection no.</dt><dd>{{ box.inspection_no }}</dd>{% endif %}
-    <dt>Cleaned</dt><dd>{{ 'Yes' if box.cleaned else 'No' }}</dd>
-    {% if box.visual_description %}<dt>Visual / organoleptic</dt><dd>{{ box.visual_description }}</dd>{% endif %}
-    {% if box.checklist %}
-    <dt>Inspection checklist</dt><dd>{{ box.checklist.values()|selectattr('result', 'equalto', 'Pass')|list|length }} pass ·
-      {{ failed|length }} fail · {{ box.checklist.values()|selectattr('result', 'equalto', 'N/A')|list|length }} N/A</dd>
-    {% for point, remarks in failed %}<dt>Failed: {{ point }}</dt><dd>{{ remarks }}</dd>{% endfor %}
+{# The box's facts, grouped: where it came from, then its inspection. #}
+{% set inspected = box.status != 'Awaiting Inspection' %}
+{% set problems = failed or box.ncr_no or box.unusable_reason or box.damage_reason or box.nonconformity %}
+<div class="bx-grid">
+  <section class="card bx-card">
+    <div class="bx-head">
+      <span class="bx-ico">{{ icon('truck', 18) }}</span>
+      <div><h2 class="bx-title">Delivery &amp; batch</h2>
+        <div class="bx-sub">From {{ box.supplier_name or '—' }}, received {{ box.received_date|longdate if box.received_date else '—' }}</div></div>
+    </div>
+    <dl class="bx-facts">
+      <div class="bx-fact"><dt>Delivery</dt><dd>{% if can('receiving') %}<a href="{{ url_for('receiving.batch', batch_id=box.batch_id) }}">{{ box.batch_ref }}</a>{% else %}{{ box.batch_ref }}{% endif %}</dd></div>
+      <div class="bx-fact"><dt>PO</dt><dd>{{ box.po_no or '—' }}</dd></div>
+      <div class="bx-fact"><dt>Delivery receipt</dt><dd>{{ box.delivery_ref or '—' }}</dd></div>
+      <div class="bx-fact"><dt>Batch no.</dt><dd>{% if box.lot_no %}<a class="bx-mono" href="{{ url_for('receiving.batches', show='all', q=box.lot_no) }}">{{ box.lot_no }}</a>{% else %}—{% endif %}
+        {% if box.supplier_lot %}<span class="bx-note">supplier lot {{ box.supplier_lot }}</span>{% endif %}</dd></div>
+      <div class="bx-fact"><dt>Manufactured</dt><dd>{{ box.mfg_date|longdate if box.mfg_date else '—' }}</dd></div>
+      <div class="bx-fact"><dt>Expiry / best before</dt><dd>{{ box.expiry_date|longdate if box.expiry_date else '—' }}</dd></div>
+      <div class="bx-fact"><dt>Packaging condition</dt><dd>{{ box.packaging_condition or '—' }}</dd></div>
+      <div class="bx-fact"><dt>Temperature</dt><dd>{{ box.temperature_c|qty('°C') if box.temperature_c not in (none, '') else '—' }}</dd></div>
+    </dl>
+  </section>
+
+  <section class="card bx-card">
+    <div class="bx-head">
+      <span class="bx-ico">{{ icon('inspect', 18) }}</span>
+      <div><h2 class="bx-title">Inspection</h2>
+        <div class="bx-sub">{% if inspected %}{{ box.inspection_no or 'Inspected' }}{% if box.checked_at %} · {{ box.checked_at }}{% endif %}{% else %}Not inspected yet{% endif %}</div></div>
+    </div>
+    {% if inspected %}
+    <dl class="bx-facts">
+      <div class="bx-fact"><dt>Result</dt><dd><span class="badge {{ box.badge }}">{{ box.status }}</span></dd></div>
+      <div class="bx-fact"><dt>Cleaned</dt><dd>{{ 'Yes' if box.cleaned else 'No' }}</dd></div>
+      {% if box.checklist %}
+      {% set n_pass = box.checklist.values()|selectattr('result', 'equalto', 'Pass')|list|length %}
+      {% set n_na = box.checklist.values()|selectattr('result', 'equalto', 'N/A')|list|length %}
+      <div class="bx-fact is-wide"><dt>Checklist</dt><dd class="bx-tally">
+        <span class="bx-pill is-pass">{{ icon('check', 13) }} {{ n_pass }} pass</span>
+        <span class="bx-pill {{ 'is-fail' if failed else '' }}">{{ icon('x-circle', 13) }} {{ failed|length }} fail</span>
+        <span class="bx-pill">{{ n_na }} N/A</span></dd></div>
+      {% else %}
+      <div class="bx-fact"><dt>COA / documents</dt><dd>{{ box.coa_check or '—' }}</dd></div>
+      <div class="bx-fact"><dt>Sampling / test</dt><dd>{{ box.sampling_test or '—' }}</dd></div>
+      {% endif %}
+      {% set visual = box.visual_description or (box.visual_inspection if not box.checklist else '') %}
+      {% if visual %}<div class="bx-fact is-wide"><dt>Visual / organoleptic</dt><dd>{{ visual }}</dd></div>{% endif %}
+      {% if box.test_parameter or box.test_result %}
+      <div class="bx-fact is-wide"><dt>Test result</dt><dd>{{ box.test_parameter }}: {{ box.test_result }}{% if box.test_spec %} <span class="bx-note">spec {{ box.test_spec }}</span>{% endif %}{% if box.test_method %} <span class="bx-note">· {{ box.test_method }}</span>{% endif %}</dd></div>
+      {% endif %}
+      {% if box.action_taken %}<div class="bx-fact is-wide"><dt>Action taken</dt><dd style="white-space:pre-line">{{ box.action_taken }}</dd></div>{% endif %}
+      <div class="bx-fact"><dt>Inspected by</dt><dd>{{ box.checked_by or '—' }}</dd></div>
+      <div class="bx-fact"><dt>Verified by</dt><dd>{{ box.verified_by_name or '—' }}</dd></div>
+    </dl>
+    <div class="flex gap-sm wrap bx-links">
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.checklist', box_id=box.id) }}">{{ icon('clipboard', 14) }} Inspection checklist</a>
+      {% if can('receiving') %}
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.status_labels', batch_id=box.batch_id, only=box.id) }}">{{ icon('printer', 14) }} Status label</a>
+      {% endif %}
+    </div>
     {% else %}
-    <dt>Visual / organoleptic</dt><dd>{{ box.visual_inspection or '—' }}</dd>
-    <dt>COA / documents</dt><dd>{{ box.coa_check or '—' }}</dd>
-    <dt>Sampling / test</dt><dd>{{ box.sampling_test or '—' }}</dd>
+    <div class="bx-empty">{{ icon('inspect', 22) }}<span>The checklist, counts and result show here once the box is inspected.</span></div>
     {% endif %}
-    {% if box.test_parameter or box.test_result %}
-    <dt>Test result</dt><dd>{{ box.test_parameter }}: {{ box.test_result }}{% if box.test_spec %} (spec {{ box.test_spec }}){% endif %}{% if box.test_method %} · {{ box.test_method }}{% endif %}</dd>
-    {% endif %}
-    {% if box.ncr_no %}<dt>Hold / rejection report</dt><dd><a href="{{ url_for('receiving.ncr', ncr_id=box.ncr_id) }}">{{ box.ncr_no }}</a> · {{ box.ncr_status }}</dd>{% endif %}
-    {% if box.unusable_reason %}<dt>Why it can't be used</dt><dd>{{ box.unusable_reason }}</dd>{% endif %}
-    {% if box.damage_reason %}<dt>Damage</dt><dd>{{ box.damage_reason }}</dd>{% endif %}
-    {% if box.nonconformity %}<dt>Nonconformity</dt><dd>{{ box.nonconformity }}</dd>{% endif %}
-    {% if box.action_taken %}<dt>Action taken</dt><dd style="white-space:pre-line">{{ box.action_taken }}</dd>{% endif %}
-    <dt>Inspected by</dt><dd>{{ box.checked_by }} · {{ box.checked_at }}</dd>
-    <dt>Verified by</dt><dd>{{ box.verified_by_name or '—' }}</dd>
-    {% endif %}
-    <dt>QR code carries</dt><dd class="small" style="font-weight:500">{{ qr_text }}</dd>
-  </dl>
-  {% if box.status != 'Awaiting Inspection' %}
-  <div class="flex gap-sm wrap mt">
-    <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.checklist', box_id=box.id) }}">{{ icon('clipboard', 14) }} Inspection checklist</a>
-    {% if can('receiving') %}
-    <a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.status_labels', batch_id=box.batch_id, only=box.id) }}">{{ icon('printer', 14) }} Status label</a>
-    {% endif %}
-  </div>
-  {% endif %}
+  </section>
 </div>
 
-{# Inspection photos: shown, and more can be added after the inspection. #}
-{% if box.status != 'Awaiting Inspection' %}
-<div class="card mb" id="photos">
-  <div class="card-title">Inspection photos{% if box.photos %} <span class="muted">· {{ box.photos|length }}</span>{% endif %}</div>
-  {% if box.photos %}
-  <div class="photo-grid">
-    {% for _ in box.photos %}<a href="{{ url_for('receiving.box_photo', box_id=box.id, n=loop.index0) }}" target="_blank" rel="noopener"><img src="{{ url_for('receiving.box_photo', box_id=box.id, n=loop.index0) }}" alt="Inspection photo {{ loop.index }}" loading="lazy"></a>{% endfor %}
+{% if inspected and problems %}
+<section class="card bx-card bx-problems mb">
+  <div class="bx-head">
+    <span class="bx-ico">{{ icon('alert', 18) }}</span>
+    <div><h2 class="bx-title">What was found</h2>
+      <div class="bx-sub">{{ "Failed checklist points and the problems" if failed else "The problems" }} recorded at the inspection.</div></div>
   </div>
-  {% else %}<p class="muted small" style="margin:0">No photos were taken at the inspection.</p>{% endif %}
-  {% if box.photos|length < 6 %}
-  <form method="post" enctype="multipart/form-data" action="{{ url_for('receiving.box_add_photos', box_id=box.id) }}" class="flex gap-sm wrap mt" style="align-items:center">
-    <input type="file" name="photos" accept="image/*" multiple required style="max-width:340px">
-    <button class="btn btn-ghost btn-sm" type="submit">Add photos</button>
-    <span class="muted small">Up to {{ 6 - box.photos|length }} more</span>
-  </form>
-  {% endif %}
-</div>
+  <dl class="bx-facts">
+    {% for point, remarks in failed %}<div class="bx-fact is-wide"><dt>Failed: {{ point }}</dt><dd>{{ remarks or '—' }}</dd></div>{% endfor %}
+    {% if box.ncr_no %}<div class="bx-fact"><dt>Hold / rejection report</dt><dd><a href="{{ url_for('receiving.ncr', ncr_id=box.ncr_id) }}">{{ box.ncr_no }}</a> <span class="bx-note">{{ box.ncr_status }}</span></dd></div>{% endif %}
+    {% if box.nonconformity %}<div class="bx-fact is-wide"><dt>Nonconformity</dt><dd>{{ box.nonconformity }}</dd></div>{% endif %}
+    {% if box.unusable_reason %}<div class="bx-fact is-wide"><dt>Why it can't be used</dt><dd>{{ box.unusable_reason }}</dd></div>{% endif %}
+    {% if box.damage_reason %}<div class="bx-fact is-wide"><dt>Damage</dt><dd>{{ box.damage_reason }}</dd></div>{% endif %}
+  </dl>
+</section>
 {% endif %}
+
+{# Inspection photos: shown, and more can be added after the inspection. #}
+{% if inspected %}
+<section class="card bx-card mb" id="photos">
+  <div class="bx-head">
+    <span class="bx-ico">{{ icon('camera', 18) }}</span>
+    <div><h2 class="bx-title">Inspection photos{% if box.photos %} <span class="pr-group-count">{{ box.photos|length }}</span>{% endif %}</h2>
+      <div class="bx-sub">{{ 'Tap a photo to open it full size.' if box.photos else 'No photos were taken at the inspection.' }}</div></div>
+  </div>
+  <div class="bx-photos">
+    {% for _ in box.photos %}<a class="bx-photo" href="{{ url_for('receiving.box_photo', box_id=box.id, n=loop.index0) }}" target="_blank" rel="noopener"><img src="{{ url_for('receiving.box_photo', box_id=box.id, n=loop.index0) }}" alt="Inspection photo {{ loop.index }}" loading="lazy"></a>{% endfor %}
+    {% if box.photos|length < 6 %}
+    <form method="post" enctype="multipart/form-data" action="{{ url_for('receiving.box_add_photos', box_id=box.id) }}" class="bx-add" id="photoForm"
+          data-confirm="Add these photos to {{ box.box_code }}?">
+      <label class="bx-add-tile">
+        <input type="file" name="photos" accept="image/*" multiple required>
+        {{ icon('camera', 22) }}<b>Add photos</b><span>Up to {{ 6 - box.photos|length }} more</span>
+      </label>
+    </form>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+<section class="card bx-card bx-qr">
+  <div class="bx-head">
+    <span class="bx-ico">{{ icon('qr', 18) }}</span>
+    <div><h2 class="bx-title">QR label</h2><div class="bx-sub">What scanning this box's QR code shows.</div></div>
+  </div>
+  <code class="bx-qr-text">{{ qr_text }}</code>
+</section>
 </div>
+<script>
+(function () {
+  // Picking photos adds them straight away (after the usual "are you sure?").
+  var f = document.getElementById("photoForm");
+  if (f) f.querySelector("input[type=file]").addEventListener("change", function () {
+    if (this.files.length) { if (f.requestSubmit) f.requestSubmit(); else f.submit(); }
+  });
+})();
+</script>
 {% endblock %}

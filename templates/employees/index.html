@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Employees{% endblock %}
 {% block content %}
+{% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead with context %}
 <div class="page-head">
   <div>
     <h1 class="page-title">Employees</h1>
@@ -8,24 +9,30 @@
   </div>
 </div>
 
-<div class="card mb">
-  <div class="card-title">New employees waiting for your approval · {{ pending|length }}</div>
-  {% if pending %}
-  <div class="queue">
-    {% for r in pending %}
-    <a class="queue-item" href="{{ url_for('additions.detail', req_id=r.id) }}">
-      <span class="queue-main">
-        <span class="queue-title">{{ r.title }}</span>
-        <span class="queue-sub">Added by {{ r.requested_by_name or '—' }} · {{ (r.created_at or '')[:10] }}</span>
-      </span>
-      <span class="queue-go">Approve or reject {{ icon('arrow-right', 14) }}</span>
-    </a>
-    {% endfor %}
-  </div>
-  {% else %}
-  <p class="muted" style="margin:0">None right now. The Admin adds new employees under New Records.</p>
-  {% endif %}
+{% if pending %}
+{# The employees waiting for approval: a card table (templates/_ct.html). #}
+<div data-ct="employees-pending" class="mb">
+{{ ct_topbar(search="Search a name or who added it…", dates=[('data-date', 'Added')]) }}
+{% call ct_box('pending', 'New employees waiting for your approval', 'Added by the Admin under New Records — they join the list once you approve them.',
+               'amber', 'users', pending|length, ['Employee', 'Added', ''],
+               'minmax(240px, 2.4fr) minmax(150px, 1fr) minmax(150px, auto)', tabbed=false,
+               empty='No employee here matches.') %}
+  {% for r in pending %}
+    {% set href = url_for('additions.detail', req_id=r.id) %}
+    {% call ct_row('pending', href=href, date=r.created_at, search=r.title ~ ' ' ~ (r.requested_by_name or '')) %}
+      {% call ct_lead('users', r.title, href) %}Added by {{ r.requested_by_name or '—' }}{% endcall %}
+      <div role="cell" class="prt-date">{{ (r.created_at or '')[:10]|longdate if r.created_at else '—' }}</div>
+      <div role="cell" class="prt-cell-end"><a class="btn btn-primary btn-sm" href="{{ href }}">Approve or reject {{ icon('arrow-right', 14) }}</a></div>
+    {% endcall %}
+  {% endfor %}
+{% endcall %}
 </div>
+{% else %}
+<div class="card mb">
+  <div class="card-title">New employees waiting for your approval · 0</div>
+  <p class="muted" style="margin:0">None right now. The Admin adds new employees under New Records.</p>
+</div>
+{% endif %}
 
 <div class="card">
   <div class="card-title">Employee list · {{ rows|length }}</div>
@@ -35,7 +42,7 @@
     <span class="muted small">{% for d in departments if counts[d] %}{{ d }} {{ counts[d] }}{{ ' · ' if not loop.last }}{% endfor %}</span>
   </div>
   <div class="table-wrap">
-    <table class="table" id="empTable">
+    <table class="table" id="empTable" data-no-filter>
       <thead>
         <tr><th>Name</th><th>Position</th><th>Department</th><th>Employee no.</th><th>Mobile</th><th>Actions</th></tr>
       </thead>

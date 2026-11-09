@@ -1,0 +1,34 @@
+{# The items still to come on a purchase order, one card each — on the
+   receive form, and sent to it when a PO number is typed in.  Honey lines
+   are received as containers (net weight each, how many); the rest as
+   boxes.  Needs: po_lines, submitted, materials, categories, category_of,
+   track_labels, conditions, is_honey. #}
+{% from "receiving/_item_fields.html" import item_fields %}
+{% for l in po_lines %}
+{% set sent = submitted.get(l.line_no|string) %}
+{% set mat = (materials|selectattr('id', 'equalto', l.material_id)|first) if l.material_id else none %}
+{% set honey = is_honey(mat, l) if is_honey else false %}
+{% set kg_unit = (l.unit or '')|lower|replace('.', '') in ('kg', 'kgs', 'kilo', 'kilos', 'kilogram', 'kilograms') %}
+<div class="line-card{{ ' is-honey' if honey }}" data-item data-po-line>
+  <div class="line-card-head">
+    <span class="line-card-num">PO line {{ l.line_no }}{% if honey %} <span class="honey-tag">{{ icon('honey', 12) }} Honey · containers</span>{% endif %}</span>
+    <label class="flex gap-sm small" style="align-items:center;margin:0;cursor:pointer">
+      <input type="checkbox" class="js-skip" data-review-skip> Not in this delivery
+    </label>
+  </div>
+  <p class="small mb-sm"><b>{{ l.description }}</b>{% if l.brand_model %} · {{ l.brand_model }}{% endif %}
+    <span class="muted">— ordered {{ l.qty|qty(l.unit) }}{% if l.received %}, {{ l.received|qty }} received{% endif %}{% if l.pending %}, {{ l.pending|qty }} being {{ 'checked' if honey else 'inspected' }}{% endif %}{% if l.rejected %}, {{ l.rejected|qty }} rejected{% endif %} · still to come <b>{{ l.remaining|qty(l.unit) }}</b></span></p>
+  <input type="hidden" name="po_line_no" value="{{ l.line_no }}">
+  {% if honey %}
+    {# Honey in kilos: one container of what's left (change it to the real
+       weights); counted in containers / pails: that many, weight to fill. #}
+    {% set start = {'material_id': l.material_id or 'new', 'qty_per_box': ('%g'|format(l.remaining)) if kg_unit else '',
+                    'boxes': 1 if kg_unit else (l.remaining|round(0, 'ceil')|int or 1)} %}
+  {% else %}
+    {% set start = {'material_id': l.material_id or 'new', 'qty_per_box': '%g'|format(l.remaining), 'boxes': 1} %}
+  {% endif %}
+  {{ item_fields(sent or start, materials, categories, category_of, track_labels, conditions,
+                 locked={'name': l.description, 'unit': 'kg' if honey else (l.unit or (mat.unit if mat else ''))},
+                 is_honey=is_honey) }}
+</div>
+{% endfor %}

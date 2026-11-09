@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Pest Control{% endblock %}
 {% block content %}
+{% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead with context %}
 <style>
   .month-strip { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; }
   @media (max-width: 720px) { .month-strip { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
@@ -83,18 +84,27 @@
 
 <div class="section-label">Inspections</div>
 {% if records %}
-<div class="queue">
+{# The inspections: a card table (templates/_ct.html). #}
+<div data-ct="pest">
+{{ ct_topbar(search="Search a month, who monitored, an area…", dates=[('data-date', 'Monitored')],
+             filters=[('data-result', 'Result', ['Clear', 'Pest activity'])]) }}
+{% call ct_box('inspections', ico='shield', head=['Month', 'Monitored', 'Result', ''],
+               cols='minmax(240px, 2.4fr) minmax(160px, 1.2fr) minmax(120px, .9fr) minmax(90px, auto)',
+               tabbed=false, empty='No inspection matches.') %}
   {% for r in records %}
-  <a class="queue-item" href="{{ url_for('facility.pest_record', record_id=r.id) }}">
-    <span class="task-icon" style="width:40px;height:40px">{{ icon('shield', 18) }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ r.month }}</span>
-      <span class="queue-sub">Monitored {{ r.nice_date }} by {{ r.monitored_by }} · {{ r.summary }}</span>
-    </span>
-    {% if r.activity_count %}<span class="badge badge-danger">Pest activity</span>
-    {% else %}<span class="badge badge-ok">Clear</span>{% endif %}
-  </a>
+    {% set href = url_for('facility.pest_record', record_id=r.id) %}
+    {% set result = 'Pest activity' if r.activity_count else 'Clear' %}
+    {% call ct_row('inspections', href=href, date=r.record_date,
+                   search=r.month ~ ' ' ~ (r.monitored_by or '') ~ ' ' ~ r.summary ~ ' ' ~ (r.remarks or ''),
+                   data={'result': result}) %}
+      {% call ct_lead('shield', r.month, href) %}{{ r.summary }}{% endcall %}
+      <div role="cell" class="prt-date">{{ r.nice_date }}
+        {% if r.monitored_by %}<div class="prt-small">by {{ r.monitored_by }}</div>{% endif %}</div>
+      <div role="cell"><span class="st-chip tone-{{ 'red' if r.activity_count else 'green-soft' }}">{{ result }}</span></div>
+      <div role="cell" class="prt-cell-end"><a class="btn btn-ghost btn-sm" href="{{ href }}">Open {{ icon('arrow-right', 14) }}</a></div>
+    {% endcall %}
   {% endfor %}
+{% endcall %}
 </div>
 {% else %}
 <div class="card"><div class="empty">

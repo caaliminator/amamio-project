@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}New Records{% endblock %}
 {% block content %}
+{% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead, ct_nothing with context %}
 <div class="page-head">
   <div>
     <h1 class="page-title">New Records</h1>
@@ -23,30 +24,62 @@
 </div>
 {% endif %}
 
-<div class="tabs">
-  {% for key, label in [('waiting', 'Waiting for approval'), ('approved', 'Approved'), ('rejected', 'Rejected'), ('all', 'All')] %}
-  <a href="{{ url_for('additions.index', show=key) }}" class="{{ 'is-active' if show == key }}">{{ label }} <span class="muted">{{ counts[key] }}</span></a>
-  {% endfor %}
-</div>
-
+{# A tab per status, each a card table (templates/_ct.html); ?show= picks
+   the tab it opens on. #}
+{% set groups = [
+  ('waiting', 'Waiting for approval', 'Sent to the Super Admin — part of the system once approved.', 'amber', 'clipboard', statuses[0]),
+  ('approved', 'Approved', 'Added to the system.', 'green-soft', 'check', statuses[1]),
+  ('rejected', 'Rejected', 'Turned down by the Super Admin, with the reason.', 'red', 'x-circle', statuses[2]),
+  ('withdrawn', 'Withdrawn', 'Called back by the Admin before a decision.', 'done', 'close', statuses[3])] %}
+{% set kind_icons = {'employee': 'users', 'supplier': 'suppliers', 'material': 'box', 'supply': 'swap'} %}
 {% if rows %}
-<div class="queue">
-  {% for r in rows %}
-  <a class="queue-item" href="{{ url_for('additions.detail', req_id=r.id) }}">
-    <span class="code" style="min-width:110px">{{ r.kind_label }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ r.title }}</span>
-      <span class="queue-sub">Added by {{ r.requested_by_name or '—' }} · {{ (r.created_at or '')[:10] }}{% if r.decided_by_name %} · {{ r.status|lower }} by {{ r.decided_by_name }}{% endif %}{% if r.remarks %} · “{{ r.remarks }}”{% endif %}</span>
-    </span>
-    <span class="badge {{ r.badge }}">{{ 'Waiting for approval' if r.status == 'Pending' else r.status }}</span>
-    <span class="queue-go">{{ ('Approve or reject' if can_decide and r.status == 'Pending' else 'Open') }} {{ icon('arrow-right', 14) }}</span>
-  </a>
+{% set tabs = [] %}
+{% for key, label, sub, tone, ico, status in groups %}
+  {% set n = rows|selectattr('status', 'equalto', status)|list|length %}
+  {% if n or key == 'waiting' %}{% set _ = tabs.append({'key': key, 'label': label, 'icon': ico, 'tone': tone, 'count': n}) %}{% endif %}
+{% endfor %}
+{% set kind_options = rows|map(attribute='kind_label')|reject('none')|unique|sort %}
+{% if show and show != 'all' %}
+<script>try { localStorage.setItem("ct.additions.tab", {{ show|tojson }}); } catch (e) {}</script>
+{% endif %}
+
+<div data-ct="additions">
+{{ ct_topbar(tabs=tabs, search="Search names, kinds, who added…", dates=[('data-date', 'Added')],
+             filters=[('data-kind', 'Kind', kind_options)]) }}
+
+{% for key, label, sub, tone, ico, status in groups %}
+{% set group = rows|selectattr('status', 'equalto', status)|list %}
+{% if group or key == 'waiting' %}
+{% call ct_box(key, label, sub, tone, ico, group|length, ['Record', 'Kind', 'Added', 'Decision', ''],
+               'minmax(240px, 2.4fr) minmax(110px, .9fr) minmax(150px, 1.1fr) minmax(160px, 1.2fr) minmax(150px, auto)',
+               empty='No record here matches.') %}
+  {% for r in group %}
+    {% set href = url_for('additions.detail', req_id=r.id) %}
+    {% call ct_row(key, href=href, date=r.created_at,
+                   search=r.title ~ ' ' ~ r.kind_label ~ ' ' ~ (r.requested_by_name or '') ~ ' ' ~ (r.decided_by_name or '') ~ ' ' ~ (r.remarks or ''),
+                   data={'kind': r.kind_label}) %}
+      {% if r.remarks %}{% call ct_lead(kind_icons.get(r.kind, 'plus'), r.title, href) %}“{{ r.remarks }}”{% endcall %}
+      {% else %}{{ ct_lead(kind_icons.get(r.kind, 'plus'), r.title, href) }}{% endif %}
+      <div role="cell"><span class="st-chip tone-done">{{ r.kind_label }}</span></div>
+      <div role="cell" class="prt-date">{{ (r.created_at or '')[:10]|longdate if r.created_at else '—' }}
+        <div class="prt-small">by {{ r.requested_by_name or '—' }}</div></div>
+      <div role="cell"><span class="st-chip tone-{{ tone }}">{{ 'Waiting for approval' if r.status == statuses[0] else r.status }}</span>
+        {% if r.decided_by_name %}<div class="prt-small">{{ r.status|lower }} by {{ r.decided_by_name }}</div>{% endif %}</div>
+      <div role="cell" class="prt-cell-end"><a class="btn {{ 'btn-primary' if can_decide and r.status == statuses[0] else 'btn-ghost' }} btn-sm" href="{{ href }}">{{ 'Approve or reject' if can_decide and r.status == statuses[0] else 'Open' }} {{ icon('arrow-right', 14) }}</a></div>
+    {% endcall %}
+  {% else %}
+    <div class="empty" style="padding:24px"><div class="empty-title">Nothing waiting for approval</div>
+      <p class="muted">{% if can_add %}Use the cards above to add a new record.{% else %}New records the Admin adds appear here.{% endif %}</p></div>
   {% endfor %}
+{% endcall %}
+{% endif %}
+{% endfor %}
+{{ ct_nothing() }}
 </div>
 {% else %}
 <div class="card"><div class="empty">
   <div class="empty-icon">{{ icon('plus', 30) }}</div>
-  <div class="empty-title">{{ 'Nothing waiting for approval' if show == 'waiting' else 'Nothing here yet' }}</div>
+  <div class="empty-title">Nothing here yet</div>
   <p class="muted">{% if can_add %}Use the cards above to add a new record.{% else %}New records the Admin adds appear here.{% endif %}</p>
 </div></div>
 {% endif %}

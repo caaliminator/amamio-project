@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Cleaning & Sanitation{% endblock %}
 {% block content %}
+{% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead, ct_nothing with context %}
 <div class="page-head">
   <div>
     <h1 class="page-title">Cleaning &amp; Sanitation</h1>
@@ -29,58 +30,112 @@
 </div>
 {% endif %}
 
+{% if records or actions %}
+{# Two card tables (templates/_ct.html): the areas still needing action and
+   every cleaning record.  "This week" / "This month" fill the date filter;
+   ?show=week|month|action opens that way. #}
+{% if show == 'action' %}
+<script>try { localStorage.setItem("ct.sanitation.tab", "action"); } catch (e) {}</script>
+{% endif %}
 <div class="toolbar">
-  <div class="seg">
-    <a href="{{ url_for('facility.sanitation', show='week') }}" class="{{ 'is-active' if show == 'week' }}">This week</a>
-    <a href="{{ url_for('facility.sanitation', show='month') }}" class="{{ 'is-active' if show == 'month' }}">This month</a>
-    <a href="{{ url_for('facility.sanitation', show='action') }}" class="{{ 'is-active' if show == 'action' }}">Needs action{% if stats.open_actions %} ({{ stats.open_actions }}){% endif %}</a>
+  <div class="seg" id="sanRange" role="group" aria-label="Quick dates">
+    <a href="{{ url_for('facility.sanitation', show='week') }}" data-from="{{ week_start }}" class="{{ 'is-active' if show == 'week' }}">This week</a>
+    <a href="{{ url_for('facility.sanitation', show='month') }}" data-from="{{ month_start }}" class="{{ 'is-active' if show == 'month' }}">This month</a>
   </div>
 </div>
 
-{% if show == 'action' %}
-  {% if actions %}
-  <div class="queue">
-    {% for a in actions %}
-    <a class="queue-item" href="{{ url_for('facility.sanitation_record', record_id=a.record_id) }}#area-{{ a.index }}">
-      <span class="task-icon" style="width:40px;height:40px">{{ icon('tools' if a.current_status == 'Needs repair' else 'sparkle', 18) }}</span>
-      <span class="queue-main">
-        <span class="queue-title">{{ a.location }} — {{ a.action }}</span>
-        <span class="queue-sub">{{ a.nice_date }} · {{ a.phase|lower }}{% if a.remarks %} · {{ a.remarks }}{% endif %}</span>
-      </span>
-      <span class="badge {{ a.badge }}">{{ a.current_status }}</span>
-      <span class="queue-go">Mark done {{ icon('arrow-right', 14) }}</span>
-    </a>
-    {% endfor %}
-  </div>
+<div data-ct="sanitation">
+{{ ct_topbar(tabs=[
+      {'key': 'action', 'label': 'Needs action', 'icon': 'tools', 'tone': 'red' if actions else 'done', 'count': actions|length},
+      {'key': 'records', 'label': 'Cleaning records', 'icon': 'sparkle', 'tone': 'green-soft', 'count': records|length}],
+    search="Search an area, action, who cleaned…", dates=[('data-date', 'Date')],
+    filters=[('data-phase', 'Phase', [PRE|capitalize, POST|capitalize]),
+             ('data-state', 'Status', ['Needs action', 'Fixed', 'Not checked', 'Clean'])]) }}
+
+{% call ct_box('action', 'Needs action', 'Areas marked for cleaning or repair — mark each one done once it has been undertaken.',
+               'red' if actions else 'done', 'tools', actions|length, ['Area', 'Checked', 'Status', ''],
+               'minmax(260px, 2.6fr) minmax(150px, 1.1fr) minmax(130px, 1fr) minmax(120px, auto)',
+               empty='No open area matches.') %}
+  {% for a in actions %}
+    {% set href = url_for('facility.sanitation_record', record_id=a.record_id) ~ '#area-' ~ a.index %}
+    {% call ct_row('action', href=href, date=a.record_date,
+                   search=a.location ~ ' ' ~ a.action ~ ' ' ~ a.remarks ~ ' ' ~ a.current_status ~ ' ' ~ (a.phase or '') ~ ' ' ~ a.nice_date,
+                   data={'phase': (a.phase or '')|capitalize, 'state': 'Needs action'}) %}
+      {% set ico, title = ('tools' if a.current_status == 'Needs repair' else 'sparkle'), a.location ~ (' — ' ~ a.action if a.action else '') %}
+      {% if a.remarks %}{% call ct_lead(ico, title, href) %}{{ a.remarks }}{% endcall %}{% else %}{{ ct_lead(ico, title, href) }}{% endif %}
+      <div role="cell" class="prt-date">{{ a.nice_date }}<div class="prt-small">{{ (a.phase or '')|lower }}</div></div>
+      <div role="cell"><span class="st-chip tone-{{ 'red' if a.current_status == 'Needs repair' else 'amber' }}">{{ a.current_status }}</span></div>
+      <div role="cell" class="prt-cell-end"><a class="btn btn-primary btn-sm" href="{{ href }}">Mark done {{ icon('arrow-right', 14) }}</a></div>
+    {% endcall %}
   {% else %}
-  <div class="card"><div class="empty">
-    <div class="empty-icon">{{ icon('check', 30) }}</div>
-    <div class="empty-title">Nothing needs action</div>
-    <p class="muted">Every area marked for cleaning or repair has been taken care of.</p>
-  </div></div>
-  {% endif %}
-{% elif records %}
-  <div class="queue">
-    {% for r in records %}
-    <a class="queue-item" href="{{ url_for('facility.sanitation_record', record_id=r.id) }}">
-      <span class="task-icon" style="width:40px;height:40px">{{ icon('sparkle', 18) }}</span>
-      <span class="queue-main">
-        <span class="queue-title">{{ r.short_date }} · {{ r.phase }}</span>
-        <span class="queue-sub">{{ r.summary }} · conducted by {{ r.conducted_by }}</span>
-      </span>
-      {% if r.open_count %}<span class="badge badge-danger">{{ r.open_count }} open</span>
-      {% elif r.flagged %}<span class="badge badge-muted">Fixed</span>
-      {% elif r.not_checked %}<span class="badge badge-muted">{{ r.not_checked }} not checked</span>
-      {% else %}<span class="badge badge-ok">Clean</span>{% endif %}
-    </a>
-    {% endfor %}
-  </div>
+    <div class="empty" style="padding:24px"><div class="empty-icon">{{ icon('check', 30) }}</div>
+      <div class="empty-title">Nothing needs action</div>
+      <p class="muted">Every area marked for cleaning or repair has been taken care of.</p></div>
+  {% endfor %}
+{% endcall %}
+
+{% call ct_box('records', 'Cleaning records', 'Each pre- and post-production check of the five areas.',
+               'green-soft', 'sparkle', records|length, ['Check', 'Phase', 'Conducted by', 'Status', ''],
+               'minmax(240px, 2.4fr) minmax(130px, 1fr) minmax(140px, 1.1fr) minmax(120px, .9fr) minmax(90px, auto)',
+               empty='No cleaning record matches.') %}
+  {% for r in records %}
+    {% set href = url_for('facility.sanitation_record', record_id=r.id) %}
+    {% if r.open_count %}{% set state, chip, tone = 'Needs action', r.open_count ~ ' open', 'red' %}
+    {% elif r.flagged %}{% set state, chip, tone = 'Fixed', 'Fixed', 'done' %}
+    {% elif r.not_checked %}{% set state, chip, tone = 'Not checked', r.not_checked ~ ' not checked', 'done' %}
+    {% else %}{% set state, chip, tone = 'Clean', 'Clean', 'green-soft' %}{% endif %}
+    {% call ct_row('records', href=href, date=r.record_date,
+                   search=r.nice_date ~ ' ' ~ r.phase ~ ' ' ~ r.summary ~ ' ' ~ (r.conducted_by or '') ~ ' ' ~ (r.inspected_by or '') ~ ' ' ~ (r.areas|map(attribute='location')|join(' ')),
+                   data={'phase': (r.phase or '')|capitalize, 'state': state}) %}
+      {% call ct_lead('sparkle', r.short_date ~ ' · ' ~ r.phase, href) %}{{ r.summary }}{% endcall %}
+      <div role="cell" class="prt-date">{{ (r.phase or '')|capitalize }}</div>
+      <div role="cell" class="prt-date">{{ r.conducted_by or '—' }}</div>
+      <div role="cell"><span class="st-chip tone-{{ tone }}">{{ chip }}</span></div>
+      <div role="cell" class="prt-cell-end"><a class="btn btn-ghost btn-sm" href="{{ href }}">Open {{ icon('arrow-right', 14) }}</a></div>
+    {% endcall %}
+  {% else %}
+    <div class="empty" style="padding:24px"><div class="empty-icon">{{ icon('sparkle', 30) }}</div>
+      <div class="empty-title">No cleaning recorded yet</div>
+      <p class="muted">Check the five areas before production starts and again after it ends.</p></div>
+  {% endfor %}
+{% endcall %}
+{{ ct_nothing() }}
+</div>
+
+<script>
+(function () {
+  // "This week" / "This month" fill the date filter (from that day to
+  // today); other dates or Clear un-mark them.
+  var root = document.querySelector('[data-ct="sanitation"]');
+  if (!root) return;
+  var from = root.querySelector(".ct-from"), to = root.querySelector(".ct-to");
+  var links = Array.prototype.slice.call(document.querySelectorAll("#sanRange a"));
+  var today = {{ today|tojson }};
+  function mark(on) { links.forEach(function (a) { a.classList.toggle("is-active", a === on); }); }
+  function pick(a) {
+    from.value = a.getAttribute("data-from");
+    to.value = today;
+    mark(a);
+  }
+  links.forEach(function (a) {
+    if (a.classList.contains("is-active")) pick(a);     // ?show=week|month
+    a.addEventListener("click", function (e) {
+      e.preventDefault();
+      pick(a);
+      from.dispatchEvent(new Event("change"));
+    });
+  });
+  [from, to].forEach(function (el) { el.addEventListener("input", function () { mark(null); }); });
+  var clear = root.querySelector(".ct-clear");
+  if (clear) clear.addEventListener("click", function () { mark(null); });
+})();
+</script>
 {% else %}
-  <div class="card"><div class="empty">
-    <div class="empty-icon">{{ icon('sparkle', 30) }}</div>
-    <div class="empty-title">No cleaning recorded {{ 'this week' if show == 'week' else 'this month' }}</div>
-    <p class="muted">Check the five areas before production starts and again after it ends.</p>
-    <a class="btn btn-primary mt" href="{{ url_for('facility.sanitation_new') }}">Record cleaning</a>
-  </div></div>
+<div class="card"><div class="empty">
+  <div class="empty-icon">{{ icon('sparkle', 30) }}</div>
+  <div class="empty-title">No cleaning recorded yet</div>
+  <p class="muted">Check the five areas before production starts and again after it ends.</p>
+  <a class="btn btn-primary mt" href="{{ url_for('facility.sanitation_new') }}">Record cleaning</a>
+</div></div>
 {% endif %}
 {% endblock %}

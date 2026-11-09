@@ -2,7 +2,7 @@
 {% from "employees/_fields.html" import employee_fields %}
 {% block title %}Edit — {{ emp.name }}{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('employees.index') }}">{{ icon('arrow-left', 15) }} Employees</a>
+<a class="back-link" href="{{ url_for('employees.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Employees</span></a>
 <div class="page-head">
   <div>
     <h1 class="page-title">{{ emp.name }}</h1>

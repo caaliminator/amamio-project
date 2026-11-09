@@ -133,7 +133,7 @@ report. The receive form's preview shows it before anything is saved.
 manufactured and expiry / best-before. Marking it *Pass* needs the expiry
 date. The next box of the same batch starts with the dates already picked.
 
-**Batches & Expiry** (menu: Stock, and Receiving Reports) lists every batch:
+**Batches & Expiry** (menu: Stock, and Records & Reports for the receiving team) lists every batch:
 received, accepted, left in storage and in the production area, used, and
 its expiry, with the days left. Batches with stock that have expired or
 expire within 30 days are flagged and shown on the home page. Production
@@ -248,6 +248,11 @@ yearly · platform) and five tabs:
 > computer running the system.
 
 ## Supplier Directory and purchasing
+
+**Who does what on a purchase order:** only the **Admin** prepares a PO
+(and closes it as delivered or cancels it). The **Super Admin** only gives
+the final approval, which issues it; they can open and print POs but have
+no Prepare / Cancel / Close buttons, and the server refuses those actions.
 
 **The directory is the client's spreadsheet** ("SUPPLIERS  DIRECTORY
 2026.xlsx", 66 suppliers). It was converted once into `seed_suppliers.py`

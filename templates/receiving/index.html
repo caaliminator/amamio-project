@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Receiving Area{% endblock %}
 {% block content %}
+{% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead, ct_nothing with context %}
 <div class="page-head">
   <div>
     <h1 class="page-title">Receiving Area</h1>
@@ -19,50 +20,73 @@
   <div class="figure"><div class="figure-label">Received today</div><div class="figure-value">{{ stats.today }}</div></div>
 </div>
 
+{% if expected or batches %}
+{# A tab for the approved POs still to arrive, then one per delivery status. #}
+{% set groups = [
+  ('open', 'Awaiting inspection', 'Received; boxes still to be inspected.', 'amber', 'inspect', 'Open'),
+  ('closing', 'Ready to close', 'Every box is inspected — close the delivery.', 'blue', 'check', 'For Closing'),
+  ('done', 'Completed', 'Closed deliveries.', 'green', 'box', 'Completed'),
+  ('cancelled', 'Cancelled', 'Called off.', 'red', 'x-circle', 'Cancelled')] %}
+{% set tabs = [] %}
+{% if expected %}{% set _ = tabs.append({'key': 'expected', 'label': 'Expected', 'icon': 'truck', 'tone': 'green-soft', 'count': expected|length}) %}{% endif %}
+{% for key, label, sub, tone, ico, status in groups %}
+  {% set n = batches|selectattr('status', 'equalto', status)|list|length %}
+  {% if n or key == 'open' %}{% set _ = tabs.append({'key': key, 'label': label, 'icon': ico, 'tone': tone, 'count': n}) %}{% endif %}
+{% endfor %}
+{% set suppliers = ((batches|map(attribute='supplier_name')|list) + (expected|map(attribute='supplier_name')|list))|reject('none')|unique|sort %}
+
+<div data-ct="receiving">
+{{ ct_topbar(tabs=tabs, search="Search suppliers, MRR, PO, DR…", dates=[('data-date', 'Date')],
+             filters=[('data-supplier', 'Supplier', suppliers)]) }}
+
 {% if expected %}
-<div class="section-label">Expected deliveries — approved purchase orders ({{ expected|length }})</div>
-<div class="queue mb">
+{% call ct_box('expected', 'Expected deliveries', 'Approved purchase orders with goods still to come — press Receive when they arrive.',
+               'green-soft', 'truck', expected|length, ['Purchase order', 'Still to come', 'Expected', ''],
+               'minmax(240px, 2fr) minmax(220px, 2.4fr) minmax(130px, 1fr) minmax(120px, auto)',
+               empty='No purchase order here matches.') %}
   {% for po in expected %}
-  <a class="queue-item" href="{{ url_for('receiving.new', po=po.id) }}">
-    <span class="code" style="min-width:96px">{{ po.po_no }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ po.supplier_name }}</span>
-      <span class="queue-sub">Still to come: {{ po.summary }}{% if po.expected_delivery %} · expected {{ po.expected_delivery }}{% endif %}</span>
-    </span>
-    <span class="queue-go">Receive {{ icon('arrow-right', 14) }}</span>
-  </a>
+    {% call ct_row('expected', href=url_for('receiving.new', po=po.id), date=po.expected_delivery,
+                   search=po.po_no ~ ' ' ~ po.supplier_name ~ ' ' ~ po.summary, data={'supplier': po.supplier_name}) %}
+      {{ ct_lead('orders', po.supplier_name or '—', url_for('receiving.new', po=po.id), code=po.po_no) }}
+      <div role="cell" class="prt-date">{{ po.summary }}</div>
+      <div role="cell" class="prt-date">{{ po.expected_delivery|longdate if po.expected_delivery else '—' }}</div>
+      <div role="cell" class="prt-cell-end"><a class="btn btn-primary btn-sm" href="{{ url_for('receiving.new', po=po.id) }}">Receive {{ icon('arrow-right', 14) }}</a></div>
+    {% endcall %}
   {% endfor %}
-</div>
-<div class="section-label">Deliveries</div>
+{% endcall %}
 {% endif %}
 
-<div class="toolbar">
-  <div class="seg">
-    <a href="{{ url_for('receiving.index', show='open') }}" class="{{ 'is-active' if show == 'open' }}">Open</a>
-    <a href="{{ url_for('receiving.index', show='all') }}" class="{{ 'is-active' if show != 'open' }}">All deliveries</a>
-  </div>
-</div>
-
-{% if batches %}
-<div class="queue">
-  {% for b in batches %}
-  <a class="queue-item" href="{{ url_for('receiving.batch', batch_id=b.id) }}">
-    <span class="task-icon" style="width:40px;height:40px">{{ icon('receiving', 18) }}</span>
-    <span class="queue-main">
-      <span class="queue-title">{{ b.supplier_name }}</span>
-      <span class="queue-sub">
-        <span class="code">{{ b.ref_no }}</span> · {{ b.received_date }} · {{ b.box_count }} box(es)
-        {% if b.delivery_ref %} · DR {{ b.delivery_ref }}{% endif %}
-      </span>
-    </span>
-    <span class="badge {{ b.badge }}">{{ 'Awaiting inspection' if b.status == 'Open' else ('Ready to close' if b.status == 'For Closing' else b.status) }}</span>
-  </a>
+{% for key, label, sub, tone, ico, status in groups %}
+{% set rows = batches|selectattr('status', 'equalto', status)|list %}
+{% if rows or key == 'open' %}
+{% call ct_box(key, label, sub, tone, ico, rows|length, ['Delivery', 'Received', 'Boxes', 'PO · DR', 'Status', ''],
+               'minmax(210px, 2.2fr) minmax(120px, 1fr) 70px minmax(120px, 1fr) minmax(140px, 1fr) minmax(90px, auto)',
+               empty='No delivery here matches.') %}
+  {% for b in rows %}
+    {% call ct_row(key, href=url_for('receiving.batch', batch_id=b.id), date=b.received_date,
+                   search=b.ref_no ~ ' ' ~ b.supplier_name ~ ' ' ~ (b.po_no or '') ~ ' ' ~ (b.delivery_ref or '') ~ ' ' ~ (b.received_by or ''),
+                   data={'supplier': b.supplier_name}) %}
+      {{ ct_lead('receiving', b.supplier_name or '—', url_for('receiving.batch', batch_id=b.id), code=b.ref_no) }}
+      <div role="cell" class="prt-date">{{ b.received_date|longdate if b.received_date else '—' }}
+        {% if b.received_by %}<div class="prt-small">by {{ b.received_by }}</div>{% endif %}</div>
+      <div role="cell" class="prt-num">{{ b.box_count }}</div>
+      <div role="cell" class="prt-date">{{ b.po_no or '—' }}{% if b.delivery_ref %}<div class="prt-small">DR {{ b.delivery_ref }}</div>{% endif %}</div>
+      <div role="cell"><span class="st-chip tone-{{ tone }}">{{ label }}</span></div>
+      <div role="cell" class="prt-cell-end"><a class="btn btn-ghost btn-sm" href="{{ url_for('receiving.batch', batch_id=b.id) }}">Open {{ icon('arrow-right', 14) }}</a></div>
+    {% endcall %}
+  {% else %}
+    <div class="empty" style="padding:24px"><div class="empty-title">No delivery is waiting for inspection</div>
+      <p class="muted">When a delivery arrives, record it here and print a QR label for each box.</p></div>
   {% endfor %}
+{% endcall %}
+{% endif %}
+{% endfor %}
+{{ ct_nothing() }}
 </div>
 {% else %}
 <div class="card"><div class="empty">
   <div class="empty-icon">{{ icon('receiving', 30) }}</div>
-  <div class="empty-title">{{ 'No open deliveries' if show == 'open' else 'No deliveries yet' }}</div>
+  <div class="empty-title">No deliveries yet</div>
   <p class="muted">When a delivery arrives, record it here and print a QR label for each box.</p>
   <a class="btn btn-primary mt" href="{{ url_for('receiving.new') }}">Receive a delivery</a>
 </div></div>

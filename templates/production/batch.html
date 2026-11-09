@@ -22,7 +22,7 @@
   .disp-big.is-bad { color: var(--danger); }
 </style>
 <div class="focus">
-<a class="back-link" href="{{ url_for('production.index') }}">{{ icon('arrow-left', 15) }} Batch Records</a>
+<a class="back-link" href="{{ url_for('production.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Batch Records</span></a>
 
 <div class="record-head">
   <div>
@@ -47,17 +47,20 @@
     </div>
     <a class="btn btn-primary" href="{{ url_for('production.dispensing', batch_id=rec.id) }}">Sign off dispensing</a>
   </div>
-  <div class="card mb">
-    <div class="card-title">What to dispense</div>
-    <div class="queue">
-      {% for l in rec.dispensing or [] %}
-      <div class="queue-item">
-        <span class="queue-main"><span class="queue-title">{{ l.ingredient }}</span>
-          <span class="queue-sub">{% if l.lot_no %}Lot {{ l.lot_no }}{% else %}No lot no. yet{% endif %}{% if l.expiry_date %} · Exp {{ l.expiry_date }}{% endif %}</span></span>
-        <b>{{ l.theoretical_qty|qty(l.unit) }}</b>
-      </div>
-      {% endfor %}
-    </div>
+  {% from "_ct.html" import ct_box, ct_row, ct_lead with context %}
+  <div data-ct="batch-dispense" class="mb">
+  {% call ct_box('dispense', 'What to dispense', 'The ingredients to weigh for this batch.', 'amber', 'scale', (rec.dispensing or [])|length,
+                 ['Ingredient', 'Lot no.', 'Expiry', 'To weigh'],
+                 'minmax(220px, 2.2fr) minmax(130px, 1fr) minmax(120px, 1fr) minmax(110px, auto)', tabbed=false) %}
+    {% for l in rec.dispensing or [] %}
+      {% call ct_row('dispense', search=l.ingredient ~ ' ' ~ (l.lot_no or '')) %}
+        {{ ct_lead('drop', l.ingredient) }}
+        <div role="cell" class="prt-date">{% if l.lot_no %}Lot {{ l.lot_no }}{% else %}<span class="muted">No lot no. yet</span>{% endif %}</div>
+        <div role="cell" class="prt-date">{{ ('Exp ' ~ l.expiry_date) if l.expiry_date else '—' }}</div>
+        <div role="cell" class="prt-num prt-cell-end">{{ l.theoretical_qty|qty(l.unit) }}</div>
+      {% endcall %}
+    {% endfor %}
+  {% endcall %}
   </div>
 
 {% elif rec.stage == 'procedure' %}

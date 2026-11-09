@@ -1,69 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Purchase Requests{% endblock %}
 {% block content %}
-{% macro table_head() %}
-    <div class="prt-head" role="row">
-      <span role="columnheader">Request</span>
-      <span role="columnheader">Items &amp; est. cost</span>
-      <span role="columnheader">Needed by</span>
-      <span role="columnheader">Progress</span>
-      <span role="columnheader">Urgency</span>
-      <span role="columnheader">Status</span>
-    </div>
-{% endmacro %}
-
-{% macro request_card(r, key) %}
-    <div class="prt-card urg-{{ r.urgency|lower }}" data-stage="{{ key }}"
-         data-search="{{ (r.pr_no ~ ' ' ~ (r.purpose or '') ~ ' ' ~ r.summary ~ ' ' ~ (r.department or '') ~ ' ' ~ r.requested_by ~ ' ' ~ r.status ~ ' ' ~ r.urgency ~ ' ' ~ (r['items']|map(attribute='name')|join(' ')) ~ ' ' ~ (r['items']|map(attribute='supplier')|join(' ')))|lower }}">
-      <div class="prt-row" role="row">
-        <div class="prt-req" role="cell">
-          <button type="button" class="prt-toggle" aria-expanded="false" aria-controls="pri-{{ r.id }}"
-                  aria-label="Show the items of {{ r.pr_no }}">{{ icon('chevron-down', 16) }}</button>
-          <div class="prt-req-text">
-            <a class="prt-title" href="{{ url_for('requests.detail', id=r.id) }}">{{ r.purpose or r.summary }}</a>
-            <div class="prt-sub"><span class="prt-code">{{ r.pr_no }}</span> · {{ r.department or '—' }} · {{ r.requested_by }}</div>
-          </div>
-        </div>
-        <div class="prt-items" role="cell">
-          <div class="prt-bar" aria-hidden="true">
-            {% for it in r['items'] if it.share > 0 %}<span class="seg-{{ it.seg }}" style="width:{{ it.share }}%"></span>{% endfor %}
-          </div>
-          <div class="prt-small"><b>{{ r.total|peso }}</b> · {{ r['items']|length }} item{{ 's' if r['items']|length != 1 }}</div>
-        </div>
-        <div class="prt-date" role="cell">
-          {% if r.needed_by %}{{ r.needed_by|longdate }}
-            {% if r.days_left is not none and r.tone not in ('done', 'red') %}
-            <div class="prt-small {{ 'is-late' if r.days_left < 0 else ('is-soon' if r.days_left <= 3 else '') }}">
-              {% if r.days_left < 0 %}{{ -r.days_left }} day{{ 's' if r.days_left != -1 }} late{% elif r.days_left == 0 %}today{% else %}in {{ r.days_left }} day{{ 's' if r.days_left != 1 }}{% endif %}</div>
-            {% endif %}
-          {% else %}<span class="muted">—</span>{% endif %}
-        </div>
-        <div class="prt-prog" role="cell" title="{{ 'Rejected' if r.rejected else (steps[r.progress - 1] if r.progress else '') }}">
-          {% set pct = (r.progress / steps|length * 100) if not r.rejected else 100 %}
-          <svg viewBox="0 0 36 36" class="prt-ring {{ 'is-rejected' if r.rejected else ('is-done' if r.progress == steps|length else '') }}" aria-hidden="true">
-            <circle cx="18" cy="18" r="15" class="prt-ring-track"/>
-            <circle cx="18" cy="18" r="15" class="prt-ring-fill" pathLength="100" stroke-dasharray="{{ pct }} 100"/>
-          </svg>
-          <span class="prt-ring-text">{{ '✕' if r.rejected else r.progress ~ '/' ~ steps|length }}</span>
-        </div>
-        <div role="cell"><span class="urg-chip urg-{{ r.urgency|lower }}">{% if r.urgency == 'Critical' %}{{ icon('alert', 13) }}{% endif %}{{ r.urgency }}</span></div>
-        <div role="cell"><span class="st-chip tone-{{ r.tone }}">{{ r.status }}</span></div>
-      </div>
-
-      <div class="prt-children" id="pri-{{ r.id }}" hidden>
-        {% for it in r['items'] %}
-        <div class="prt-child">
-          <div class="prt-child-name"><span class="prt-tree" aria-hidden="true"></span>{{ it.name }}</div>
-          <div class="prt-child-cost"><span class="prt-dot seg-{{ it.seg }}"></span>{{ it.cost|peso }}</div>
-          <div class="prt-child-qty">{{ it.qty|qty(it.unit) if it.qty else '—' }}</div>
-          <div class="prt-child-sup">{{ it.supplier or 'No preferred supplier' }}</div>
-          <div class="prt-child-st"><span class="st-chip st-chip-sm tone-{{ it.tone }}">{{ it.status }}{% if it.po_no %} · {{ it.po_no }}{% endif %}</span></div>
-        </div>
-        {% endfor %}
-        <div class="prt-open"><a href="{{ url_for('requests.detail', id=r.id) }}">Open {{ r.pr_no }} {{ icon('arrow-right', 14) }}</a></div>
-      </div>
-    </div>
-{% endmacro %}
+{% from "requests/_cards.html" import pr_head, pr_card with context %}
 
 <div class="page-head">
   <div>
@@ -89,146 +27,89 @@
 </div>
 
 {% if rows %}
-{% set final = groups|selectattr('key', 'equalto', 'final')|list %}
-{% set others = groups|rejectattr('key', 'equalto', 'final')|list %}
-{# "For final approval" has a card of its own; everything else is in the
-   table below.  The stage chips and the search work on both; "Show n
-   entries" and the pages are for the table. #}
+{# A tab per stage — For final approval, Waiting for the Admin's check,
+   Approved, Ordered (and Received / Rejected under "All") — each tab its
+   own table with its own pages.  It opens on the stage waiting on you (or
+   the tab picked last time); the search and "Show n entries" work on every
+   tab, and while searching each tab counts its matches. #}
+{% set stage_icons = {'final': 'approvals', 'check': 'requests', 'approved': 'check', 'ordered': 'truck',
+                      'received': 'box', 'rejected': 'x-circle', 'other': 'folder'} %}
+<div data-ct="requests">
 <div class="prt-topbar">
-  <div class="pr-stages" role="group" aria-label="Filter by stage">
-    <button type="button" class="pr-stage is-active" data-filter="">
-      <span class="pr-stage-name">All stages</span><b>{{ rows|length }}</b></button>
+  <div class="prt-tabs" role="tablist" aria-label="Stages">
     {% for g in groups %}
-    <button type="button" class="pr-stage tone-{{ g.tone }}" data-filter="{{ g.key }}">
-      <span class="pr-stage-dot"></span><span class="pr-stage-name">{{ g.title.split(' — ')[0] }}</span><b>{{ g.rows|length }}</b></button>
+    <button type="button" class="prt-tab tone-{{ g.tone }}" role="tab" id="tab-{{ g.key }}" data-tab="{{ g.key }}"
+            aria-controls="stage-{{ g.key }}" aria-selected="false" tabindex="-1">
+      <span class="prt-tab-ico">{{ icon(stage_icons.get(g.key, 'folder'), 16) }}</span>
+      <span class="prt-tab-name">{{ g.title.split(' — ')[0] }}</span>
+      <span class="prt-tab-count" data-count>{{ g.rows|length }}</span>
+    </button>
     {% endfor %}
   </div>
-  <label class="prt-search">{{ icon('search', 15) }}
-    <input type="search" id="prtSearch" placeholder="Search requests, items, people…" autocomplete="off" aria-label="Search purchase requests"></label>
-</div>
-
-{% if final %}{% set g = final[0] %}
-<div class="prt-box prt-final tone-{{ g.tone }}" id="prtFinal">
-  <div class="prt-final-head">
-    <span class="prt-final-icon">{{ icon('check', 18) }}</span>
-    <div>
-      <h2 class="prt-final-title">{{ g.title }} <span class="pr-group-count">{{ g.rows|length }}</span></h2>
-      <div class="prt-final-sub">{{ g.sub }}</div>
+  {# Filters: search, the dates requested (or needed by), department and
+     urgency — they work across every tab. #}
+  {% set depts = rows|map(attribute='department')|select|unique|sort|list %}
+  <div class="tf-bar prt-filters">
+    <label class="tf-search">{{ icon('search', 15) }}
+      <input type="search" class="ct-search" placeholder="Search requests, items, people…" autocomplete="off" aria-label="Search purchase requests"></label>
+    <div class="tf-pill tf-dates" role="group" aria-label="Date">
+      <span class="tf-pill-label">{{ icon('calendar', 15) }}</span>
+      <select class="tf-kind ct-datekind" data-kind aria-label="Which date">
+        <option value="data-date">Requested</option><option value="data-needed">Needed by</option>
+      </select>
+      <span class="tf-sep" aria-hidden="true"></span>
+      <input type="date" class="ct-from" aria-label="From">
+      <span class="tf-arrow" aria-hidden="true">→</span>
+      <input type="date" class="ct-to" aria-label="To">
     </div>
+    {% if depts|length > 1 %}
+    <label class="tf-pill"><span class="tf-pill-label">Department</span>
+      <select data-ct-filter="data-dept" aria-label="Department"><option value="">All</option>
+        {% for d in depts %}<option>{{ d }}</option>{% endfor %}</select></label>
+    {% endif %}
+    <label class="tf-pill"><span class="tf-pill-label">Urgency</span>
+      <select data-ct-filter="data-urgency" aria-label="Urgency"><option value="">All</option>
+        <option>Critical</option><option>Urgent</option><option>Normal</option></select></label>
+    <button type="button" class="tf-clear ct-clear" hidden>{{ icon('close', 13) }} Clear</button>
   </div>
-  <div class="prt" role="table" aria-label="For final approval">
-    {{ table_head() }}
-    {% for r in g.rows %}{{ request_card(r, g.key) }}{% endfor %}
-  </div>
-</div>
-{% endif %}
-
-<div class="prt-box" id="prtMain">
-  <div class="prt-tools">
+  <div class="prt-topbar-tools">
     <label class="prt-show">Show
-      <select id="prtSize" aria-label="Requests per page"><option>10</option><option>25</option><option>50</option></select>
+      <select class="ct-size" aria-label="Requests per page in each table"><option value="10">10</option><option value="15">15</option><option value="25">25</option><option value="50">50</option></select>
       entries</label>
-    {% if final %}<span class="prt-tools-note">Every other request</span>{% endif %}
   </div>
+</div>
 
-  <div class="prt" role="table" aria-label="Purchase requests">
-    {{ table_head() }}
-    {% for g in others %}
-    <div class="prt-divider tone-{{ g.tone }}" data-stage="{{ g.key }}">
-      <span class="pr-stage-dot"></span><b>{{ g.title }}</b>
-      <span class="pr-group-count">{{ g.rows|length }}</span>
-      {% if g.sub %}<span class="prt-divider-sub">{{ g.sub }}</span>{% endif %}
+{% for g in groups %}
+<section class="prt-box prt-stage-card tone-{{ g.tone }}" data-stage-card="{{ g.key }}" id="stage-{{ g.key }}"
+         role="tabpanel" aria-labelledby="tab-{{ g.key }}" hidden>
+  <div class="prt-final-head">
+    <span class="prt-final-icon">{{ icon(stage_icons.get(g.key, 'folder'), 18) }}</span>
+    <div>
+      <h2 class="prt-final-title" id="stage-title-{{ g.key }}">{{ g.title }} <span class="pr-group-count">{{ g.rows|length }}</span></h2>
+      {% if g.sub %}<div class="prt-final-sub">{{ g.sub }}</div>{% endif %}
     </div>
-    {% for r in g.rows %}{{ request_card(r, g.key) }}{% endfor %}
-    {% endfor %}
-    <div class="prt-empty" id="prtNone" hidden></div>
   </div>
-
-  <div class="prt-foot">
-    <span class="prt-info" id="prtInfo" aria-live="polite"></span>
-    <span class="pager-controls">
-      <button type="button" class="pager-btn" id="prtPrev">&lsaquo; Previous</button>
-      <span class="pager-page" id="prtPage"></span>
-      <button type="button" class="pager-btn" id="prtNext">Next &rsaquo;</button>
+  <div class="prt" role="table" aria-label="{{ g.title }}">
+    {{ pr_head() }}
+    {% for r in g.rows %}{{ pr_card(r, g.key) }}{% endfor %}
+    <div class="prt-empty" data-none hidden>No request here matches the search.</div>
+  </div>
+  <div class="prt-foot" data-foot>
+    <span class="prt-info" data-info aria-live="polite"></span>
+    <span class="pager-controls" data-controls>
+      <button type="button" class="pager-btn" data-prev>&lsaquo; Previous</button>
+      <span class="pager-page" data-page></span>
+      <button type="button" class="pager-btn" data-next>Next &rsaquo;</button>
     </span>
   </div>
+</section>
+{% endfor %}
+<div class="card prt-nothing ct-nothing" hidden><div class="empty">
+  <div class="empty-title">No purchase request matches</div>
+  <p class="muted">Try other words or dates — the tabs show how many each stage has.</p>
+</div></div>
+
 </div>
-
-<script>
-(function () {
-  var finalBox = document.getElementById("prtFinal"), mainBox = document.getElementById("prtMain");
-  var finalCards = finalBox ? Array.prototype.slice.call(finalBox.querySelectorAll(".prt-card")) : [];
-  var cards = Array.prototype.slice.call(mainBox.querySelectorAll(".prt-card"));
-  var dividers = Array.prototype.slice.call(mainBox.querySelectorAll(".prt-divider"));
-  var size = document.getElementById("prtSize"), search = document.getElementById("prtSearch");
-  var none = document.getElementById("prtNone");
-  var state = { filter: "", page: 0 };
-  try { var saved = localStorage.getItem("prtSize"); if (saved) size.value = saved; } catch (e) {}
-
-  function matches(c, words) {
-    if (state.filter && c.getAttribute("data-stage") !== state.filter) return false;
-    var hay = c.getAttribute("data-search");
-    return words.every(function (w) { return hay.indexOf(w) !== -1; });
-  }
-  function render() {
-    var words = search.value.toLowerCase().split(/\s+/).filter(Boolean);
-    // The final-approval card: everything that matches, no pages.
-    var finalShown = 0;
-    finalCards.forEach(function (c) { var on = matches(c, words); c.hidden = !on; if (on) finalShown++; });
-    if (finalBox) finalBox.hidden = !finalShown;
-    // The table: matches, a page at a time.
-    var match = cards.filter(function (c) { return matches(c, words); });
-    var per = parseInt(size.value, 10) || 10, pages = Math.max(1, Math.ceil(match.length / per));
-    state.page = Math.min(Math.max(state.page, 0), pages - 1);
-    var start = state.page * per, shown = match.slice(start, start + per);
-    var stagesShown = {};
-    cards.forEach(function (c) { c.hidden = shown.indexOf(c) === -1; });
-    shown.forEach(function (c) { stagesShown[c.getAttribute("data-stage")] = true; });
-    dividers.forEach(function (d) { d.hidden = !stagesShown[d.getAttribute("data-stage")]; });
-    // Only final approvals picked: the table steps aside.
-    mainBox.hidden = state.filter === "final";
-    none.hidden = match.length > 0;
-    none.textContent = words.length ? (finalShown ? "Nothing else matches." : "No purchase request matches.")
-                                    : (finalShown ? "Nothing else is open." : "No purchase requests here.");
-    document.getElementById("prtInfo").innerHTML = match.length
-      ? "Showing <b>" + (start + 1) + "–" + (start + shown.length) + "</b> of <b>" + match.length + "</b> request" + (match.length === 1 ? "" : "s")
-      : "";
-    document.getElementById("prtPage").textContent = "Page " + (state.page + 1) + " of " + pages;
-    document.getElementById("prtPrev").disabled = state.page === 0;
-    document.getElementById("prtNext").disabled = state.page >= pages - 1;
-  }
-  size.addEventListener("change", function () {
-    state.page = 0;
-    try { localStorage.setItem("prtSize", size.value); } catch (e) {}
-    render();
-  });
-  search.addEventListener("input", function () { state.page = 0; render(); });
-  document.getElementById("prtPrev").addEventListener("click", function () { state.page--; render(); });
-  document.getElementById("prtNext").addEventListener("click", function () { state.page++; render(); });
-  document.querySelectorAll(".pr-stage[data-filter]").forEach(function (b) {
-    b.addEventListener("click", function () {
-      state.filter = b.getAttribute("data-filter"); state.page = 0;
-      document.querySelectorAll(".pr-stage[data-filter]").forEach(function (x) { x.classList.toggle("is-active", x === b); });
-      render();
-    });
-  });
-  // A click on a request (but not on its link) opens its items.
-  function toggle(card) {
-    var btn = card.querySelector(".prt-toggle"), kids = card.querySelector(".prt-children");
-    var open = kids.hidden;
-    kids.hidden = !open;
-    btn.setAttribute("aria-expanded", open ? "true" : "false");
-    card.classList.toggle("is-open", open);
-  }
-  finalCards.concat(cards).forEach(function (card) {
-    card.querySelector(".prt-row").addEventListener("click", function (e) {
-      if (e.target.closest("a")) return;
-      toggle(card);
-    });
-  });
-  render();
-})();
-</script>
 {% else %}
 <div class="card"><div class="empty">
   <div class="empty-icon">{{ icon('requests', 30) }}</div>

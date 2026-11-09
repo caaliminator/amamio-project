@@ -261,6 +261,16 @@ def user_profile(id):
             flash("%s removed." % ("Photo" if kind == "photo" else "E-signature"),
                   "success")
             return redirect(url_for("auth.user_profile", id=id))
+        if action == "make_signature":
+            # A stand-in drawn from the name in a cursive font, until the
+            # real signature is uploaded.
+            _, err = profiles.make_signature(target)
+            if err:
+                flash(err, "error")
+            else:
+                flash("A cursive e-signature was made for %s — upload the real one any time."
+                      % target.get("name"), "success")
+            return redirect(url_for("auth.user_profile", id=id))
         # Fields are checked first and stored last, so a rejected picture
         # leaves the profile as it was.
         changes, err = profiles.clean_profile(form)

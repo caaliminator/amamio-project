@@ -28,22 +28,22 @@ def _me():
 @facility_bp.route("/sanitation")
 @module_required("facility")
 def sanitation():
-    show = request.args.get("show") or "week"
+    # Every record and every open area are on the page (two card-table tabs
+    # with a date filter); ?show=action opens on the "Needs action" tab.
+    show = request.args.get("show") or ""
     if show not in ("week", "month", "action"):
-        show = "week"
-    records, actions = [], []
-    if show == "action":
-        actions = fs.open_sanitation_actions()
-    else:
-        start = fs.week_start() if show == "week" else services.this_month() + "-01"
-        records = [fs.sanitation_view(r) for r in fs.sanitation_records(date_from=start)]
+        show = ""
+    actions = fs.open_sanitation_actions()
+    records = [fs.sanitation_view(r) for r in fs.sanitation_records()]
     today = services.today_iso()
     done_today = {r.get("phase") for r in db.read("sanitation_records")
                   if r.get("record_date") == today}
     return render_template("facility/sanitation.html", show=show,
                            records=records, actions=actions,
                            stats=fs.sanitation_summary(), done_today=done_today,
-                           PRE=fs.PRE, POST=fs.POST)
+                           PRE=fs.PRE, POST=fs.POST, today=today,
+                           week_start=fs.week_start(),
+                           month_start=services.this_month() + "-01")
 
 
 def _sanitation_areas_from(form):

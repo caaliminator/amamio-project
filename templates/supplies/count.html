@@ -13,7 +13,7 @@
   .count-sub:first-child { margin-top: 0; }
   @media (max-width: 560px) { .count-line { grid-template-columns: 1fr 110px; } .count-line .cl-sys { grid-column: 1; grid-row: 2; } }
 </style>
-<a class="back-link" href="{{ url_for('supplies.index') }}">{{ icon('arrow-left', 15) }} Supplies In / Out</a>
+<a class="back-link" href="{{ url_for('supplies.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Supplies In / Out</span></a>
 
 <form method="post" class="wizard" id="countForm" data-wizard data-wizard-start="{{ start }}"
       data-submit-label="Save count" data-cancel="{{ url_for('supplies.index') }}">
@@ -75,20 +75,27 @@
 </form>
 
 {% if recent %}
-<div class="wizard mt">
-  <div class="section-label">Recent counts</div>
-  <div class="queue">
+{% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead, ct_nothing with context %}
+<div class="wizard mt" data-ct="supply-counts">
+  {{ ct_topbar(search="Search report, month, counted by…", dates=[('data-date', 'Counted')],
+               filters=[('data-report', 'Report', recent|map(attribute='category_label')|unique|sort|list)]) }}
+  {% call ct_box('counts', 'Recent counts', '', 'done', 'count', recent|length,
+                 ['Count', 'Items', 'Counted', 'Stock', ''],
+                 'minmax(220px, 2.2fr) minmax(120px, 1fr) minmax(150px, 1.2fr) minmax(120px, 1fr) minmax(90px, auto)',
+                 tabbed=false, empty='No count here matches.') %}
     {% for c in recent %}
-    <a class="queue-item" href="{{ url_for('supplies.report', category=c.category, period=c.period) }}">
-      <span class="queue-main">
-        <span class="queue-title">{{ c.category_label }} — {{ c.period_label|title }}</span>
-        <span class="queue-sub">{{ c['items'] }} item(s) · {{ c.variances }} with a variance · {{ c.counted_by }} · {{ c.when }}</span>
-      </span>
-      {% if c.adjusted %}<span class="badge badge-gold">Stock adjusted</span>{% endif %}
-      <span class="queue-go">Report</span>
-    </a>
+      {% set href = url_for('supplies.report', category=c.category, period=c.period) %}
+      {% call ct_row('counts', href=href, date=c.when,
+                     search=c.category_label ~ ' ' ~ c.period_label ~ ' ' ~ (c.counted_by or ''), data={'report': c.category_label}) %}
+        {{ ct_lead('count', c.category_label ~ ' — ' ~ c.period_label|title, href) }}
+        <div role="cell" class="prt-num">{{ c['items'] }} item(s)<div class="prt-small">{{ c.variances }} with a variance</div></div>
+        <div role="cell" class="prt-date">{{ c.when }}<div class="prt-small">by {{ c.counted_by }}</div></div>
+        <div role="cell">{% if c.adjusted %}<span class="st-chip tone-amber">Stock adjusted</span>{% else %}<span class="prt-small">—</span>{% endif %}</div>
+        <div role="cell" class="prt-cell-end"><a class="btn btn-ghost btn-sm" href="{{ href }}">Report {{ icon('arrow-right', 14) }}</a></div>
+      {% endcall %}
     {% endfor %}
-  </div>
+  {% endcall %}
+  {{ ct_nothing("Try other words or dates.") }}
 </div>
 {% endif %}
 

@@ -2,7 +2,7 @@
 {% block title %}{{ r.kind_label }}: {{ r.title }}{% endblock %}
 {% block content %}
 <div class="focus">
-<a class="back-link" href="{{ url_for('additions.index') }}">{{ icon('arrow-left', 15) }} New Records</a>
+<a class="back-link" href="{{ url_for('additions.index') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> New Records</span></a>
 
 <div class="record-head">
   <div>

@@ -126,7 +126,7 @@ with application.test_client() as c:
 import page_notes             # noqa: E402
 
 NOT_PAGES = {"static", "auth.root", "auth.login", "auth.logout",
-             "honey.suggest", "qr.lookup", "qr.image", "qr.go",
+             "honey.suggest", "receiving.new_po_lines", "qr.lookup", "qr.image", "qr.go",
              "platforms.export_csv", "platforms.import_file",
              "migration.download", "requests.bom_calc", "production.new",
              "requests.new_material", "auth.user_image", "ledger.proof",
@@ -219,6 +219,8 @@ GUARDS = [
     ("finance", "finance123", "/finance/accounts", 200),
     ("finance", "finance123", "/purchasing/", 200),
     ("finance", "finance123", "/purchasing/new", 403),
+    # Only the Admin prepares a PO; the Super Admin only gives the final approval.
+    ("superadmin", "super123", "/purchasing/new", 403),
     ("finance", "finance123", "/approvals/", 403),
     ("finance", "finance123", "/requests/", 403),
     ("finance", "finance123", "/receiving/", 403),
@@ -236,14 +238,25 @@ for u, p, route, expected in GUARDS:
         check(c.get(route).status_code == expected,
               "%s -> %s is %d" % (u, route, expected))
 
+# 3c) Purchase orders: the Super Admin can't prepare, cancel or close one
+with application.test_client() as c:
+    login(c, "superadmin", "super123")
+    _po_any = (db.read("purchase_orders") or [{"id": 1}])[0]
+    check(c.post("/purchasing/new", data={}).status_code == 403
+          and c.post("/purchasing/%d/cancel" % _po_any["id"]).status_code == 403
+          and c.post("/purchasing/%d/delivered" % _po_any["id"]).status_code == 403,
+          "the Super Admin can't prepare, cancel or close a purchase order")
+    check("Prepare PO" not in c.get("/purchasing/?show=all").data.decode("utf-8"),
+          "the Super Admin sees no Prepare PO button")
+
 # 3a) The purchase request list is split by stage, urgency in its own colour
 with application.test_client() as c:
     login(c, "superadmin", "super123")
     page = c.get("/requests/?show=all").data.decode("utf-8")
-    check(page.count('class="prt-card ') >= 1 and 'class="prt-divider ' in page
-          and 'class="pr-stages"' in page and 'class="prt-children"' in page
+    check(page.count('class="prt-card ') >= 1 and page.count("data-stage-card=") >= 1
+          and 'class="prt-tabs"' in page and 'class="prt-children"' in page
           and "urg-chip urg-" in page and "st-chip tone-" in page,
-          "the purchase request table: stage dividers, request cards with their items, coloured status / urgency")
+          "purchase requests: a tab and table per stage, request cards with their items, coloured status / urgency")
 
 # 3b) Role-based menus: each function admin and the packing team see only
 #     their own job's pages
@@ -512,6 +525,25 @@ with application.test_client() as c:
     c.post("/receiving/%d/close" % batch["id"], data=dict(checks))
     check(db.get("receiving_batches", batch["id"])["status"] == "For Closing",
           "closing needs who verified the receipt")
+    # No DR / OR / AR file yet: the receipt can't be closed.
+    check(not services.has_delivery_document(db.get("receiving_batches", batch["id"])),
+          "(this delivery has no document file yet)")
+    c.post("/receiving/%d/close" % batch["id"],
+           data=dict(checks, check_lot_dates="N/A", verified_by_name="Ana"))
+    check(db.get("receiving_batches", batch["id"])["status"] == "For Closing",
+          "a receipt with no delivery document attached can't be closed")
+    page = c.get("/receiving/%d/close" % batch["id"]).data.decode("utf-8")
+    check("Attach a delivery document first" in page, "the close page asks for a delivery document")
+    page = c.get("/receiving/%d" % batch["id"]).data.decode("utf-8")
+    check("Attach at least one document" in page and "Attach a document" in page,
+          "the delivery page asks for a document before closing")
+    import io as _io
+    from PIL import Image as _Img
+    _buf = _io.BytesIO(); _Img.new("RGB", (20, 20), "white").save(_buf, "PNG")
+    c.post("/receiving/%d/proof?doc=dr" % batch["id"], data={
+        "proof": (_io.BytesIO(_buf.getvalue()), "dr.png")}, content_type="multipart/form-data")
+    check(services.has_delivery_document(db.get("receiving_batches", batch["id"])),
+          "the DR photo is attached")
     c.post("/receiving/%d/close" % batch["id"],
            data=dict(checks, check_lot_dates="N/A", verified_by_name="Ana"))
     closed = db.get("receiving_batches", batch["id"])
@@ -1219,7 +1251,13 @@ with application.test_client() as c:
     check(branch["id"] not in sup_svc.links_by_material().get(honey["id"], set()),
           "unticking an item on the supplier form removes the link")
     page = c.get("/suppliers/?type=Farmer").data.decode("utf-8")
-    check("INDAY" in page and "Tengjia" not in page, "the list filters by supplier type")
+    # The directory is a card table filtered in the browser: a Type filter,
+    # and each row carries its type (INDAY is a farmer, Tengjia isn't).
+    import re as _re
+    check('data-ct-filter="data-type"' in page
+          and _re.search(r'data-search="[^"]*inday[^"]*"[^>]*data-type="Farmer"', page)
+          and not _re.search(r'data-search="[^"]*tengjia[^"]*"[^>]*data-type="Farmer"', page),
+          "the list filters by supplier type")
     page = c.get("/suppliers/print").data.decode("utf-8")
     check("Farmer" in page and "Cooperative" in page, "the printed directory shows the supplier type")
 
@@ -2183,6 +2221,117 @@ with application.test_client() as c:
     _, err = assets_service.record_supply_movement(
         cal["id"], "OUT", 1, "Damaged / expired", user_id=1, notify=False, batch_no=first_no)
     check(not err, "an expired batch goes out as Damaged / expired")
+
+# 12f) An inspection started from a delivery page returns to that delivery
+#      (after the next box of the same delivery, when ticked).
+with application.test_client() as c:
+    login(c, "admin", "admin123")
+    c.post("/receiving/new", data={
+        "supplier_id": "", "received_date": services.today_iso(),
+        "material_id": [ginger["id"]], "qty_per_box": ["2"], "boxes": ["2"],
+        "lot_no": [""], "expiry_date": [""], "packaging_condition": ["Good / intact"],
+        "temperature_c": [""]})
+    back_batch = max(db.read("receiving_batches"), key=lambda b: b["id"])
+    back_boxes = services.receiving_box_rows(batch_id=back_batch["id"], status=services.BOX_AWAITING)
+    check(len(back_boxes) == 2, "a delivery with two boxes to inspect (for the return test)")
+    if len(back_boxes) == 2:
+        page = c.get("/receiving/box/%d/inspect" % back_boxes[0]["id"],
+                     headers={"Referer": "http://localhost/receiving/%d" % back_batch["id"]}).data.decode("utf-8")
+        check('name="back" value="%d"' % back_batch["id"] in page,
+              "opened from the delivery page, the inspection remembers the delivery")
+        check('name="back"' not in c.get("/receiving/box/%d/inspect?back=99999" % back_boxes[0]["id"]).data.decode("utf-8"),
+              "another delivery's id isn't taken as the way back")
+        data = checklist()
+        data.update(cleaned="1", usable_qty="2", acceptance="Accepted", back=str(back_batch["id"]), then="next")
+        r = c.post("/receiving/box/%d/inspect" % back_boxes[0]["id"], data=data)
+        check(r.headers.get("Location", "").endswith("/receiving/box/%d/inspect?back=%d" % (back_boxes[1]["id"], back_batch["id"])),
+              "saving goes on to the next box of the same delivery")
+        r = c.post("/receiving/box/%d/inspect" % back_boxes[1]["id"], data=data)
+        check(r.headers.get("Location", "").endswith("/receiving/%d" % back_batch["id"]),
+              "after the delivery's last box, back to the delivery page")
+
+# 12g) A PO typed on the receive form fills its items; honey on it comes in
+#      as containers in the same delivery, and counts on the PO by container.
+import purchasing_service as _pur  # noqa: E402
+_honey = db.query("raw_materials", name="Raw Honey")[0]
+_sup = [s for s in db.read("suppliers") if services.supplier_approved(s)][0]
+check(services.purchase_unit(_honey) == "container" and _honey["unit"] == "kg"
+      and [r["unit"] for _, rows in _pur.item_choices() for r in rows if r["id"] == _honey["id"]] == ["container"],
+      "honey is requested and ordered by the container (its stock stays in kg)")
+# A PO as the purchasing pages make it (every field, mostly empty).
+_po_fields = {k: None for k in (
+    "advance_amount", "approved_at", "approved_by_name", "cancelled_at", "checked_at", "checked_by_name",
+    "created_at", "created_by", "deliver_to", "delivered_at", "delivery_address", "delivery_contact",
+    "delivery_instructions", "discount", "expected_delivery", "freight", "grand_total", "labor",
+    "other_fees", "other_fees_note", "payment_terms", "pr_no", "prepared_at", "prepared_by_name",
+    "purchase_request_id", "subtotal", "supplier_ack_date", "supplier_ack_name", "supplier_address",
+    "supplier_contact", "supplier_contact_person", "supplier_reference", "supplier_tin",
+    "supplier_type", "tax", "terms", "vat_rate", "vat_type")}
+_line = {"amount": 0, "brand_model": "", "pr_item_id": None, "remarks": "", "requested_delivery": "", "unit_price": 0}
+_po = db.insert("purchase_orders", dict(_po_fields, **{
+    "po_no": "PO-HNY-T", "supplier_id": _sup["id"], "supplier_name": _sup["name"],
+    "status": _pur.PO_APPROVED, "po_date": services.today_iso(), "grand_total": 0,
+    "purchase_request_id": db.read("purchase_requests")[0]["id"], "pr_no": "PR-T",
+    "items": [dict(_line, line_no=1, description="Raw Honey", material_id=_honey["id"], qty=3, unit="container"),
+              dict(_line, line_no=2, description="Ginger", material_id=ginger["id"], qty=4, unit="kg")]}))
+with application.test_client() as c:
+    login(c, "receiving", "recv123")
+    check('"PO-HNY-T"' in c.get("/receiving/new?po=none").data.decode("utf-8"),
+          "the receive form's PO no. box offers the open POs")
+    j = c.get("/receiving/new/po/%d" % _po["id"]).get_json()
+    check(j and j["supplier_id"] == _sup["id"] and j["html"].count("data-po-line") == 2
+          and "is-honey" in j["html"] and "Number of containers" in j["html"]
+          and 'name="boxes"' in j["html"] and 'value="3"' in j["html"],
+          "typing a PO loads its items, honey as its 3 containers")
+    r = c.post("/receiving/new?po=none", data={
+        "po": str(_po["id"]), "supplier_id": "", "received_date": services.today_iso(),
+        "received_time": "09:00", "po_no": "PO-HNY-T",
+        "po_line_no": ["1", "2"], "material_id": [str(_honey["id"]), str(ginger["id"])],
+        "qty_per_box": ["25", "4"], "boxes": ["3", "1"]})
+    _b = max(db.read("receiving_batches"), key=lambda b: b["id"])
+    _hc = services.delivery_honey(_b["id"])
+    _bx = db.query("receiving_boxes", batch_id=_b["id"])
+    check(r.status_code == 302 and _b["po_id"] == _po["id"] and len(_bx) == 1
+          and len(_hc) == 3 and all(x["po_id"] == _po["id"] and x["po_line_no"] == 1 for x in _hc),
+          "one delivery for the whole PO: 1 box of ginger and 3 honey containers")
+    check(_pur.po_receipts(db.get("purchase_orders", _po["id"]))[1]["pending"] == 3,
+          "the PO shows 3 containers of honey being checked")
+    check("Honey containers in this delivery" in c.get("/receiving/%d" % _b["id"]).data.decode("utf-8"),
+          "the delivery page lists its honey")
+with application.test_client() as c:
+    login(c, "admin", "admin123")
+    inspect(c, _bx[0]["id"], cleaned="1", usable_qty="4", acceptance="Accepted")
+    check(db.get("receiving_batches", _b["id"])["status"] == "Open"
+          and db.get("purchase_orders", _po["id"])["status"] == _pur.PO_APPROVED,
+          "the delivery and the PO wait for the honey's check")
+    services.record_honey_qc(_hc[0]["id"], "Pass", 17, "Clear", user_id=1)
+    services.record_honey_qc(_hc[1]["id"], "Pass", 17, "Clear", user_id=1)
+    services.record_honey_qc(_hc[2]["id"], "Failed", 24, "Clear", user_id=1)
+    _rc = _pur.po_receipts(db.get("purchase_orders", _po["id"]))[1]
+    check(_rc["received"] == 2 and _rc["rejected"] == 1 and _rc["pending"] == 0,
+          "on the PO: 2 containers received, the failed one recorded as rejected")
+    check(db.get("receiving_batches", _b["id"])["status"] == "For Closing"
+          and db.get("purchase_orders", _po["id"])["status"] == _pur.PO_APPROVED,
+          "honey checked: the delivery can close; the PO still waits for the rejected container")
+    _hl = [l for l in services.mrr_lines(db.get("receiving_batches", _b["id"])) if l.get("containers")]
+    check(_hl and _hl[0]["unit"] == "container" and _hl[0]["accepted_qty"] == 2 and _hl[0]["rejected_qty"] == 1,
+          "the receiving report counts the honey in containers, 1 rejected")
+    page = c.get("/purchasing/%d" % _po["id"]).data.decode("utf-8")
+    check("Rejected" in page, "the PO page shows what was rejected")
+    page = c.get("/honey/%d" % _hc[2]["id"]).data.decode("utf-8")
+    check("PO-HNY-T" in page and "Rejected" in page, "the failed container shows it was rejected on its PO")
+
+# 12h) A cursive stand-in e-signature, drawn from the user's name
+import profiles as _profiles  # noqa: E402
+with application.test_client() as c:
+    login(c, "superadmin", "super123")
+    _u = db.query("users", username="marketing")[0]
+    c.post("/users/%d/profile" % _u["id"], data={"action": "make_signature"})
+    _u = db.get("users", _u["id"])
+    _fonts = any(os.path.isfile(os.path.join(d, f)) for d in _profiles.FONT_DIRS for f in _profiles.SIGNATURE_FONTS)
+    check(not _fonts or (_profiles.image_path(_u, "signature")
+                         and c.get("/users/%d/image/signature" % _u["id"]).status_code == 200),
+          "the Super Admin can make a cursive e-signature for a user")
 
 # 13) the MySQL export builds, including the new tables
 import mysql_export            # noqa: E402

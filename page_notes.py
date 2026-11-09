@@ -43,16 +43,16 @@ NOTES = {
     },
     "receiving.new": {
         "title": "Receive a delivery",
-        "what": "Record one delivery: first which purchase order it is for (or none — own harvest, walk-in), then the date and time, who delivered it and the vehicle, the documents checked (PO, DR, COA), and what arrived — each item, how much is in each box (kg, pieces or units) and how many boxes. With a PO, the supplier and the items still to come are filled in.",
+        "what": "Record one delivery: first which purchase order it is for (or none — own harvest, walk-in), then the date and time, who delivered it and the vehicle, the documents checked (PO, DR, COA), and what arrived — each item, how much is in each box (kg, pieces or units) and how many boxes. With a PO — picked first, or typed into the PO no. box on the documents step — the supplier and the items still to come are filled in. Honey is received in containers (net weight of each, how many) instead of boxes, in the same delivery as the rest of its PO.",
         "who": "Receiving Team Head (Warehouse / Inventory Officer in the SOP)",
-        "flow": "Saving creates the Material Receiving Report and one QR label per box, and notifies the production team. Shortages, overages and items not on the PO are noted on the report by themselves. Nothing joins stock yet — that happens after inspection. An item ordered that isn't on the materials list yet is added to it.",
+        "flow": "Saving creates the Material Receiving Report and one QR label per box (honey: per container — the containers go to Honey Inspection for the moisture & appearance check), and notifies the production team. Shortages, overages and items not on the PO are noted on the report by themselves. Nothing joins stock yet — that happens after inspection. An item ordered that isn't on the materials list yet is added to it.",
         "form": "Material Receiving Report (AFP-WH-FRM-001)",
     },
     "receiving.batch": {
         "title": "One delivery",
         "what": "The boxes of one delivery and where each one stands: waiting for inspection, accepted, on hold or rejected — with the usable, can't-be-used and damaged totals, any discrepancies, and the hold / rejection reports still open.",
         "who": "Receiving Team Head · " + ADMINS,
-        "flow": "Print the QR labels, then the boxes are inspected one by one. Once every box is inspected the receipt is Ready to close: print the status labels, store or segregate the boxes, and close it with the Quick Control Check.",
+        "flow": "Print the QR labels, then the boxes are inspected one by one. Honey in the delivery is listed as containers and checked on Honey Inspection. Once every box is inspected and every honey container checked, the receipt is Ready to close (a delivery document must be attached): print the status labels, store or segregate the boxes, and close it with the Quick Control Check.",
         "form": "Material Receiving Report (AFP-WH-FRM-001)",
     },
     "receiving.mrr": {
@@ -749,7 +749,7 @@ NOTES = {
     "purchasing.new": {
         "title": "Prepare a purchase order",
         "what": "The Purchase Order form, one part at a time: the supplier, picked from the directory; dates, payment terms (incl. advance or partial payment) and delivery; the items as approved on the PR (the description can't be changed) with their prices; then discount, freight, optional labor cost, other / misc. fees, and VAT (a percentage, worked out for you) or NON VAT. Prepared by is you.",
-        "who": ADMINS,
+        "who": "Admin only — the Super Admin gives the final approval",
         "flow": "Only approved PR items can be ordered. The PO No. follows the PR No.",
         "form": "Purchase Order",
     },

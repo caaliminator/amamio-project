@@ -2,7 +2,7 @@
 {% block title %}{{ 'Edit ' ~ asset.name if asset else 'Add equipment' }}{% endblock %}
 {% block content %}
 {% set back = url_for('assets.detail', asset_id=asset.id) if asset else url_for('assets.index') %}
-<a class="back-link" href="{{ back }}">{{ icon('arrow-left', 15) }} {{ asset.name if asset else 'Equipment & Assets' }}</a>
+<a class="back-link" href="{{ back }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> {{ asset.name if asset else 'Equipment & Assets' }}</span></a>
 
 <form method="post" class="wizard" id="assetForm" data-wizard data-cancel="{{ back }}"
       data-submit-label="{{ 'Save changes' if asset else 'Add to the register' }}">

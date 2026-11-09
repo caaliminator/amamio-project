@@ -2,7 +2,7 @@
 {% block title %}{{ record.filename }}{% endblock %}
 {% block content %}
 <div class="focus">
-<a class="back-link" href="{{ url_for('platforms.index', view='uploads') }}">{{ icon('arrow-left', 15) }} Uploads</a>
+<a class="back-link" href="{{ url_for('platforms.index', view='uploads') }}"><span class="back-ico">{{ icon('arrow-left', 16) }}</span><span class="back-text"><span class="back-pre">Back to</span> Uploads</span></a>
 
 <div class="record-head">
   <div>

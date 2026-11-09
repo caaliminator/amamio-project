@@ -1,0 +1,135 @@
+{# Card tables — the Purchase Requests table design for any list page.
+   Import "with context" (uses icon):
+     {% from "_ct.html" import ct_topbar, ct_box, ct_row, ct_lead with context %}
+
+   <div data-ct="page-name">                          (the app.js component)
+     {{ ct_topbar(tabs=[...], search="Search…", dates=[...], filters=[...]) }}
+     {% call ct_box("key", "Title", head=["Col", …], cols="…") %}
+       {% for x in rows %}
+         {% call ct_row("key", href=…, search=…, date=…, data={"status": …}) %}
+           {% call ct_lead("icon", x.title, href) %}sub-line{% endcall %}
+           <div role="cell">…</div> …           (one cell per column)
+         {% endcall %}
+       {% endfor %}
+     {% endcall %}
+     {{ ct_nothing() }}
+   </div>
+
+   tabs:    [{"key", "label", "icon", "tone", "count"}] — one ct_box per tab
+            (same key); leave tabs empty for a single table (tabbed=false).
+   dates:   [("data-date", "Received")] — the first is the default; several
+            add a "which date" picker.  The row's date attributes are set via
+            ct_row(date=…) for data-date, or data={"due": …} for data-due.
+   filters: [("data-status", "Status", ["Open", "Closed"])] — a pill each,
+            matched against the row's data-* value (exact).
+   cols:    the grid columns (CSS grid-template-columns) — one per head. #}
+
+{% macro ct_topbar(tabs=[], search="Search…", dates=[], filters=[], size=true) %}
+<div class="prt-topbar">
+  {% if tabs %}
+  <div class="prt-tabs" role="tablist" aria-label="Lists">
+    {% for t in tabs %}
+    <button type="button" class="prt-tab tone-{{ t.tone or 'done' }}" role="tab" data-tab="{{ t.key }}" aria-selected="false" tabindex="-1">
+      <span class="prt-tab-ico">{{ icon(t.icon or 'folder', 16) }}</span><span class="prt-tab-name">{{ t.label }}</span>
+      <span class="prt-tab-count" data-count>{{ t.count if t.count is not none else '' }}</span></button>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <div class="tf-bar prt-filters">
+    <label class="tf-search">{{ icon('search', 15) }}
+      <input type="search" class="ct-search" placeholder="{{ search }}" autocomplete="off" aria-label="Search"></label>
+    {% if dates %}
+    <div class="tf-pill tf-dates" role="group" aria-label="Date">
+      {% if dates|length > 1 %}
+      <span class="tf-pill-label">{{ icon('calendar', 15) }}</span>
+      <select class="tf-kind ct-datekind" data-kind aria-label="Which date">
+        {% for attr, label in dates %}<option value="{{ attr }}">{{ label }}</option>{% endfor %}
+      </select>
+      <span class="tf-sep" aria-hidden="true"></span>
+      {% else %}
+      <span class="tf-pill-label">{{ icon('calendar', 15) }} {{ dates[0][1] }}</span>
+      {% endif %}
+      <input type="date" class="ct-from" aria-label="From">
+      <span class="tf-arrow" aria-hidden="true">→</span>
+      <input type="date" class="ct-to" aria-label="To">
+    </div>
+    {% endif %}
+    {% for attr, label, options in filters if options|length > 1 %}
+    <label class="tf-pill"><span class="tf-pill-label">{{ label }}</span>
+      <select data-ct-filter="{{ attr }}" aria-label="{{ label }}"><option value="">All</option>
+        {% for o in options %}<option>{{ o }}</option>{% endfor %}</select></label>
+    {% endfor %}
+    <button type="button" class="tf-clear ct-clear" hidden>{{ icon('close', 13) }} Clear</button>
+  </div>
+  {% if size %}
+  <div class="prt-topbar-tools">
+    <label class="prt-show">Show
+      <select class="ct-size" aria-label="Rows per page"><option value="10">10</option><option value="15">15</option><option value="25">25</option><option value="50">50</option></select>
+      entries</label>
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{# One table: a box with a title, a header row and the rows (caller), and
+   its pager.  `tabbed` boxes start hidden — the component shows the one
+   whose tab is picked. #}
+{% macro ct_box(key, title="", sub="", tone="done", ico="folder", count=none, head=[], cols="", tabbed=true, empty="Nothing here matches.", cls="") %}
+<section class="prt-box prt-stage-card tone-{{ tone }} {{ cls }}" data-stage-card="{{ key }}"{% if tabbed %} role="tabpanel" hidden{% endif %}>
+  {% if title %}
+  <div class="prt-final-head">
+    <span class="prt-final-icon">{{ icon(ico, 18) }}</span>
+    <div>
+      <h2 class="prt-final-title">{{ title }}{% if count is not none %} <span class="pr-group-count">{{ count }}</span>{% endif %}</h2>
+      {% if sub %}<div class="prt-final-sub">{{ sub }}</div>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+  <div class="prt ct-table" role="table" aria-label="{{ title or key }}"{% if cols %} style="--prt-cols: {{ cols }}"{% endif %}>
+    {% if head %}
+    <div class="prt-head" role="row">
+      {% for h in head %}<span role="columnheader"{% if loop.last and not h %} aria-label="Actions"{% endif %}>{{ h }}</span>{% endfor %}
+    </div>
+    {% endif %}
+    {{ caller() }}
+    <div class="prt-empty" data-none hidden>{{ empty }}</div>
+  </div>
+  <div class="prt-foot">
+    <span class="prt-info" data-info aria-live="polite"></span>
+    <span class="pager-controls" data-controls>
+      <button type="button" class="pager-btn" data-prev>&lsaquo; Previous</button>
+      <span class="pager-page" data-page></span>
+      <button type="button" class="pager-btn" data-next>Next &rsaquo;</button>
+    </span>
+  </div>
+</section>
+{% endmacro %}
+
+{# One row-card.  href: a click anywhere on the row opens it.  search: the
+   text the search box looks in.  data: more data-* attributes for the
+   filters and extra dates. #}
+{% macro ct_row(key, href="", search="", date="", data={}, cls="") %}
+    <div class="prt-card {{ cls }}" data-stage="{{ key }}"{% if href %} data-href="{{ href }}"{% endif %} data-date="{{ (date or '')[:10] }}"
+         data-search="{{ search|lower }}"{% for k, v in data.items() %} data-{{ k }}="{{ v if v is not none else '' }}"{% endfor %}>
+      <div class="prt-row" role="row">{{ caller() }}</div>
+    </div>
+{% endmacro %}
+
+{# The first cell: an icon tile, the title (a link) and a sub-line (the
+   caller's content, optional). #}
+{% macro ct_lead(ico, title, href="", code="") %}
+        <div class="prt-req" role="cell">
+          <span class="prt-rec-ico">{{ icon(ico, 16) }}</span>
+          <div class="prt-req-text">
+            {% if href %}<a class="prt-title" href="{{ href }}">{{ title }}</a>{% else %}<span class="prt-title">{{ title }}</span>{% endif %}
+            {% if code or caller is defined %}<div class="prt-sub">{% if code %}<span class="prt-code">{{ code }}</span>{% endif %}{% if caller is defined %}{{ caller() }}{% endif %}</div>{% endif %}
+          </div>
+        </div>
+{% endmacro %}
+
+{% macro ct_nothing(text="Try other words or dates — the tabs show how many each has.") %}
+<div class="card prt-nothing ct-nothing" hidden><div class="empty">
+  <div class="empty-title">Nothing matches</div>
+  <p class="muted">{{ text }}</p>
+</div></div>
+{% endmacro %}
